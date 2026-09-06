@@ -20,9 +20,7 @@ from alerters.hardware.native.catalog import BY_KEY
 def cfg() -> Config:
     """A config with one hunt, built directly to avoid touching the real env."""
     return Config(
-        smtp_host="", smtp_port=587, smtp_user="", smtp_password="",
-        mail_from="", mail_to=[], ntfy_topic="", ntfy_server="", ntfy_token="",
-        discord_webhook="", desktop_notify=False, ebay_client_id="",
+        ebay_client_id="",
         ebay_client_secret="",
         reddit_client_id="", reddit_client_secret="", country="US",
         currency_symbol="$", max_listing_age_hours=72, digest_at="GOOD",
@@ -60,9 +58,6 @@ class TestQueryPriceFloors:
         cheap, dear = sorted(pair, key=lambda part: part.reference_price)
 
         cfg = Config(
-            smtp_host="", smtp_port=587, smtp_user="", smtp_password="",
-            mail_from="", mail_to=[], ntfy_topic="", ntfy_server="",
-            ntfy_token="", discord_webhook="", desktop_notify=False,
             ebay_client_id="", ebay_client_secret="", reddit_client_id="",
             reddit_client_secret="",
             country="US", currency_symbol="$", max_listing_age_hours=72,

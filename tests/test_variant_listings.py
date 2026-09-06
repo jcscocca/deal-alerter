@@ -251,49 +251,53 @@ class TestDedupe:
         )
 
     def test_the_same_listing_from_two_queries_appears_once(self) -> None:
-        import check_deals
+        from alerters.hardware.plugin import HardwarePlugin
+        from dealcore import run as check_deals
 
-        out = check_deals._dedupe(
-            [self._listing("v1|800499630296|0", 3999.0)] * 3
+        out = check_deals.dedupe(
+            [self._listing("v1|800499630296|0", 3999.0)] * 3, HardwarePlugin.key
         )
         assert len(out) == 1
 
     def test_options_of_one_listing_collapse_to_the_cheapest(self) -> None:
-        import check_deals
+        from alerters.hardware.plugin import HardwarePlugin
+        from dealcore import run as check_deals
 
-        out = check_deals._dedupe(
+        out = check_deals.dedupe(
             [
                 self._listing("v1|117348165461|417248627113", 4999.99),
                 self._listing("v1|117348165461|417248627114", 3999.99),
                 self._listing("v1|117348165461|417248627115", 4599.99),
             ]
-        )
+        , HardwarePlugin.key)
         assert len(out) == 1
         assert out[0].price == pytest.approx(3999.99)
 
     def test_an_unpriced_duplicate_never_wins(self) -> None:
         """None must not sort as free, or a Reddit post with no structured
         price would displace the eBay row that has one."""
-        import check_deals
+        from alerters.hardware.plugin import HardwarePlugin
+        from dealcore import run as check_deals
 
-        out = check_deals._dedupe(
+        out = check_deals.dedupe(
             [
                 self._listing("v1|800499630296|0", None),
                 self._listing("v1|800499630296|0", 3999.0),
             ]
-        )
+        , HardwarePlugin.key)
         assert len(out) == 1
         assert out[0].price == pytest.approx(3999.0)
 
     def test_distinct_listings_survive(self) -> None:
-        import check_deals
+        from alerters.hardware.plugin import HardwarePlugin
+        from dealcore import run as check_deals
 
-        out = check_deals._dedupe(
+        out = check_deals.dedupe(
             [
                 self._listing("v1|800499630296|0", 3999.0),
                 self._listing("v1|168609628892|0", 3400.0),
             ]
-        )
+        , HardwarePlugin.key)
         assert len(out) == 2
 
 
@@ -323,42 +327,74 @@ class TestAlertKeysCollapse:
             thresholds=Thresholds(),
         )
 
+    # The core owns dedup mechanics and takes the normaliser from the domain,
+    # so these exercise the seam rather than a hardcoded eBay rule. Hardware's
+    # re-alert rule is a 4% drop, not Steam's cent epsilon.
+    POLICY = None  # set in _policy(), imported lazily like the rest of the file
+
+    def _policy(self):
+        from dealcore.verdict import Improvement
+
+        return Improvement(epsilon=1.01, drop_pct=4.0)
+
+    def _core(self, listing_id: str, price: float = 800.0, verdict: int = 5):
+        from types import SimpleNamespace
+
+        from alerters.hardware.plugin import HardwarePlugin
+        from dealcore.types import Assessment
+
+        listing = SimpleNamespace(source="ebay", listing_id=listing_id)
+        return Assessment(HardwarePlugin.key(listing), price, verdict, None)
+
     def test_two_options_share_one_key(self, tmp_path) -> None:
-        from alerters.hardware.native.state import AlertState
+        from alerters.hardware.plugin import HardwarePlugin
+        from dealcore.state import AlertState
 
-        state = AlertState(tmp_path / "alerts.json")
-        first = self._assessment("v1|147488693237|445806612036")
-        second = self._assessment("v1|147488693237|445806612039")
-        assert AlertState.key(first) == AlertState.key(second)
+        now = datetime.now(timezone.utc)
+        state = AlertState(tmp_path / "alerts.json", HardwarePlugin.normalise_key)
+        first = self._core("v1|147488693237|445806612036")
+        second = self._core("v1|147488693237|445806612039")
+        assert HardwarePlugin.normalise_key(first.key) == HardwarePlugin.normalise_key(second.key)
 
-        state.record([first], pushed=True)
-        assert not state.should_push(second, remind_after_days=7)
+        state.record([first], "ntfy", now)
+        assert not state.is_new(second, "ntfy", self._policy(), 7, now)
 
     def test_an_old_file_is_migrated_rather_than_orphaned(self, tmp_path) -> None:
         import json
+        from datetime import timedelta
 
-        from alerters.hardware.native.state import AlertState
+        from alerters.hardware.plugin import HardwarePlugin
+        from dealcore.state import AlertState
+
+        # Relative to now, not a fixed date. An absolute timestamp rots: once it
+        # drifts past remind_after_days the reminder window has genuinely
+        # elapsed, is_new correctly returns True, and the test reports a
+        # migration failure that never happened.
+        now = datetime.now(timezone.utc)
+        alerted_at = (now - timedelta(days=1)).isoformat()
 
         path = tmp_path / "alerts.json"
         path.write_text(
             json.dumps(
                 {
-                    "updated_at": "2026-08-13T00:00:00+00:00",
+                    "updated_at": alerted_at,
                     "alerts": {
                         "ebay:v1|147488693237|445806612036": {
                             "price": 800.0,
                             "verdict": 5,
-                            "pushed_at": "2026-08-13T00:00:00+00:00",
+                            "pushed_at": alerted_at,
                         }
                     },
                 }
             ),
             encoding="utf-8",
         )
-        state = AlertState(path)
+        state = AlertState(path, HardwarePlugin.normalise_key)
         assert "ebay:v1|147488693237" in state.records
-        assert not state.should_push(
-            self._assessment("v1|147488693237|445806612039"), remind_after_days=7
+        # Legacy push state cannot name its transport, so the core carries the
+        # suppression forward to every push channel.
+        assert not state.is_new(
+            self._core("v1|147488693237|445806612039"), "ntfy", self._policy(), 7, now
         )
 
 
