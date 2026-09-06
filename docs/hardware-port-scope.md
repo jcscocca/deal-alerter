@@ -22,12 +22,22 @@ same logic. It was never to force domain knowledge through a generic layer.
 | `rig.py` | 243 | none | **Stays vendored.** The capability-gain axis. Steam has one judgment axis; hardware has three. The core is deliberately indifferent to axis count. |
 | `sources/` | ~930 | none | **Stays vendored.** eBay, Reddit, Slickdeals, Apple. |
 | `history.py` | 383 | none | **Stays vendored.** Hardware accumulates its own price history because no ITAD exists for GPUs. Steam delegates history to an API. The core expresses both as capabilities; the accumulation logic itself is domain work. |
-| `verdict.py` | 639 | `dealcore/verdict.py` (69) | **Port.** This is real duplication — 41 references to band, ordering, and formatting concepts the core now owns. |
-| `config.py` | 366 | `dealcore/config.py` | **Port — already in progress.** Notification config moved to `dealcore.config` / `dealcore.notify`; the rest has not followed. |
+| `verdict.py` | 639 | `dealcore/verdict.py` (69) | **Ported.** Takes `ago` and `money` from the core; `DOLLAR` feeds the core's `Improvement`. What remains is the three-axis hardware judgment — `_decide`, `_decide_from_history`, `_verdict_from_anchor`, `_decide_from_reference`, `_value_sentence` — which has no core counterpart and stays. |
+| `config.py` | 366 | `dealcore/config.py` | **Ported.** Notification settings live in `dealcore.config` / `dealcore.notify`; `overlay` and `read_config` come from the core. `Thresholds`, `Hunt`, `load_watchlist` and the hardware `Config` fields are domain-owned and stay. |
 
-Five of seven stay. The adapter already routes correctly: `alerters/hardware/plugin.py`
-imports `RunOptions`, `atomic_write`, `AccumulatedHistory`, `Assessment`, `Card`,
-`FetchResult`, `Listing`, `Report`, `Improvement`, `band`, and `money` from the core.
+An earlier revision of this document listed the last two as outstanding work
+based on a crude symbol count. That was wrong: most of the 639 lines in
+`verdict.py` are the hardware judgment itself, not duplicated mechanics.
+**No core symbol is re-implemented in `native/` — verified by sweep.**
+
+The adapter routes correctly: `alerters/hardware/plugin.py` imports `RunOptions`,
+`atomic_write`, `AccumulatedHistory`, `Assessment`, `Card`, `FetchResult`,
+`Listing`, `Report`, `Improvement`, `band`, and `money` from the core.
+
+`history.export_jsonl` now writes through the core's `atomic_write`. It rewrites
+the committed price log whole on every run, so a crash or cancelled CI job
+partway through a plain `open("w")` truncated it — and there is no second copy
+of a log that took months to accumulate. Covered by two tests.
 
 ## Test coverage: resolved
 
@@ -79,5 +89,5 @@ not the same rule with different constants.
 ## Retire `ai-deal-alerter` when
 
 1. ~~The inherited suite reaches parity with the control count.~~ **Done** — 483 passed against 475.
-2. `tests/pending_entrypoint/` is collectable again.
+2. `tests/pending_entrypoint/` is collectable again — the only outstanding code work.
 3. Both alerters have run in parallel long enough to compare real alerts.

@@ -29,6 +29,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from dealcore.state import atomic_write
+
 # Conditions that are priced comparably enough to pool. Anything not listed
 # here is bucketed on its own.
 CONDITION_BUCKETS = {
@@ -341,10 +343,12 @@ class History:
             """
         ).fetchall()
 
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w", encoding="utf-8", newline="\n") as handle:
-            for row in rows:
-                handle.write(json.dumps(dict(row), sort_keys=True) + "\n")
+        # Through the core's atomic write. This file is the committed price
+        # history and it is rewritten whole; a crash or a cancelled CI job
+        # partway through a plain open("w") truncates it, and there is no
+        # second copy of a log that took months to accumulate.
+        atomic_write(path, "".join(
+            json.dumps(dict(row), sort_keys=True) + "\n" for row in rows))
         return len(rows)
 
     def import_jsonl(self, path: Path) -> int:

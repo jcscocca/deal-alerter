@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import os
 import sys
-import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from dealcore.config import overlay, read_config
 
 from .catalog import BY_KEY, Part, in_class
 
@@ -222,7 +223,7 @@ def load_watchlist(path: Path = ROOT / "watchlist.toml") -> tuple[Hunt, ...]:
     if not path.exists():
         raise ConfigError(f"No watchlist at {path}. Copy the example and edit it.")
 
-    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    raw = read_config(path)
     hunts: list[Hunt] = []
 
     for entry in raw.get("hunt", []):
@@ -272,5 +273,3 @@ def load_watchlist(path: Path = ROOT / "watchlist.toml") -> tuple[Hunt, ...]:
     if not hunts:
         raise ConfigError("watchlist.toml has no [[hunt]] entries.")
     return tuple(hunts)
-
-from dealcore.config import overlay, read_config

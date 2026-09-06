@@ -322,3 +322,51 @@ class TestTitlesAreKept:
         )
         store.commit()
         assert store.total_observations() == 1
+
+
+class TestExportIsAtomic:
+    """The exported JSONL is the committed price history, rewritten whole on
+    every run. A partial write is unrecoverable: there is no second copy of a
+    log that took months to accumulate."""
+
+    def test_a_failed_export_leaves_the_previous_log_intact(self, tmp_path, monkeypatch) -> None:
+        import json
+
+        from alerters.hardware.native.history import History
+
+        log = tmp_path / "prices.jsonl"
+        log.write_text('{"kept": true}\n', encoding="utf-8")
+
+        store = History(tmp_path / "prices.db")
+        try:
+            store.record(part_key="rtx_3090", condition="used", unit_price=900.0,
+                         source="ebay", listing_id="item-1")
+            store.commit()
+            monkeypatch.setattr(
+                "alerters.hardware.native.history.atomic_write",
+                lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")),
+            )
+            with pytest.raises(OSError):
+                store.export_jsonl(log)
+        finally:
+            store.close()
+
+        # Not truncated, not half-written.
+        assert json.loads(log.read_text(encoding="utf-8")) == {"kept": True}
+
+    def test_export_replaces_rather_than_appends(self, tmp_path) -> None:
+        from alerters.hardware.native.history import History
+
+        log = tmp_path / "prices.jsonl"
+        log.write_text('{"stale": true}\n', encoding="utf-8")
+
+        store = History(tmp_path / "prices.db")
+        try:
+            store.record(part_key="rtx_3090", condition="used", unit_price=900.0,
+                         source="ebay", listing_id="item-1")
+            store.commit()
+            store.export_jsonl(log)
+        finally:
+            store.close()
+
+        assert "stale" not in log.read_text(encoding="utf-8")
