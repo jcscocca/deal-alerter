@@ -1,0 +1,131 @@
+"""Four contaminated rows found by auditing the committed log on 2026-08-17.
+
+Each one is a different hole, and each was the *cheapest* observation in its
+bucket -- which is the expensive kind of wrong. A mismatch that reads as
+expensive gets discarded as noise; a mismatch that reads as cheap sets the
+part's floor, leads the digest, and is the thing you get woken up about.
+
+The audit that found them: of 1,417 logged observations, exactly 4 sat below
+the old STRONG alert line, and all 4 are here.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from alerters.hardware.native.match import match
+
+
+class TestMaxQIsNotTheWorkstationCard:
+    """300W and 2-slot against 600W and 3-slot, sharing every other word.
+
+    The Max-Q entry existed the whole time. Its aliases just required the words
+    to be adjacent, and no seller writes them that way -- the capacity and
+    memory type land in between. So every Max-Q card was recorded against the
+    Workstation entry, corrupting both distributions, and the one part in the
+    catalog that fits a normal tower would have been recommended as a 600W one.
+    """
+
+    MAXQ_TITLES = (
+        "NVIDIA RTX PRO 6000 Blackwell 96GB GDDR7 Max-Q Edition New Bulk Packaging",
+        "NVIDIA RTX PRO 6000 96GB Blackwell Max-Q Workstation Edition",
+        "PNY NVIDIA RTX Pro 6000 Blackwell Max-Q 96GB GDDR7 Workstation GPU - Bulk",
+        "NVIDIA RTX PRO 6000 Blackwell Max-Q Turbo Workstation Edition 300W",
+        "Nvidia RTX PRO 6000 Blackwell MaxQ Workstation 96GB GDDR7 GPU Dell P/N",
+    )
+    WORKSTATION_TITLES = (
+        "NVIDIA RTX PRO 6000 Blackwell 96GB GDDR7 Workstation Edition BULK OEM",
+        "NVIDIA RTX PRO 6000 Blackwell Workstation Edition Professional Graphics Card",
+        "PNY NVIDIA RTX PRO 6000 Blackwell Workstation 96GB GDDR7 Graphics Card",
+    )
+
+    @pytest.mark.parametrize("title", MAXQ_TITLES)
+    def test_max_q_lands_on_the_max_q_entry(self, title: str) -> None:
+        result = match(title, price=13000.0)
+        assert result.part is not None
+        assert result.part.key == "rtx_pro_6000_blackwell_maxq"
+
+    @pytest.mark.parametrize("title", MAXQ_TITLES)
+    def test_max_q_is_not_read_as_two_cards(self, title: str) -> None:
+        """The exclusion has to hold in find_all_parts too. Matching the Max-Q
+        entry while the base entry still counts as present would make every
+        Max-Q listing a two-GPU bundle, which is never logged."""
+        assert not match(title, price=13000.0).is_bundle
+
+    @pytest.mark.parametrize("title", WORKSTATION_TITLES)
+    def test_the_600w_card_still_matches_itself(self, title: str) -> None:
+        result = match(title, price=13000.0)
+        assert result.part is not None
+        assert result.part.key == "rtx_pro_6000_blackwell"
+
+
+class TestWorkstationBuildIsNotABareCard:
+    def test_xeon_workstation_is_a_system(self) -> None:
+        """Logged at $21,953.97/unit as a bare RTX PRO 6000. The ai-workstation
+        pattern wanted those two words adjacent and "Machine Learning" sits
+        between them; with no RAM or SSD quoted, the Xeon had nothing to pair
+        with either."""
+        result = match(
+            "Intel Xeon w7-3565X 2x RTX PRO 6000 Blackwell AI/Machine Learning "
+            "Workstation",
+            price=43907.94,
+        )
+        assert result.is_system, "a machine, not a card"
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            # "Workstation" is in this card's actual product name, and "AI GPU"
+            # is how half the pro cards on eBay advertise themselves. Neither
+            # may condemn a listing without a CPU beside it.
+            "NVIDIA RTX PRO 6000 96GB Blackwell Workstation Edition AI GPU Graphics Card",
+            "NVIDIA RTX PRO 6000 Blackwell 96GB GDDR7 Workstation Edition New Retail",
+            "NVIDIA RTX PRO 6000 96GB Blackwell Server Edition AI GPU Graphics Cards",
+        ],
+    )
+    def test_a_bare_card_is_not_condemned_by_its_own_name(self, title: str) -> None:
+        assert not match(title, price=14000.0).is_system
+
+
+class TestMobileModuleIsNotTheDesktopCard:
+    def test_dell_pro_max_laptop_module_is_dropped(self) -> None:
+        """$3,000 against the 48GB desktop card's $4,500 reference, and the
+        cheapest observation in that bucket. "18" is a screen size written
+        without an inch mark, so no existing mobile pattern saw it."""
+        result = match(
+            "nvidia rtx pro 5000 blackwell for dell pro max 18 plus", price=3000.0
+        )
+        assert result.part is None
+
+    def test_the_desktop_card_still_matches(self) -> None:
+        result = match(
+            "NVIDIA RTX PRO 5000 Blackwell 48GB GDDR7 PCIe 5.0 Graphics Card",
+            price=6500.0,
+        )
+        assert result.part is not None
+        assert result.part.key == "rtx_pro_5000_blackwell"
+
+    def test_a_macbook_still_matches_its_own_catalog_entry(self) -> None:
+        """The mobile filter exempts unified parts, so adding "macbook" to it
+        must not cost the catalog its MacBook Pro entries."""
+        result = match(
+            "MacBook Pro 16 2024 M4 Max 128GB 4TB Space Black", price=4650.0
+        )
+        assert result.part is not None
+        assert result.part.key == "macbook_pro_m4_max_128"
+
+
+class TestBlankTitleIsNotAMatch:
+    """40.3% of the log carries no title at all.
+
+    A storage bug, fixed forward on 2026-08-13, but the rows remain and cannot
+    be audited for mismatch even in hindsight -- including a $2,686 A100 40GB
+    that would have been the tool's only push-worthy alert. A title is the only
+    evidence a listing is what its part key says it is.
+    """
+
+    @pytest.mark.parametrize("title", ["", "   ", "\n\t"])
+    def test_blank_titles_are_refused(self, title: str) -> None:
+        result = match(title, price=2686.0)
+        assert result.part is None
+        assert result.junk
