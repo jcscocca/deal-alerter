@@ -1,0 +1,89 @@
+# What to hunt for.
+#
+# The Steam version of this project watched a fixed list of appids. Hardware
+# doesn't work that way: you don't want "this exact SKU", you want "any 24GB
+# Ampere card under $700, whoever is selling it". So a hunt is a *rule*.
+#
+# Every hunt needs either `parts` (catalog keys, see ada/catalog.py) or a
+# `class` filter. `target` is the price at or below which you always get
+# alerted regardless of what the history says -- the equivalent of targets.json.
+
+# ---------------------------------------------------------------------- tier 1
+# The recommendation: 96GB on one card, 300W, fits the Z790 tower untouched.
+[[hunt]]
+name = "RTX PRO 6000 Blackwell"
+parts = ["rtx_pro_6000_blackwell_maxq", "rtx_pro_6000_blackwell"]
+target = 6300.0
+note = "Max-Q is the one that matters -- 300W fits the 1000 GT without a rebuild."
+
+# The cheap path to 48GB matched-Ampere in the machine you already own.
+[[hunt]]
+name = "RTX 3090 (pair up)"
+parts = ["rtx_3090", "rtx_3090_ti"]
+target = 700.0
+# Two of these replace the 3080 + 2080 entirely and NVLink together.
+quantity_wanted = 2
+
+[[hunt]]
+name = "RTX 5090"
+parts = ["rtx_5090"]
+target = 2200.0
+
+[[hunt]]
+name = "RTX 4090"
+parts = ["rtx_4090"]
+target = 900.0
+
+# ---------------------------------------------------------------------- tier 2
+# 48GB single-slot-ish pro cards. Blower coolers, no transient power spikes.
+[[hunt]]
+name = "48GB pro cards"
+parts = ["rtx_a6000", "rtx_6000_ada", "l40s", "rtx_pro_5000_blackwell"]
+target = 1900.0
+
+# ---------------------------------------------------------------------- tier 3
+# Unified memory. Capacity per dollar is unbeatable; bandwidth is not.
+[[hunt]]
+name = "Mac Studio Ultra (256/512GB)"
+parts = ["mac_studio_m3_ultra_256", "mac_studio_m3_ultra_512"]
+target = 6800.0
+note = "Apple refurb is the realistic source. Watch prefill speed, not just GB."
+
+[[hunt]]
+name = "Mac Studio M4 Max 128GB"
+parts = ["mac_studio_m4_max_128"]
+target = 2450.0
+note = "Cheapest way into 128GB unified. 546 GB/s, so capacity over speed."
+
+# Portable inference. A mobile discrete GPU tops out near 24GB, so the only
+# laptops worth hunting are the ones where memory *is* GPU memory. Slower than
+# a desktop card -- 546 GB/s against 936 on a 3090 -- so this holds big models
+# at modest speed rather than competing with the reasoning node.
+[[hunt]]
+name = "MacBook Pro (128GB unified)"
+parts = ["macbook_pro_m4_max_128", "macbook_pro_m3_max_128"]
+target = 2500.0
+note = "Only 128GB configs. Anything less is a laptop, not an inference machine."
+
+[[hunt]]
+name = "Unified-memory mini boxes"
+parts = ["framework_desktop_128", "dgx_spark", "strix_halo_mini_128"]
+target = 1200.0
+
+# ---------------------------------------------------------------------- tier 4
+# Datacenter. Mostly gray-market; verify the seller hard before buying.
+[[hunt]]
+name = "Datacenter accelerators"
+class = "datacenter"
+min_vram_gb = 40
+target = 3200.0
+note = "A100 40GB PCIe under $4k is the interesting one. Needs blower airflow."
+
+# ------------------------------------------------------------------ open-ended
+# A catch-all so a card the catalog doesn't know about still gets seen. Judged
+# on $/GB-VRAM alone since there's no reference price to compare against.
+[[hunt]]
+name = "Anything with lots of VRAM, cheap"
+class = "any"
+min_vram_gb = 32
+max_dollars_per_gb = 25.0

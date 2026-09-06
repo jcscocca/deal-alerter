@@ -1,16 +1,84 @@
+# Tunables. Secrets live in .env (local) or GitHub Secrets (Actions).
+
 [general]
 country = "US"
 currency_symbol = "$"
+# Listings older than this are ignored. Used-market posts go stale fast; a
+# three-day-old r/buildapcsales thread is almost always a dead link.
 max_listing_age_hours = 72
 
 [alerts]
-digest_at = "GOOD"
-push_at = "STRONG"
+# Minimum verdict that triggers the *daily email digest*. Ordered weakest to
+# strongest:  PASS | FAIR | GOOD | STRONG | EXCEPTIONAL | GRAIL
+digest_at = "STRONG"
+
+# Minimum verdict that triggers an *instant push*. Keep this high -- the whole
+# point of push is that it is rare enough that you'll actually look at it.
+push_at = "EXCEPTIONAL"
+
+# If a listing is still live and still qualifies, nudge again after this many
+# days. Stops a week-long Slickdeals post from pushing you every 15 minutes.
 remind_after_days = 7
 
-[fit]
-enforce = false
-psu_headroom_w = 150
-
 [thresholds]
-# Keep the existing native Thresholds defaults, including minimum history span.
+# A price at or below the Nth percentile of everything we've recorded for that
+# part counts as the corresponding verdict. Percentiles are computed from this
+# repo's own observation log (see history.py) -- there is no public price
+# history API for hardware, so the log gets better the longer it runs.
+grail_pct = 3.0
+exceptional_pct = 10.0
+strong_pct = 20.0
+good_pct = 35.0
+
+# Rank is necessary but not sufficient. A percentile describes the other
+# listings, not the thing -- the cheapest 20% of any pool is the cheapest 20%
+# however bad the pool is -- so a price must also clear the ratio bands below
+# before it can alert. The weaker of the two answers wins.
+
+# How cheap against *sold* value each verdict needs, for the reference path and
+# as the second opinion on the percentile. Recalibrated 2026-08-17: the old
+# bands (0.60 / 0.75 / 0.88 / 1.05) compared asking prices to a sold anchor as
+# though they were the same unit. They are not -- logged asks ran 1.50x their
+# reference at the median, and the 1st percentile was 0.91x, so the old STRONG
+# line at 0.75x sat below the entire honest distribution and only mismatches
+# and bait could reach it.
+reference_grail_ratio = 0.75
+reference_exceptional_ratio = 0.85
+reference_strong_ratio = 0.95
+reference_good_ratio = 1.05
+reference_fair_ratio = 1.20
+
+# Below this multiple of the anchor a price is shown but never recorded, and
+# never allowed to alert. Must stay under reference_grail_ratio -- the tool's
+# best verdict and its bait warning must not describe the same price. Enforced
+# by tests/test_threshold_bands.py.
+suspicious_price_ratio = 0.70
+
+# Until we have at least this many observations of a part, percentile verdicts
+# are untrustworthy and the engine falls back to $/GB-VRAM against the class
+# median plus the reference price in the catalog.
+min_observations = 8
+
+# Ignore anything priced above this multiple of the part's reference price.
+# Filters out the "RTX 3090 *box*" and "broken for parts" noise in one shot.
+max_price_ratio = 1.6
+# ...and anything suspiciously below it, which is almost always a scam listing
+# or a mislabelled accessory.
+min_price_ratio = 0.25
+
+# The ceiling while the anchor is still the catalog constant. Pinned here at
+# the value that has actually been running: the loader used to hardcode its own
+# 3.0 fallback, so the dataclass default of 2.0 never took effect. Fixing that
+# drift on 2026-08-17 would otherwise have silently started rejecting 18.9% of
+# the log as implausibly expensive -- unshown *and* unlogged, which censors the
+# ask distribution the percentile path now depends on. Whether 2.0 is right is
+# a live question, but it is a separate change from the alert recalibration and
+# wants its own before/after. See ROADMAP.md.
+reference_max_price_ratio = 3.0
+
+[fit]
+# Checked against the target rig in rig.py. A deal that can't physically go in
+# your machine gets flagged, not hidden -- sometimes the answer is a new PSU.
+enforce = false
+# Headroom to leave on the PSU above total system draw, in watts.
+psu_headroom_w = 150

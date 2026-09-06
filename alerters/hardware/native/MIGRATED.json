@@ -1,0 +1,14 @@
+{
+  "catalog.py": "3b9c99d57ee1c641250f914f7b51d4255fafb2e76c341f10658e18ec9844891b",
+  "rig.py": "0bf80c3f4dc612a0fda7dd54eaa87eb02988d9916d617aaf23c1707674b54db1",
+  "match.py": "66a974b0c839be6ed523dbe5e6ca41955870832ce2f66e8e152152812276f9bd",
+  "history.py": "07f470645526ac0ddc5ee4b920c29475e1b7fd6deb1e2b7ca5dc4f3d9cae4954",
+  "verdict.py": "62c09ad47a37a843036c47183c0dce2d411352d58a56cb2827e9947d8d01791d",
+  "config.py": "475a409e5c95e79eb5d1f9d3f197ba624a7a522c23b4e35a6e6bc0603ca281bd",
+  "sources\\apple.py": "38e06b161c44cf11823db0a76f76610a45b0911f6d2ce73afc2e0b7c2c108a56",
+  "sources\\base.py": "d22956eb789fd9abff74ba42ce3bb9bad24599a3de0515e024ed06cddddd6974",
+  "sources\\ebay.py": "7e6c79ebf92d3e8ea1f2c522a0e6cd90c7b3fca8e0ac846afb70085de0bd5164",
+  "sources\\reddit.py": "c624e90853dd761555fdbbd3d1b80c015f0f3f31927e3e657cf5c74d7f68bf97",
+  "sources\\slickdeals.py": "ac54f32437c7e6fe2548d70742ddb42eaf93ae237b575f6af39eb165bce8369c",
+  "sources\\__init__.py": "4184a6650b723bf2aef272852f15b0fe60fbcc96fa7711595f5e7bae7b707554"
+}

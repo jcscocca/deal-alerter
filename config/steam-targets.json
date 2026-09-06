@@ -1,1 +1,6 @@
-{}
+{
+  "_comment": "Optional. Steam appid -> the most you're willing to pay. A game at or under its target always emails you, whatever the history says. Find the appid in the store URL: store.steampowered.com/app/427520/Factorio -> 427520.",
+  "_example_factorio": 427520,
+  "294100": 20.0,
+  "1030300": 15.0
+}

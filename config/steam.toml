@@ -1,11 +1,31 @@
+# Tunables. Secrets live in .env (local) or GitHub Secrets (Actions).
+
 [general]
 country = "US"
 currency_symbol = "$"
+# Years of Steam price history to pull per discounted game. More history means
+# better "how often does this go on sale" numbers.
 history_years = 5
 
 [alerts]
+# Minimum verdict that triggers an email. Ordered weakest to strongest:
+#   WAIT | DECENT | BEST_THIS_YEAR | NEAR_LOW | MATCHES_LOW | ALL_TIME_LOW
+# NEAR_LOW is a good default: you hear about anything within 10% of the best
+# price the game has ever been, and stay quiet otherwise.
 alert_at = "NEAR_LOW"
+
+# If a game is still on sale and still qualifies, nudge again after this many
+# days. Stops a two-week sale from emailing you fourteen times.
 remind_after_days = 30
 
 [thresholds]
-# Omitted settings use the Thresholds dataclass, not a second list of defaults.
+# Within this % of the all-time low counts as matching it.
+matches_low_pct = 2.0
+# Within this % of the all-time low is still a strong buy.
+near_low_pct = 10.0
+# Within this % of the best price in the last 12 months.
+best_this_year_pct = 2.0
+# A cut this deep is worth flagging even when history says a better price exists.
+decent_cut = 50
+# Ignore discounts shallower than this entirely.
+min_cut = 10
