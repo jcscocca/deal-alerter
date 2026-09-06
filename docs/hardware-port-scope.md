@@ -41,7 +41,7 @@ of a log that took months to accumulate. Covered by two tests.
 
 ## Test coverage: resolved
 
-The inherited suite now runs **483 passed, 0 failed** here, against **475 passed**
+The inherited suite now runs **485 passed, 0 failed** here, against **475 passed**
 in `ai-deal-alerter`. The gap that existed on first import was entirely on the
 migration seam, not in the ported logic:
 
@@ -71,7 +71,7 @@ past `remind_after_days` the reminder window had genuinely elapsed, so the test
 reported a migration failure that never happened. It had been red in CI since
 2026-08-18 for that reason alone.
 
-## Do not lose these while porting `verdict.py`
+## Do not lose these if you touch `verdict.py`
 
 Hardware bands are `PASS / FAIR / GOOD / STRONG / EXCEPTIONAL / GRAIL`; Steam
 bands are `WAIT / DECENT / BEST_THIS_YEAR / NEAR_LOW / MATCHES_LOW / ALL_TIME_LOW`.
@@ -88,6 +88,6 @@ not the same rule with different constants.
 
 ## Retire `ai-deal-alerter` when
 
-1. ~~The inherited suite reaches parity with the control count.~~ **Done** — 483 passed against 475.
+1. ~~The inherited suite reaches parity with the control count.~~ **Done** — 485 passed against 476.
 2. `tests/pending_entrypoint/` is collectable again — the only outstanding code work.
 3. Both alerters have run in parallel long enough to compare real alerts.
