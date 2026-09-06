@@ -29,24 +29,37 @@ Five of seven stay. The adapter already routes correctly: `alerters/hardware/plu
 imports `RunOptions`, `atomic_write`, `AccumulatedHistory`, `Assessment`, `Card`,
 `FetchResult`, `Listing`, `Report`, `Improvement`, `band`, and `money` from the core.
 
-## The remaining work is narrow and already marked
+## Test coverage: resolved
 
-The inherited suite runs **446 passed** here against **475 passed** in
-`ai-deal-alerter`. That gap is not scattered — it sits on the two modules above:
+The inherited suite now runs **483 passed, 0 failed** here, against **475 passed**
+in `ai-deal-alerter`. The gap that existed on first import was entirely on the
+migration seam, not in the ported logic:
 
-- **16 tests** construct the pre-migration `Config` (`smtp_host` and siblings now
-  live in `dealcore.config` / `dealcore.notify`). Finishing the config port fixes
-  these.
-- **4 tests** in `tests/pending_entrypoint/` import the retired `check_deals`
-  entry point. They become collectable once the hardware domain runs through
-  `dealcore.run`. Kept verbatim rather than deleted; they are coverage that must
-  survive.
-- **21 errors** are Windows temp-directory permission failures that do not
-  reproduce in the control repo. Environmental, not a porting defect.
+- `pytest.ini` had not been carried across. The source repository pins
+  `--basetemp=.pytest_tmp` with a comment explaining that the Windows system
+  temp root is not always writable and that the failure surfaces as an opaque
+  `PermissionError` from inside pytest. Dropping it cost 21 spurious errors.
+  **Restored.**
+- `AlertState` moved to `dealcore.state`, taking the domain's normaliser and
+  per-channel delivery records. The key-collapse tests were rewritten against
+  `is_new()` / `record()`; they now exercise the plugin seam rather than a
+  hardcoded eBay rule.
+- `dedupe` moved to `dealcore.run` and takes the domain's key function.
+- Mode-dependent credential validation moved from `Config.load(need_email=,
+  need_push=)` to `dealcore.notify.channels(email=, push=)`. Same guarantee,
+  now shared by both domains.
 
-One pre-existing failure in the source repository —
-`test_variant_listings.py::TestAlertKeysCollapse::test_an_old_file_is_migrated_rather_than_orphaned`
-— predates the consolidation. Do not read it as a regression.
+**Four tests remain quarantined** in `tests/pending_entrypoint/`. `show_stats`
+is now a `HardwarePlugin` method rather than a free function; `evaluate` and
+`price_stats` have no successor, their orchestration having split across
+`dealcore.run` and the plugin's `prepare`/`judge`. `tests/conftest.py` records
+what each needs. They are kept verbatim, not deleted.
+
+A time-bomb in the source repository has also been fixed there: the alert
+migration test pinned `pushed_at` to an absolute date, and once that drifted
+past `remind_after_days` the reminder window had genuinely elapsed, so the test
+reported a migration failure that never happened. It had been red in CI since
+2026-08-18 for that reason alone.
 
 ## Do not lose these while porting `verdict.py`
 
@@ -65,6 +78,6 @@ not the same rule with different constants.
 
 ## Retire `ai-deal-alerter` when
 
-1. The inherited suite here reaches parity with the control count.
+1. ~~The inherited suite reaches parity with the control count.~~ **Done** — 483 passed against 475.
 2. `tests/pending_entrypoint/` is collectable again.
 3. Both alerters have run in parallel long enough to compare real alerts.
