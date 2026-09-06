@@ -1,0 +1,126 @@
+{
+  "appids": [
+    220
+  ],
+  "responses": {
+    "/lookup/id/shop/61/v1": {
+      "app/220": "sample-game"
+    },
+    "/games/prices/v3": [
+      {
+        "id": "sample-game",
+        "deals": [
+          {
+            "shop": {
+              "id": 61
+            },
+            "price": {
+              "amount": 9.99,
+              "currency": "USD"
+            },
+            "regular": {
+              "amount": 39.99,
+              "currency": "USD"
+            },
+            "cut": 75,
+            "storeLow": {
+              "amount": 9.99,
+              "currency": "USD"
+            },
+            "url": "https://store.steampowered.com/app/220/",
+            "expiry": null
+          }
+        ],
+        "historyLow": {
+          "all": {
+            "amount": 9.99,
+            "currency": "USD"
+          },
+          "y1": {
+            "amount": 9.99,
+            "currency": "USD"
+          }
+        }
+      }
+    ],
+    "/games/storelow/v2": [
+      {
+        "id": "sample-game",
+        "lows": [
+          {
+            "shop": {
+              "id": 61
+            },
+            "price": {
+              "amount": 9.99,
+              "currency": "USD"
+            },
+            "cut": 75,
+            "timestamp": "2024-06-01T00:00:00Z"
+          }
+        ]
+      }
+    ],
+    "/games/info/v2": {
+      "sample-game": {
+        "title": "Example Game \u2014 synthetic prices",
+        "assets": {}
+      }
+    },
+    "/games/history/v2": {
+      "sample-game": [
+        {
+          "timestamp": "2024-06-15T00:00:00Z",
+          "shop": {
+            "id": 61
+          },
+          "deal": {
+            "price": {
+              "amount": 39.99,
+              "currency": "USD"
+            },
+            "regular": {
+              "amount": 39.99,
+              "currency": "USD"
+            },
+            "cut": 0
+          }
+        },
+        {
+          "timestamp": "2024-06-01T00:00:00Z",
+          "shop": {
+            "id": 61
+          },
+          "deal": {
+            "price": {
+              "amount": 9.99,
+              "currency": "USD"
+            },
+            "regular": {
+              "amount": 39.99,
+              "currency": "USD"
+            },
+            "cut": 75
+          }
+        },
+        {
+          "timestamp": "2024-01-01T00:00:00Z",
+          "shop": {
+            "id": 61
+          },
+          "deal": {
+            "price": {
+              "amount": 39.99,
+              "currency": "USD"
+            },
+            "regular": {
+              "amount": 39.99,
+              "currency": "USD"
+            },
+            "cut": 0
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,2 @@
+# Already used by both original repositories. Tests use the standard library.
+requests

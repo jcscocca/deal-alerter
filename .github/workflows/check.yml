@@ -1,0 +1,99 @@
+name: Check deals
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+    - cron: '17 2 * * *'
+    - cron: '47 2 * * *'
+  workflow_dispatch:
+    inputs:
+      domain:
+        type: choice
+        options: [steam, hardware]
+        default: steam
+      mode:
+        type: choice
+        options: [digest, fast]
+        default: digest
+      dry_run:
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+# Both domains write to one branch. Separate concurrency groups would still
+# race at git push, even though their state files have different names.
+concurrency:
+  group: deal-alerter-state-writer
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.schedule == '17 2 * * *' && vars.ENABLE_STEAM == 'true') ||
+      (github.event.schedule != '17 2 * * *' && vars.ENABLE_HARDWARE == 'true')
+    runs-on: ubuntu-latest
+    env:
+      STEAM_ID: ${{ secrets.STEAM_ID }}
+      ITAD_API_KEY: ${{ secrets.ITAD_API_KEY }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      MAIL_TO: ${{ secrets.MAIL_TO }}
+      SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
+      SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+      NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+      NTFY_SERVER: ${{ vars.NTFY_SERVER || 'https://ntfy.sh' }}
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      DESKTOP_NOTIFY: '0'
+      EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+      EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+      REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+      REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Install and test
+        run: |
+          python -m pip install -r requirements.txt
+          if [ -f alerters/hardware/native/requirements.txt ]; then
+            python -m pip install -r alerters/hardware/native/requirements.txt
+          fi
+          python -m unittest discover -s tests -v
+      - name: Check
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          DOMAIN: ${{ inputs.domain }}
+          MODE: ${{ inputs.mode }}
+          DRY: ${{ inputs.dry_run }}
+        run: |
+          if [ "$EVENT" != workflow_dispatch ]; then
+            case "$SCHEDULE" in
+              '17 2 * * *') DOMAIN=steam; MODE=digest ;;
+              '47 2 * * *') DOMAIN=hardware; MODE=digest ;;
+              *) DOMAIN=hardware; MODE=fast ;;
+            esac
+          fi
+          flags=("--$MODE" --quiet-when-empty)
+          if [ "$DRY" = true ]; then flags+=(--dry-run); fi
+          python -m alerters "$DOMAIN" "${flags[@]}"
+      - name: Preserve observations and successful delivery receipts
+        if: always()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Never stage secrets, previews or the disposable SQLite cache.
+          find state -type f \( -name '*.json' -o -name '*.jsonl' \) -print0 |
+            xargs -0 -r git add --
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update deal evidence and delivery receipts'
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi

@@ -1,0 +1,11 @@
+[general]
+country = "US"
+currency_symbol = "$"
+history_years = 5
+
+[alerts]
+alert_at = "NEAR_LOW"
+remind_after_days = 30
+
+[thresholds]
+# Omitted settings use the Thresholds dataclass, not a second list of defaults.

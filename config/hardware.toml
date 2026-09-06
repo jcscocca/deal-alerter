@@ -1,0 +1,16 @@
+[general]
+country = "US"
+currency_symbol = "$"
+max_listing_age_hours = 72
+
+[alerts]
+digest_at = "GOOD"
+push_at = "STRONG"
+remind_after_days = 7
+
+[fit]
+enforce = false
+psu_headroom_w = 150
+
+[thresholds]
+# Keep the existing native Thresholds defaults, including minimum history span.
