@@ -59,11 +59,15 @@ migration seam, not in the ported logic:
   need_push=)` to `dealcore.notify.channels(email=, push=)`. Same guarantee,
   now shared by both domains.
 
-**Four tests remain quarantined** in `tests/pending_entrypoint/`. `show_stats`
-is now a `HardwarePlugin` method rather than a free function; `evaluate` and
-`price_stats` have no successor, their orchestration having split across
-`dealcore.run` and the plugin's `prepare`/`judge`. `tests/conftest.py` records
-what each needs. They are kept verbatim, not deleted.
+**The four quarantined tests are restored.** `test_dry_run`, `test_stats`,
+`test_threshold_bands` and `test_trust` sat in `tests/pending_entrypoint/`
+because they imported the retired `check_deals` entry point. They now drive its
+replacement: `tests/hardware_pipeline.py` runs `dealcore.run` over the shipped
+config with a stub source and reads the log back from the persisted JSONL.
+Their assertions did not change. Restoring `test_stats` caught a regression the
+port had introduced -- `--stats` printed `median=1100.0` and had lost its low
+and p25 columns -- and the original table was restored rather than the test
+loosened. The suite is at 681 passed.
 
 A time-bomb in the source repository has also been fixed there: the alert
 migration test pinned `pushed_at` to an absolute date, and once that drifted
@@ -89,5 +93,8 @@ not the same rule with different constants.
 ## Retire `ai-deal-alerter` when
 
 1. ~~The inherited suite reaches parity with the control count.~~ **Done** — 485 passed against 476.
-2. `tests/pending_entrypoint/` is collectable again — the only outstanding code work.
-3. Both alerters have run in parallel long enough to compare real alerts.
+2. ~~`tests/pending_entrypoint/` is collectable again.~~ **Done** — restored, see above.
+3. ~~Both alerters have run in parallel long enough to compare real alerts.~~
+   **Dropped.** The old hardware alerter stopped collecting on 2026-08-17, so
+   there was nothing left to run in parallel with, and every day spent waiting
+   was a day missing from the price log. Cut over directly instead.

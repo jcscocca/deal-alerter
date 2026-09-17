@@ -31,6 +31,7 @@ class NativeAssessment:
     vram_after: float = 16
     loggable: bool = True
     dollars_per_gb: float = 37.5
+    dollars_per_gb_bandwidth: float = 40.1
     reason: str = "Capped for no upgrade; target subsequently promoted it"
     unlock: str = "No new model fits"
 

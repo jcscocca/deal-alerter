@@ -103,6 +103,20 @@ class Part:
     def dollars_per_gb(self) -> float:
         return self.reference_price / self.vram_gb
 
+    @property
+    def capacity_bandwidth(self) -> float:
+        """Capacity times speed: GB of VRAM x TB/s of bandwidth.
+
+        The denominator of the combined index. Scaled to TB/s rather than GB/s
+        purely so the resulting dollar figure is readable -- a 3090 comes out
+        near $45 per GB-TB/s instead of $0.045.
+        """
+        return self.vram_gb * self.bandwidth_gb_s / 1000
+
+    @property
+    def dollars_per_gb_bandwidth(self) -> float:
+        return self.reference_price / self.capacity_bandwidth
+
 
 # Ordered roughly by how interesting each is for local inference, not by price.
 PARTS: tuple[Part, ...] = (
@@ -288,6 +302,85 @@ PARTS: tuple[Part, ...] = (
         low_precision="fp4",
         aliases=("5080",),
     ),
+    # ------------------------------------------------------------- AMD / Intel
+    # Everything above this line is NVIDIA, which is not a statement about the
+    # hardware so much as about the software. These four carry real capacity at
+    # real bandwidth for a fraction of the CUDA tax, and llama.cpp runs on all
+    # of them; vLLM, bitsandbytes and most quantisation tooling do not, or do
+    # only on a lagging fork. Priced accordingly, and worth watching for it.
+    Part(
+        key="radeon_pro_w7900",
+        name="Radeon PRO W7900 48GB",
+        kind=Kind.PRO_GPU,
+        vram_gb=48,
+        bandwidth_gb_s=864,
+        tdp_w=295,
+        reference_price=2600.0,
+        year=2023,
+        arch="RDNA3",
+        slots=3.0,
+        aliases=("w7900", "radeon pro w7900"),
+        note="48GB at A6000 bandwidth for less money. ROCm only -- no NVLink, "
+        "no vLLM fast path, and 3 slots against the A6000's 2.",
+    ),
+    Part(
+        key="radeon_pro_w7800",
+        name="Radeon PRO W7800 32GB",
+        kind=Kind.PRO_GPU,
+        vram_gb=32,
+        bandwidth_gb_s=576,
+        tdp_w=260,
+        reference_price=1800.0,
+        year=2023,
+        arch="RDNA3",
+        slots=2.0,
+        aliases=("w7800", "radeon pro w7800"),
+    ),
+    Part(
+        key="radeon_ai_pro_r9700",
+        name="Radeon AI PRO R9700 32GB",
+        kind=Kind.PRO_GPU,
+        vram_gb=32,
+        bandwidth_gb_s=640,
+        tdp_w=300,
+        reference_price=1300.0,
+        year=2025,
+        arch="RDNA4",
+        slots=2.0,
+        low_precision="fp8",
+        aliases=("r9700", "radeon ai pro r9700"),
+        note="RDNA4 brings fp8, which is what makes 32GB behave like more.",
+    ),
+    Part(
+        key="rx_7900_xtx",
+        name="Radeon RX 7900 XTX 24GB",
+        kind=Kind.CONSUMER_GPU,
+        vram_gb=24,
+        bandwidth_gb_s=960,
+        tdp_w=355,
+        reference_price=700.0,
+        year=2022,
+        arch="RDNA3",
+        slots=2.5,
+        aliases=("7900 xtx", "rx 7900 xtx"),
+        note="24GB at 3090 bandwidth, often cheaper than a used 3090. The "
+        "difference is entirely software.",
+    ),
+    Part(
+        key="arc_pro_b60",
+        name="Intel Arc Pro B60 24GB",
+        kind=Kind.PRO_GPU,
+        vram_gb=24,
+        bandwidth_gb_s=456,
+        tdp_w=200,
+        reference_price=600.0,
+        year=2025,
+        arch="Battlemage",
+        slots=2.0,
+        aliases=("arc pro b60", "arc b60"),
+        note="Cheapest 24GB card sold new. Half the bandwidth of a 3090 and "
+        "the thinnest software stack of the three vendors.",
+    ),
     # ----------------------------------------------------------- datacenter
     Part(
         key="a100_40",
@@ -396,6 +489,98 @@ PARTS: tuple[Part, ...] = (
         aliases=("m4 max 128", "mac studio m4 max"),
         require_all=("mac studio", "m4 max"),
     ),
+    Part(
+        key="mac_studio_m3_ultra_384",
+        name="Mac Studio M3 Ultra 384GB",
+        kind=Kind.UNIFIED,
+        vram_gb=384,
+        bandwidth_gb_s=819,
+        tdp_w=270,
+        reference_price=11500.0,
+        year=2025,
+        arch="Apple",
+        usable_fraction=0.75,
+        aliases=("m3 ultra 384", "mac studio 384gb"),
+        require_all=("mac studio", "m3 ultra"),
+    ),
+    Part(
+        key="mac_studio_m2_ultra_192",
+        name="Mac Studio M2 Ultra 192GB",
+        kind=Kind.UNIFIED,
+        vram_gb=192,
+        bandwidth_gb_s=800,
+        tdp_w=295,
+        reference_price=5200.0,
+        year=2023,
+        arch="Apple",
+        usable_fraction=0.75,
+        aliases=("m2 ultra 192", "mac studio 192gb"),
+        require_all=("mac studio", "m2 ultra"),
+        note="The last generation's top box. 800 GB/s is within 3% of an M3 "
+        "Ultra for roughly half the used price.",
+    ),
+    Part(
+        key="mac_studio_m2_ultra_128",
+        name="Mac Studio M2 Ultra 128GB",
+        kind=Kind.UNIFIED,
+        vram_gb=128,
+        bandwidth_gb_s=800,
+        tdp_w=295,
+        reference_price=3700.0,
+        year=2023,
+        arch="Apple",
+        usable_fraction=0.75,
+        aliases=("m2 ultra 128", "mac studio 128gb"),
+        require_all=("mac studio", "m2 ultra"),
+    ),
+    Part(
+        key="mac_studio_m1_ultra_128",
+        name="Mac Studio M1 Ultra 128GB",
+        kind=Kind.UNIFIED,
+        vram_gb=128,
+        bandwidth_gb_s=800,
+        tdp_w=370,
+        reference_price=2600.0,
+        year=2022,
+        arch="Apple",
+        usable_fraction=0.75,
+        aliases=("m1 ultra 128",),
+        require_all=("mac studio", "m1 ultra"),
+        note="Cheapest 128GB at 800 GB/s anywhere. Four years old, so verify "
+        "the machine before the price.",
+    ),
+    Part(
+        key="mac_studio_m4_max_64",
+        name="Mac Studio M4 Max 64GB",
+        kind=Kind.UNIFIED,
+        vram_gb=64,
+        bandwidth_gb_s=546,
+        tdp_w=160,
+        reference_price=2300.0,
+        year=2025,
+        arch="Apple",
+        usable_fraction=0.75,
+        aliases=("m4 max 64", "mac studio 64gb"),
+        require_all=("mac studio", "m4 max"),
+        note="64GB and up is the 40-core GPU bin at 546 GB/s; the 36GB part "
+        "is a slower 410 GB/s machine and is not this entry.",
+    ),
+    Part(
+        key="mac_mini_m4_pro_64",
+        name="Mac mini M4 Pro 64GB",
+        kind=Kind.UNIFIED,
+        vram_gb=64,
+        bandwidth_gb_s=273,
+        tdp_w=65,
+        reference_price=1700.0,
+        year=2024,
+        arch="Apple",
+        usable_fraction=0.75,
+        aliases=("m4 pro 64",),
+        require_all=("mac mini", "m4 pro"),
+        note="65W for 64GB. Bandwidth is DGX Spark territory, so this holds "
+        "big models slowly rather than running medium ones fast.",
+    ),
     # Portable unified memory. The only laptops worth hunting for this: a mobile
     # discrete GPU tops out around 24GB, but here the memory *is* the GPU
     # memory, so a 128GB MacBook holds models no $15k mobile workstation can.
@@ -446,8 +631,25 @@ PARTS: tuple[Part, ...] = (
         usable_fraction=0.85,
         low_precision="fp4",
         aliases=("dgx spark", "gb10", "project digits"),
+        excludes=("gx10", "ascent"),
         note="CUDA in 128GB, but 273 GB/s. Great for building and testing what "
         "you'll deploy elsewhere; slow for actually serving.",
+    ),
+    Part(
+        key="asus_ascent_gx10",
+        name="ASUS Ascent GX10 (GB10) 128GB",
+        kind=Kind.UNIFIED,
+        vram_gb=128,
+        bandwidth_gb_s=273,
+        tdp_w=170,
+        reference_price=2999.0,
+        year=2025,
+        arch="Blackwell",
+        usable_fraction=0.85,
+        low_precision="fp4",
+        aliases=("ascent gx10", "gx10"),
+        note="The same GB10 superchip as a DGX Spark in someone else's case. "
+        "Cross-shop the two; they are the same machine.",
     ),
     Part(
         key="framework_desktop_128",
@@ -480,6 +682,7 @@ PARTS: tuple[Part, ...] = (
             "gmktec evo-x2",
             "beelink gtr9",
             "minisforum ms-s1 max",
+            "bosgame m5",
             "ryzen ai max+ 395",
             "ryzen ai max 395",
             "strix halo",
@@ -499,6 +702,30 @@ def in_class(kind: str) -> list[Part]:
     if kind == "any":
         return list(PARTS)
     return [part for part in PARTS if part.kind.value == kind]
+
+
+def class_median_dollars_per_gb_bandwidth(kind: Kind) -> float:
+    """Typical $/GB-TB/s for a category. The bandwidth-aware sibling of below.
+
+    $/GB on its own systematically flatters slow capacity: a 128GB unified box
+    at 256 GB/s scores four times better than a 3090 and generates tokens at a
+    quarter of the speed. Reporting only that number recommends the wrong
+    hardware to anyone who reads it quickly, which is everyone reading a push
+    notification. Multiplying capacity by bandwidth prices the two things the
+    machine actually has to offer, and the two figures disagreeing is itself
+    the useful signal -- it means "lots of memory, slowly".
+
+    This is a value heuristic, not tokens per second. Bandwidth predicts decode
+    speed well and prefill speed badly, and neither number knows anything about
+    whether the software stack you need runs on the thing.
+    """
+    values = sorted(part.dollars_per_gb_bandwidth for part in PARTS if part.kind is kind)
+    if not values:
+        return 0.0
+    middle = len(values) // 2
+    if len(values) % 2:
+        return values[middle]
+    return (values[middle - 1] + values[middle]) / 2
 
 
 def class_median_dollars_per_gb(kind: Kind) -> float:

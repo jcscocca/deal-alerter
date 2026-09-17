@@ -1,0 +1,32 @@
+name: Tests
+
+# The gate for code. check.yml no longer runs the suite before every alert run,
+# so this is where a regression has to show up. Most of the inherited hardware
+# suite is pytest, which `unittest discover` cannot import, so run pytest.
+#
+# The matrix covers what the scheduled alerters run on (3.11) and local
+# development (3.14), so drift between them fails here rather than at 3am.
+# State commits are data, not code, and do not need a test run.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'state/**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest -q

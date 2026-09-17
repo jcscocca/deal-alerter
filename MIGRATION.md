@@ -1,5 +1,10 @@
 # Hardware migration map
 
+A historical record of the 2026-09-06 consolidation of `steam-deal-alerter` and
+`ai-deal-alerter` into this repository. The import it describes has been run and
+both originals are retired; nothing here needs doing again. The README describes
+the product as it runs now.
+
 ## Every Part 3 module
 
 | Original | Destination | Treatment and resistance |
@@ -109,10 +114,12 @@ The old history docstring said “forever”; the supplied runner actually prune
 on fast runs or mutate history during dry runs/statistics.
 
 Steam's original decision quirks are deliberately preserved for equivalence:
-a recently ended cheap episode can still be classified as ongoing, and a
-positive price compared with a genuine zero historic low raises division by
-zero. The core isolates that assessment and reports an error rather than
-silently inventing a new verdict. Those need a separate behavior-changing patch.
+a recently ended cheap episode can still be classified as ongoing. The other
+quirk recorded here has since been fixed on both sides, in the original
+(`33198b7`) and in this port together: a positive price against a genuine zero
+historic low used to raise division by zero, and now yields `DECENT` or `WAIT`
+with the $0.00 low stated. `test_zero_low_legacy_failure_is_not_silently_rewritten`
+holds the two to the same answer.
 
 The value axis supplies explanatory context and the dollars-per-GB tiebreaker;
 this port does not invent a weighted three-axis score. Native reference estimates

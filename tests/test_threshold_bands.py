@@ -16,9 +16,12 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-from alerters.hardware.native.config import ROOT, Thresholds, _thresholds_from
+from alerters.hardware.native.config import Thresholds
+from dealcore.config import overlay
 
 TH = Thresholds()
+# The hardware configuration the scheduled runs actually load.
+SHIPPED = Path(__file__).resolve().parents[1] / "config" / "hardware.toml"
 
 
 class TestBandsStayDisjoint:
@@ -69,25 +72,28 @@ class TestConfigLoaderHonoursDefaults:
     reference_max_price_ratio, so the loader's own 0.5 and 3.0 were what ran
     while the dataclass said 0.5 and 2.0. Editing the dataclass appeared to
     work and changed nothing.
+
+    That loader is `dealcore.config.overlay` now, shared with Steam, and it
+    owes the hardware thresholds the same promise.
     """
 
     def test_absent_keys_fall_back_to_the_dataclass(self) -> None:
-        loaded = _thresholds_from({})
+        loaded = overlay(Thresholds(), {})
         assert loaded == Thresholds()
 
     def test_present_keys_win(self) -> None:
-        loaded = _thresholds_from({"suspicious_price_ratio": 0.42})
+        loaded = overlay(Thresholds(), {"suspicious_price_ratio": 0.42})
         assert loaded.suspicious_price_ratio == 0.42
 
     def test_int_fields_stay_int(self) -> None:
-        loaded = _thresholds_from({"min_observations": 12})
+        loaded = overlay(Thresholds(), {"min_observations": 12})
         assert loaded.min_observations == 12
         assert isinstance(loaded.min_observations, int)
 
     def test_shipped_config_does_not_reintroduce_an_overlap(self) -> None:
         """The invariant has to hold for the config actually shipped, not just
         for the defaults."""
-        with (ROOT / "config.toml").open("rb") as handle:
+        with SHIPPED.open("rb") as handle:
             section = tomllib.load(handle).get("thresholds", {})
-        shipped = _thresholds_from(section)
+        shipped = overlay(Thresholds(), section)
         assert shipped.suspicious_price_ratio < shipped.reference_grail_ratio

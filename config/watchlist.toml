@@ -1,12 +1,13 @@
 # What to hunt for.
 #
-# The Steam version of this project watched a fixed list of appids. Hardware
-# doesn't work that way: you don't want "this exact SKU", you want "any 24GB
-# Ampere card under $700, whoever is selling it". So a hunt is a *rule*.
+# Steam watches a fixed list of appids. Hardware doesn't work that way: you
+# don't want "this exact SKU", you want "any 24GB Ampere card under $700,
+# whoever is selling it". So a hunt is a *rule*.
 #
-# Every hunt needs either `parts` (catalog keys, see ada/catalog.py) or a
-# `class` filter. `target` is the price at or below which you always get
-# alerted regardless of what the history says -- the equivalent of targets.json.
+# Every hunt needs either `parts` (catalog keys, see
+# alerters/hardware/native/catalog.py) or a `class` filter. `target` is the price
+# at or below which you always get alerted regardless of what the history says
+# -- the equivalent of config/steam-targets.json.
 
 # ---------------------------------------------------------------------- tier 1
 # The recommendation: 96GB on one card, 300W, fits the Z790 tower untouched.
@@ -69,6 +70,51 @@ note = "Only 128GB configs. Anything less is a laptop, not an inference machine.
 name = "Unified-memory mini boxes"
 parts = ["framework_desktop_128", "dgx_spark", "strix_halo_mini_128"]
 target = 1200.0
+
+# ------------------------------------------------------------- AMD and Intel
+# Cheaper capacity at real bandwidth, and a software stack that is the entire
+# reason it is cheaper: llama.cpp runs on all of these, vLLM and most
+# quantisation tooling do not. Worth watching, worth reading the note before
+# buying. Every reference price here is an estimate, so these are held below
+# the push threshold until somebody checks one against sold data.
+[[hunt]]
+name = "AMD pro cards (32-48GB)"
+parts = ["radeon_pro_w7900", "radeon_pro_w7800", "radeon_ai_pro_r9700"]
+target = 1400.0
+note = "W7900 is 48GB at A6000 bandwidth. Three slots and ROCm-only."
+
+[[hunt]]
+name = "24GB non-NVIDIA"
+parts = ["rx_7900_xtx", "arc_pro_b60"]
+target = 450.0
+note = "Below the catch-all's 32GB floor, so it needs naming to be seen at all."
+
+# ---------------------------------------------------------- more unified bins
+# The M3 Ultra hunt above covers this generation's top boxes. These are the
+# ones that were invisible: last generation at nearly the same bandwidth, and
+# the small end where capacity is cheap and speed is not.
+[[hunt]]
+name = "Mac Studio Ultra (previous generations)"
+parts = ["mac_studio_m2_ultra_192", "mac_studio_m2_ultra_128", "mac_studio_m1_ultra_128"]
+target = 2600.0
+note = "800 GB/s, within 3% of an M3 Ultra, at used prices. Verify the machine."
+
+[[hunt]]
+name = "Mac Studio M3 Ultra 384GB"
+parts = ["mac_studio_m3_ultra_384"]
+target = 8500.0
+
+[[hunt]]
+name = "Small unified boxes (64GB)"
+parts = ["mac_studio_m4_max_64", "mac_mini_m4_pro_64"]
+target = 1300.0
+note = "The mini is 273 GB/s. Capacity is the whole argument; speed is not."
+
+[[hunt]]
+name = "GB10 boxes"
+parts = ["dgx_spark", "asus_ascent_gx10"]
+target = 2400.0
+note = "Same superchip under two names. Cross-shop them; 273 GB/s either way."
 
 # ---------------------------------------------------------------------- tier 4
 # Datacenter. Mostly gray-market; verify the seller hard before buying.
