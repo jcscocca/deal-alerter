@@ -21,9 +21,9 @@ typed or pasted is yours to run.
   discounted games of 20 wishlisted with no problems and nothing new to send,
   because the old alerter already sent both on Sep 14. The first real run is
   18:15 UTC.
-- **Hardware is on.** The price log holds 1,620 observations from Aug 8-19,
-  including 203 that only existed on the Mac, and grows from the first
-  scheduled run on.
+- **Hardware is on and has run.** The first scheduled push loop and digest ran
+  on 2026-09-17, sent 2 pushes and a 19-deal email, and grew the price log
+  from 1,620 to 2,065 observations.
 - The old repos moved to the `jcscoccaprivate` account. The old `jcscocca/...`
   URLs redirect, but `gh repo list jcscocca` does not show them.
 
@@ -199,6 +199,22 @@ against the Free plan's 2,000, so the loop stays on waking hours until a week
 of scheduled runs shows how often they cross 120 seconds. The first real runs
 should push at most 2 listings, both Mac Studio M3 Ultra 96GB on eBay, and
 email about 23 deals at STRONG or better.
+
+**First scheduled runs, 2026-09-17.** GitHub took almost six hours after #2
+merged to pick up the new schedule, then fired both hardware runs back to back
+at 07:57 UTC:
+
+| Run    | Assessed | Problems | Job time | Sent                  |
+|--------|----------|----------|----------|-----------------------|
+| fast   | 607      | 0        | 140 s    | 2 ntfy pushes         |
+| digest | 605      | 0        | 116 s    | 1 email with 19 deals |
+
+Both committed "Update deal evidence and delivery receipts". The push loop's
+first real run billed 3 minutes. Before this, GitHub created only about 1 in 10
+of this repo's 15-minute scheduled runs, with gaps of up to 5.5 hours, and it
+ran the old Steam repo's daily job 2 to 3.5 hours late. Expect the push loop to
+run a few times a day rather than hourly, with pushes arriving hours after a
+listing appears. Revisit that once there is a day of real runs.
 
 After section 1, turn on the daily digest:
 
