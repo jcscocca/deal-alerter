@@ -11,31 +11,28 @@ verdict for that part from then on.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
-from alerters.hardware.native.config import Config
-from alerters.hardware.native.history import History, bucket_for
+from alerters.hardware.native.history import bucket_for
 from alerters.hardware.native.sources.base import Listing
 from alerters.hardware.native.sources.ebay import _seller_risk
 from alerters.hardware.native.verdict import Verdict
-from check_deals import evaluate, price_stats
+from alerters.hardware.plugin import Candidate, HardwarePlugin
+from tests.hardware_pipeline import evaluate, logged, plugin
 
 
 @pytest.fixture
-def cfg(monkeypatch) -> Config:
-    for name, value in (
-        ("SMTP_USER", "nobody@example.invalid"),
-        ("SMTP_PASSWORD", "unused"),
-        ("MAIL_TO", "nobody@example.invalid"),
-    ):
-        monkeypatch.setenv(name, value)
-    return Config.load()
+def state(tmp_path) -> Path:
+    # Consecutive evaluate() calls in one test share this directory, the way
+    # consecutive scheduled runs share the committed log.
+    return tmp_path / "state"
 
 
 @pytest.fixture
-def history(tmp_path):
-    store = History(tmp_path / "prices.db")
+def hardware(state: Path):
+    store = plugin(state)
     yield store
     store.close()
 
@@ -57,46 +54,40 @@ class TestParts:
     def test_parts_never_pools_with_working_cards(self) -> None:
         assert bucket_for("parts") == "parts"
 
-    def test_a_for_parts_card_is_shown_but_not_logged(
-        self, cfg: Config, history: History
-    ) -> None:
+    def test_a_for_parts_card_is_shown_but_not_logged(self, state: Path) -> None:
         """It already scored PASS; the danger was it becoming the used low."""
         assessments, _ = evaluate(
-            cfg, [_listing(price=300.0, condition_hint="parts")], history
+            state, [_listing(price=300.0, condition_hint="parts")]
         )
         assert assessments[0].verdict is Verdict.PASS
-        assert history.total_observations() == 0
+        assert logged(state) == 0
 
 
 class TestSamplingBias:
-    def test_price_sorted_ebay_actives_are_not_logged(
-        self, cfg: Config, history: History
-    ) -> None:
-        evaluate(cfg, [_listing(loggable=False)], history)
-        assert history.total_observations() == 0
+    def test_price_sorted_ebay_actives_are_not_logged(self, state: Path) -> None:
+        evaluate(state, [_listing(loggable=False)])
+        assert logged(state) == 0
 
-    def test_confirmed_sales_are_logged(self, cfg: Config, history: History) -> None:
-        evaluate(cfg, [_listing(source="ebay-sold", sold=True)], history)
-        assert history.total_observations() == 1
+    def test_confirmed_sales_are_logged(self, state: Path) -> None:
+        evaluate(state, [_listing(source="ebay-sold", sold=True)])
+        assert logged(state) == 1
 
 
 class TestSuspiciousPrice:
-    def test_far_below_market_is_shown_but_not_logged(
-        self, cfg: Config, history: History
-    ) -> None:
+    def test_far_below_market_is_shown_but_not_logged(self, state: Path) -> None:
         """$300 against a $750 reference is ratio 0.40 -- the scam band.
 
         It clears min_price_ratio (0.25) deliberately: a genuine steal lives in
         the same band, and price alone cannot separate the two.
         """
-        assessments, _ = evaluate(cfg, [_listing(price=300.0)], history)
+        assessments, _ = evaluate(state, [_listing(price=300.0)])
         assert assessments, "must still be surfaced for your judgment"
         assert "bait rather than a bargain" in assessments[0].reason
-        assert history.total_observations() == 0
+        assert logged(state) == 0
 
-    def test_an_ordinary_price_is_logged(self, cfg: Config, history: History) -> None:
-        evaluate(cfg, [_listing(price=700.0)], history)
-        assert history.total_observations() == 1
+    def test_an_ordinary_price_is_logged(self, state: Path) -> None:
+        evaluate(state, [_listing(price=700.0)])
+        assert logged(state) == 1
 
 
 class TestSellerRisk:
@@ -118,12 +109,10 @@ class TestSellerRisk:
         """Absent fields mean eBay didn't send them, not that the seller is bad."""
         assert _seller_risk({"seller": {}}) == ("low", "")
 
-    def test_high_risk_downgrades_and_blocks_logging(
-        self, cfg: Config, history: History
-    ) -> None:
-        clean, _ = evaluate(cfg, [_listing(price=700.0)], history)
+    def test_high_risk_downgrades_and_blocks_logging(self, state: Path) -> None:
+        clean, _ = evaluate(state, [_listing(price=700.0)])
         risky, _ = evaluate(
-            cfg,
+            state,
             [
                 _listing(
                     listing_id="l2",
@@ -132,12 +121,11 @@ class TestSellerRisk:
                     seller_note="the seller has 3 feedback",
                 )
             ],
-            history,
         )
         assert risky[0].verdict < clean[0].verdict
         assert "3 feedback" in risky[0].reason
         # Only the clean listing made it into the log.
-        assert history.total_observations() == 1
+        assert logged(state) == 1
 
 
 class TestUntrustedSellerAtAnAlertingPrice:
@@ -158,11 +146,9 @@ class TestUntrustedSellerAtAnAlertingPrice:
 
     TITLE = "Apple Mac Studio 2025 M3 Ultra 28C/60C 256GB RAM 2TB SSD | A3389"
 
-    def test_the_mac_studio_does_not_reach_the_digest(
-        self, cfg: Config, history: History
-    ) -> None:
+    def test_the_mac_studio_does_not_reach_the_digest(self, state: Path) -> None:
         items, _ = evaluate(
-            cfg,
+            state,
             [
                 _listing(
                     listing_id="206497757350",
@@ -172,23 +158,22 @@ class TestUntrustedSellerAtAnAlertingPrice:
                     seller_note="the seller has 0 feedback",
                 )
             ],
-            history,
         )
         assert items, "the listing must still be matched and shown"
         assert items[0].verdict <= Verdict.GOOD, "must not reach the digest floor"
         assert not items[0].loggable
-        assert history.total_observations() == 0
+        assert logged(state) == 0
 
     def test_an_ordinary_price_from_the_same_seller_only_drops_one_level(
-        self, cfg: Config, history: History
+        self, state: Path
     ) -> None:
         """The cap is aimed at the profile, not at new sellers generally. A
         merely unremarkable price keeps the old one-level treatment."""
         clean, _ = evaluate(
-            cfg, [_listing(listing_id="a", title=self.TITLE, price=13000.0)], history
+            state, [_listing(listing_id="a", title=self.TITLE, price=13000.0)]
         )
         risky, _ = evaluate(
-            cfg,
+            state,
             [
                 _listing(
                     listing_id="b",
@@ -198,37 +183,46 @@ class TestUntrustedSellerAtAnAlertingPrice:
                     seller_note="the seller has 0 feedback",
                 )
             ],
-            history,
         )
         assert risky[0].verdict == Verdict(max(int(clean[0].verdict) - 1, 0))
         assert "Downgraded one level" in risky[0].reason
 
 
+def _used_3090(hardware: HardwarePlugin) -> Candidate:
+    """What a run reads history for: a prepared candidate, here a used 3090."""
+    candidate = hardware.prepare(_listing(condition_hint="used"))
+    assert candidate is not None and candidate.match.part.key == "rtx_3090"
+    return candidate
+
+
 class TestSoldPricesDoNotPoolWithAsking:
+    # `price_stats` became the plugin's history read, which a run calls with a
+    # prepared candidate. The rows go into the log that plugin rebuilt.
+
     def test_asking_prices_are_used_until_there_are_enough_sales(
-        self, cfg: Config, history: History
+        self, hardware: HardwarePlugin
     ) -> None:
         for index in range(10):
-            history.record(
+            hardware.log.record(
                 part_key="rtx_3090",
                 condition="used",
                 unit_price=900.0,
                 source="reddit",
                 listing_id=f"ask-{index}",
             )
-        history.commit()
-        stats = price_stats(history, "rtx_3090", "used", cfg.thresholds)
+        hardware.log.commit()
+        stats = hardware.read_history(_used_3090(hardware))
         assert stats.count == 10
         assert stats.median == 900.0
 
     def test_confirmed_sales_take_over_once_trustworthy(
-        self, cfg: Config, history: History
+        self, hardware: HardwarePlugin
     ) -> None:
         # Spread over months: percentiles need time depth, not just row count,
         # or one snapshot of current inventory would rank against itself.
         now = datetime.now(timezone.utc)
         for index in range(10):
-            history.record(
+            hardware.log.record(
                 part_key="rtx_3090",
                 condition="used",
                 unit_price=900.0,
@@ -237,7 +231,7 @@ class TestSoldPricesDoNotPoolWithAsking:
                 seen_at=now - timedelta(days=90 - index * 3),
             )
         for index in range(8):
-            history.record(
+            hardware.log.record(
                 part_key="rtx_3090",
                 condition="used",
                 unit_price=700.0,
@@ -246,8 +240,8 @@ class TestSoldPricesDoNotPoolWithAsking:
                 sold=True,
                 seen_at=now - timedelta(days=80 - index * 5),
             )
-        history.commit()
+        hardware.log.commit()
 
-        stats = price_stats(history, "rtx_3090", "used", cfg.thresholds)
+        stats = hardware.read_history(_used_3090(hardware))
         assert stats.count == 8, "asking prices must not dilute the sold sample"
         assert stats.median == 700.0

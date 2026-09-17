@@ -6,36 +6,25 @@ arbitrary moment logs whatever asking prices happen to be up, and every future
 percentile is computed against them. Skipping only the JSONL export isn't
 enough -- the SQLite cache is never re-seeded once it has rows, so anything
 committed there survives and gets exported by the next real run.
+
+The cache is now private to a single run and rebuilt from the JSONL, so that
+particular leak cannot recur. What these guard is the log the next run loads.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
-from alerters.hardware.native.config import Config
-from alerters.hardware.native.history import History
 from alerters.hardware.native.sources.base import Listing
-from check_deals import evaluate
+from tests.hardware_pipeline import evaluate, logged
 
 
 @pytest.fixture
-def cfg(monkeypatch) -> Config:
-    for name, value in (
-        ("SMTP_USER", "nobody@example.invalid"),
-        ("SMTP_PASSWORD", "unused"),
-        ("MAIL_TO", "nobody@example.invalid"),
-    ):
-        monkeypatch.setenv(name, value)
-    return Config.load()
-
-
-@pytest.fixture
-def history(tmp_path):
-    store = History(tmp_path / "prices.db")
-    yield store
-    store.close()
+def state(tmp_path) -> Path:
+    return tmp_path / "state"
 
 
 @pytest.fixture
@@ -52,17 +41,15 @@ def listing() -> Listing:
 
 class TestDryRunLeavesNoTrace:
     def test_a_real_run_records_the_observation(
-        self, cfg: Config, history: History, listing: Listing
+        self, state: Path, listing: Listing
     ) -> None:
         """The control: this listing does reach the record loop."""
-        _, matched = evaluate(cfg, [listing], history)
+        _, matched = evaluate(state, [listing])
         assert matched == 1
-        assert history.total_observations() == 1
+        assert logged(state) == 1
 
-    def test_dry_run_records_nothing(
-        self, cfg: Config, history: History, listing: Listing
-    ) -> None:
-        assessments, matched = evaluate(cfg, [listing], history, record=False)
+    def test_dry_run_records_nothing(self, state: Path, listing: Listing) -> None:
+        assessments, matched = evaluate(state, [listing], record=False)
         assert matched == 1
         assert assessments, "the listing should still be scored and reported"
-        assert history.total_observations() == 0
+        assert logged(state) == 0

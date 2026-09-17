@@ -12,13 +12,15 @@ from __future__ import annotations
 
 import pytest
 
-from alerters.hardware.native.history import History
-from check_deals import show_stats
+from alerters.hardware.plugin import HardwarePlugin
+from tests.hardware_pipeline import plugin
 
 
 @pytest.fixture
-def history(tmp_path):
-    store = History(tmp_path / "prices.db")
+def hardware(tmp_path):
+    # --stats is a plugin method now and reads the log the plugin rebuilt, so
+    # the observations go into that log rather than a free-standing History.
+    store = plugin(tmp_path / "state")
     yield store
     store.close()
 
@@ -34,41 +36,43 @@ def _rows(captured: str) -> list[str]:
 
 class TestStatsBuckets:
     def test_each_observation_is_reported_once(
-        self, history: History, capsys
+        self, hardware: HardwarePlugin, capsys
     ) -> None:
-        history.record(
+        hardware.log.record(
             part_key="rtx_3090",
             condition="used",
             unit_price=900.0,
             source="ebay",
             listing_id="used-1",
         )
-        history.commit()
+        hardware.log.commit()
 
-        show_stats(history)
+        hardware.show_stats()
         rows = _rows(capsys.readouterr().out)
 
         assert len(rows) == 1, f"one observation, one row; got {rows}"
         assert "used" in rows[0]
 
-    def test_refurb_is_reported_as_refurb(self, history: History, capsys) -> None:
-        history.record(
+    def test_refurb_is_reported_as_refurb(
+        self, hardware: HardwarePlugin, capsys
+    ) -> None:
+        hardware.log.record(
             part_key="rtx_3090",
             condition="used",
             unit_price=900.0,
             source="ebay",
             listing_id="used-1",
         )
-        history.record(
+        hardware.log.record(
             part_key="rtx_3090",
             condition="refurbished",
             unit_price=1100.0,
             source="ebay",
             listing_id="refurb-1",
         )
-        history.commit()
+        hardware.log.commit()
 
-        show_stats(history)
+        hardware.show_stats()
         rows = _rows(capsys.readouterr().out)
 
         assert len(rows) == 2

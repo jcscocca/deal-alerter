@@ -298,15 +298,35 @@ class HardwarePlugin:
                  ". No hunt covers this part, so it will not be judged -- add it to watchlist.toml."))
 
     def show_stats(self) -> None:
-        print(f"{self.log.total_observations():,} observations in {self.log_path}")
+        """What the log knows. Useful for deciding whether to trust the verdicts yet.
+
+        The table is the retired entry point's, restored: the port had
+        flattened it to raw floats and dropped the low and p25 columns, which
+        are what reference prices get recalibrated against.
+        """
+        total = self.log.total_observations()
+        print(f"{total:,} observations logged at {self.log_path}\n")
+        if not total:
+            print("Nothing yet. Verdicts will use catalog reference prices until the")
+            print("log fills up -- let the scheduled runs collect for a week or two.")
+            return
+        header = f"{'part':<38} {'cond':<7} {'n':>4} {'low':>9} {'p25':>9} {'median':>9}"
+        print(header)
+        print("-" * len(header))
+        cell = lambda value: money(value, decimals=0) if value is not None else "-"
         for part in self.catalog.PARTS:
+            # Conditions, not bucket names: stats() re-maps whatever it's given
+            # through bucket_for(), and "refurb" isn't a condition -- it would
+            # fall through the default and report the used bucket a second time.
             for condition in ("used", "refurbished", "new"):
                 stats = self.log.stats(part.key, condition,
                     min_observations=self.cfg.thresholds.min_observations,
                     min_span_days=self.cfg.thresholds.min_observation_days)
-                if stats.count:
-                    print(f"{part.name}: {stats.bucket}, n={stats.count}, median={stats.median}, "
-                          f"trustworthy={stats.trustworthy}")
+                if not stats.count:
+                    continue
+                mark = "" if stats.trustworthy else "  (too few to rank)"
+                print(f"{part.name:<38} {stats.bucket:<7} {stats.count:>4} {cell(stats.low):>9} "
+                      f"{cell(stats.p25):>9} {cell(stats.median):>9}{mark}")
 
     def close(self) -> None:
         try:
