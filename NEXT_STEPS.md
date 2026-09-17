@@ -14,14 +14,15 @@ typed or pasted is yours to run.
   in `tests.yml` and pass at 681 on Python 3.11 and 3.14, scheduled runs in
   `check.yml` only check deals, the four quarantined hardware tests are
   restored, and the README describes the product.
-- **Nothing is scheduled yet.** Every `ENABLE_*` repository variable is unset,
-  and `STEAM_ID` is the only secret.
-- **The only live alerting** is the old Steam alerter,
-  `jcscoccaprivate/steam-deal-alerter`, daily at 18:15 UTC.
-- **Hardware has been dark since 2026-08-17.** The committed price log holds
-  1,417 observations from Aug 8-17, identical in both repos. It never reached
-  the 14-day span percentiles need, so every hardware verdict so far has been
-  reference-based.
+- **Everything is switched on as of 2026-09-16.** `ENABLE_STEAM`,
+  `ENABLE_HARDWARE` and `ENABLE_HARDWARE_FAST` are all true. The old Steam
+  workflow is disabled and the old launchd agents are unloaded.
+- **Steam is blocked on its key.** `ITAD_API_KEY` is set but ITAD rejects it,
+  so every Steam run fails, and sends nothing, until section 3's key step is
+  done.
+- **Hardware is on.** The price log holds 1,620 observations from Aug 8-19,
+  including 203 that only existed on the Mac, and grows from the first
+  scheduled run on.
 - The old repos moved to the `jcscoccaprivate` account. The old `jcscocca/...`
   URLs redirect, but `gh repo list jcscocca` does not show them.
 
@@ -38,13 +39,13 @@ If it is already cloned, `git pull` instead. Commands below run from
 
 ## 1. The old hardware alerter on the Mac -- do this first
 
-**Done 2026-09-16 on the Mac, except stopping the agents.** Both agents were
-still loaded but had failed every run since 2026-08-19 because
-`~/Repos/ai-deal-alerter/.venv` no longer exists (digest exits 127 daily at
-09:00, fast exits 78 every 15 min). The Mac's log had 203 rows newer than the
-committed one and none missing, and no changes outside `state/`; both files are
-copied into `state/hardware/US/`, stats and the 681 tests pass. The only thing
-left in this section is the `launchctl bootout` block below.
+**Done 2026-09-16 on the Mac.** Both agents were still loaded but had failed
+every run since 2026-08-19 because `~/Repos/ai-deal-alerter/.venv` no longer
+exists (digest exits 127 daily at 09:00, fast exits 78 every 15 min). They are
+now booted out, with their plists in `~/Library/LaunchAgents.disabled/`. The
+Mac's log had 203 rows newer than the committed one and none missing, and no
+changes outside `state/`; both files are copied into `state/hardware/US/`, and
+stats and the 681 tests pass.
 
 It ran from `~/Repos/ai-deal-alerter` under two launchd agents,
 `com.jscocca.ai-deal-alerter.fast` and `com.jscocca.ai-deal-alerter.digest`.
@@ -112,20 +113,31 @@ EOF
 
 ## 2. Secrets
 
-The Mac's old `.env` has every key `check.yml` reads, including Reddit API
-credentials the Windows one lacked (these should cut the Reddit throttling
-noted under "Later"). Its `SMTP_HOST`, `SMTP_PORT` and `NTFY_SERVER` match the
-workflow defaults, so no repository variables are needed. This sends only the settings that have a value, and prints none:
+**Done 2026-09-16, but `ITAD_API_KEY` is invalid; see section 3.** The command
+below set `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `MAIL_TO`, `NTFY_TOPIC`,
+`EBAY_CLIENT_ID` and `EBAY_CLIENT_SECRET`. The old `.env` names `NTFY_TOKEN`,
+`DISCORD_WEBHOOK` and both Reddit keys but leaves them blank, so those stay
+unset. Its `SMTP_HOST`, `SMTP_PORT` and `NTFY_SERVER` match the workflow
+defaults, so no repository variables are needed.
+
+The Mac's old `.env` has what the Windows one lacked. This sends only the
+settings that have a value, and prints none:
 
 ```bash
 grep -E '^(SMTP_USER|SMTP_PASSWORD|MAIL_FROM|MAIL_TO|NTFY_TOPIC|NTFY_TOKEN|DISCORD_WEBHOOK|EBAY_CLIENT_ID|EBAY_CLIENT_SECRET|REDDIT_CLIENT_ID|REDDIT_CLIENT_SECRET)=.+' ~/Repos/ai-deal-alerter/.env | gh secret set -f - -R jcscocca/deal-alerter
 ```
 
-The IsThereAnyDeal key is shown at isthereanydeal.com/apps/my:
+The IsThereAnyDeal key is shown at isthereanydeal.com/apps/my. That page also
+shows OAuth client credentials, and this needs the API key. Copy it, then run
+this. It checks the clipboard's key against ITAD and stores it only if ITAD
+accepts it, and it avoids `gh`'s interactive prompt, which a terminal's escape
+replies can break:
 
 ```bash
-gh secret set ITAD_API_KEY -R jcscocca/deal-alerter
+printf 'ITAD-API-Key: %s' "$(pbpaste | tr -d '[:space:]')" | curl -s --fail-with-body -X POST 'https://api.isthereanydeal.com/games/prices/v3?country=US&shops=61' -H @- -H 'Content-Type: application/json' -d '["018d937f-12e9-71ca-a5d5-f31985870694"]' && echo && pbpaste | tr -d '[:space:]' | gh secret set ITAD_API_KEY -R jcscocca/deal-alerter
 ```
+
+A rejected key prints ITAD's `Invalid or expired api key` and stores nothing.
 
 ```bash
 gh secret list -R jcscocca/deal-alerter
@@ -136,6 +148,14 @@ the mail server is not Gmail on port 587, also set the repository variables
 `SMTP_HOST` and `SMTP_PORT`.
 
 ## 3. Steam cutover -- in this order
+
+**Done 2026-09-16 except the key.** The old workflow is disabled, its state as
+of its Sep 16 run is committed, and `ENABLE_STEAM` is on. The dry run failed
+with `steam: ITAD /games/prices/v3: HTTP 403`. ITAD answers a missing or
+invalid key with 403, and it does read the `ITAD-API-Key` header this client
+sends, so the stored key itself is wrong. Re-set it with section 2's clipboard
+command, then repeat the dry run below. Until then, each 18:15 UTC Steam run
+fails and sends nothing.
 
 Needs `ITAD_API_KEY`, `SMTP_USER`, `SMTP_PASSWORD` and `MAIL_TO`.
 
@@ -166,6 +186,20 @@ The Check step should end with `N assessed; 0 problem(s).`, and the HTML
 preview is attached to the run. The first real run is the next 18:15 UTC.
 
 ## 4. Hardware
+
+**Switched on 2026-09-16.** Dry runs with eBay:
+
+| Mode   | Assessed | Problems | Job time |
+|--------|----------|----------|----------|
+| digest | 608      | 0        | 114 s    |
+| fast   | 605      | 0        | 112 s    |
+
+Each bills 2 minutes, but only 6-8 seconds under the line where a run bills 3.
+Around the clock comes to about 1,530 minutes a month at 2 and 2,280 at 3,
+against the Free plan's 2,000, so the loop stays on waking hours until a week
+of scheduled runs shows how often they cross 120 seconds. The first real runs
+should push at most 2 listings, both Mac Studio M3 Ultra 96GB on eBay, and
+email about 23 deals at STRONG or better.
 
 After section 1, turn on the daily digest:
 
