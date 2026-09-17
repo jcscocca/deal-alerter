@@ -11,12 +11,15 @@ on:
     - cron: '15 18 * * *'
     # Hardware digest, daily. Email only; lateness costs nothing here.
     - cron: '47 2 * * *'
-    # Hardware fast loop, hourly. Push only. Not every 15 minutes: a run bills
-    # one to two runner minutes, so that cadence is roughly 3,000-6,000 minutes
-    # a month against the Free plan's 2,000 for private repositories, and
-    # GitHub delivers short-interval crons late or not at all under load.
-    # Check what a real run bills before tightening it.
-    - cron: '37 * * * *'
+    # Hardware fast loop, push only: hourly from 14:00 to 06:00 UTC, which is
+    # 7am-11pm Pacific in summer. Measured 2026-09-16, a run takes ~110s before
+    # eBay's searches (Reddit's anonymous throttling is ~80% of it) and GitHub
+    # bills whole minutes, so call it 3. Around the clock that is ~2,300
+    # minutes a month with the other schedules, over the Free plan's 2,000 for
+    # private repositories -- and when the quota runs out, every workflow here
+    # stops until the next cycle, Steam included. Waking hours come to ~1,650.
+    # With more minutes, '37 * * * *' is the change; mind the two matches below.
+    - cron: '37 0-6,14-23 * * *'
   workflow_dispatch:
     inputs:
       domain:
@@ -50,7 +53,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.schedule == '15 18 * * *' && vars.ENABLE_STEAM == 'true') ||
       (github.event.schedule == '47 2 * * *' && vars.ENABLE_HARDWARE == 'true') ||
-      (github.event.schedule == '37 * * * *' && vars.ENABLE_HARDWARE_FAST == 'true')
+      (github.event.schedule == '37 0-6,14-23 * * *' && vars.ENABLE_HARDWARE_FAST == 'true')
     runs-on: ubuntu-latest
     env:
       STEAM_ID: ${{ secrets.STEAM_ID }}
@@ -92,7 +95,7 @@ jobs:
             case "$SCHEDULE" in
               '15 18 * * *') DOMAIN=steam; MODE=digest ;;
               '47 2 * * *') DOMAIN=hardware; MODE=digest ;;
-              '37 * * * *') DOMAIN=hardware; MODE=fast ;;
+              '37 0-6,14-23 * * *') DOMAIN=hardware; MODE=fast ;;
               *) echo "Unrecognised schedule: $SCHEDULE" >&2; exit 1 ;;
             esac
           fi
