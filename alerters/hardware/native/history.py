@@ -94,6 +94,9 @@ class PriceStats:
     all_time_low_at: datetime | None = None
     # Median over the last 30 days, to spot a market that is moving.
     recent_median: float | None = None
+    # How many observations that median rests on. Three listings are not
+    # evidence that a market has moved.
+    recent_count: int = 0
     # How many of the observations are confirmed sales rather than asking prices.
     sold_count: int = 0
 
@@ -307,6 +310,7 @@ class History:
             for row in rows
             if (parsed := _parse(row["last_seen"])) and parsed >= cutoff
         ]
+        stats.recent_count = len(recent)
         if recent:
             stats.recent_median = _quantile(sorted(recent), 0.50)
 

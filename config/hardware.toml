@@ -48,6 +48,16 @@ reference_strong_ratio = 0.95
 reference_good_ratio = 1.05
 reference_fair_ratio = 1.20
 
+# A sold reference only means what it says while asking prices still sit above
+# it. Once the last 30 days of asks have fallen to it, a successor has usually
+# shipped and the reference describes the old market, so the part is held below
+# push until the number is refreshed. Measured 2026-09-17, after the M5 Ultra:
+# Mac Studio M3 Ultra asks ran 0.95-1.01x their August sold averages, while the
+# 512GB part it did not replace still asked 1.78x.
+stale_anchor_ask_ratio = 1.05
+# ...and only when at least this many recent observations back that median up.
+stale_anchor_min_recent = 5
+
 # Below this multiple of the anchor a price is shown but never recorded, and
 # never allowed to alert. Must stay under reference_grail_ratio -- the tool's
 # best verdict and its bait warning must not describe the same price. Enforced

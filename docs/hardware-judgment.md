@@ -33,3 +33,11 @@ that part. So these are surfaced with the reason stated, and never recorded:
 Sold prices and asking prices do not pool either. An asking price is what nobody
 has paid yet; once a part has enough confirmed sales, those become what it is
 judged against, and asking prices stop diluting them.
+
+That gap is also how the tool notices its own numbers going stale. A reference
+price is a claim about a market at a moment. Asks sit above what a thing sells
+for, so when the last 30 days of asks have fallen to a part's sold average, the
+average is describing a market that has moved on -- a successor shipped,
+usually -- and every ratio against it reads a band too generous. Such a part is
+held below push, with the reason stated, until the number is refreshed.
+`stale_anchor_ask_ratio` in `config/hardware.toml` sets the line.
