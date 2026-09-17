@@ -24,8 +24,9 @@ typed or pasted is yours to run.
 - **Hardware is on and has run.** The first scheduled push loop and digest ran
   on 2026-09-17, sent 2 pushes and a 19-deal email, and grew the price log
   from 1,620 to 2,065 observations.
-- The old repos moved to the `jcscoccaprivate` account. The old `jcscocca/...`
-  URLs redirect, but `gh repo list jcscocca` does not show them.
+- The old repos moved to the `jcscoccaprivate` account and were archived on
+  2026-09-17. The old `jcscocca/...` URLs redirect, but `gh repo list jcscocca`
+  does not show them.
 
 ## 0. Get this repo on the Mac
 
@@ -243,6 +244,12 @@ look for a bot commit, "Update deal evidence and delivery receipts", touching
 `state/hardware/US/prices.jsonl`.
 
 ## 5. Retire the old repos
+
+**Done 2026-09-17, ahead of Steam's first scheduled run.** Both old repos have
+`"status": "archived"`, an `ARCHIVED.md` in place of `SUPERSEDED.md`, and are
+archived on GitHub. If Steam's first real run fails and the old alerter is
+needed, `gh repo unarchive` and `gh workflow enable` bring it back. Delete this
+file once that run has succeeded.
 
 Once Steam and hardware have each completed a real scheduled run, and
 section 1 is done:
