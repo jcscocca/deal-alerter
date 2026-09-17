@@ -1,0 +1,3 @@
+-r requirements.txt
+-r alerters/hardware/native/requirements.txt
+pytest>=8

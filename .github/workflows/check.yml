@@ -1,9 +1,22 @@
 name: Check deals
+
+# Scheduled alert runs, nothing else. The test suite gates code in tests.yml
+# instead: run before every check, one broken test silenced every alert until
+# somebody noticed, and a date-pinned test in ai-deal-alerter once went red on
+# its own with nobody touching the code.
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
-    - cron: '17 2 * * *'
+    # Steam, daily at 18:15 UTC: Steam flips sale pricing around 10:00 PT, so
+    # this lands shortly after new discounts go live.
+    - cron: '15 18 * * *'
+    # Hardware digest, daily. Email only; lateness costs nothing here.
     - cron: '47 2 * * *'
+    # Hardware fast loop, hourly. Push only. Not every 15 minutes: a run bills
+    # one to two runner minutes, so that cadence is roughly 3,000-6,000 minutes
+    # a month against the Free plan's 2,000 for private repositories, and
+    # GitHub delivers short-interval crons late or not at all under load.
+    # Check what a real run bills before tightening it.
+    - cron: '37 * * * *'
   workflow_dispatch:
     inputs:
       domain:
@@ -29,16 +42,22 @@ concurrency:
 
 jobs:
   check:
+    # One switch per schedule, so each can go live as soon as its own secrets
+    # exist. ENABLE_HARDWARE is the daily digest and needs only SMTP;
+    # ENABLE_HARDWARE_FAST needs NTFY_TOPIC or DISCORD_WEBHOOK, and without one
+    # every hourly run would fail on configuration.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.schedule == '17 2 * * *' && vars.ENABLE_STEAM == 'true') ||
-      (github.event.schedule != '17 2 * * *' && vars.ENABLE_HARDWARE == 'true')
+      (github.event.schedule == '15 18 * * *' && vars.ENABLE_STEAM == 'true') ||
+      (github.event.schedule == '47 2 * * *' && vars.ENABLE_HARDWARE == 'true') ||
+      (github.event.schedule == '37 * * * *' && vars.ENABLE_HARDWARE_FAST == 'true')
     runs-on: ubuntu-latest
     env:
       STEAM_ID: ${{ secrets.STEAM_ID }}
       ITAD_API_KEY: ${{ secrets.ITAD_API_KEY }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      MAIL_FROM: ${{ secrets.MAIL_FROM }}
       MAIL_TO: ${{ secrets.MAIL_TO }}
       SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
       SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
@@ -59,13 +78,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
-      - name: Install and test
-        run: |
-          python -m pip install -r requirements.txt
-          if [ -f alerters/hardware/native/requirements.txt ]; then
-            python -m pip install -r alerters/hardware/native/requirements.txt
-          fi
-          python -m unittest discover -s tests -v
+      - name: Install
+        run: python -m pip install -r requirements.txt -r alerters/hardware/native/requirements.txt
       - name: Check
         env:
           EVENT: ${{ github.event_name }}
@@ -76,14 +90,25 @@ jobs:
         run: |
           if [ "$EVENT" != workflow_dispatch ]; then
             case "$SCHEDULE" in
-              '17 2 * * *') DOMAIN=steam; MODE=digest ;;
+              '15 18 * * *') DOMAIN=steam; MODE=digest ;;
               '47 2 * * *') DOMAIN=hardware; MODE=digest ;;
-              *) DOMAIN=hardware; MODE=fast ;;
+              '37 * * * *') DOMAIN=hardware; MODE=fast ;;
+              *) echo "Unrecognised schedule: $SCHEDULE" >&2; exit 1 ;;
             esac
           fi
           flags=("--$MODE" --quiet-when-empty)
           if [ "$DRY" = true ]; then flags+=(--dry-run); fi
           python -m alerters "$DOMAIN" "${flags[@]}"
+      # A dry run sends nothing, so the preview is the only way to see what it
+      # would have sent.
+      - name: Keep the dry-run preview
+        if: always() && inputs.dry_run
+        uses: actions/upload-artifact@v7
+        with:
+          name: preview-${{ inputs.domain }}-${{ inputs.mode }}
+          path: report-*.html
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Preserve observations and successful delivery receipts
         if: always()
         run: |

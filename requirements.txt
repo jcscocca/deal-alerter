@@ -1,2 +1,3 @@
-# Already used by both original repositories. Tests use the standard library.
+# Runtime dependencies for both alerters. The test suite also needs pytest;
+# install requirements-dev.txt for that.
 requests
