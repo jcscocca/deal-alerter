@@ -182,6 +182,15 @@ run and keeps the HTML preview as a downloadable artifact.
 Tests do not run before alerts. `tests.yml` gates code on pushes and pull
 requests instead, so a broken test cannot silence an alert.
 
+**Scheduled runs are best effort, and GitHub means it.** Measured 2026-09-17:
+the hourly push loop produced one run in the eight slots between 14:00 and
+21:00 UTC, the daily hardware digest arrived five hours after its slot, and
+Steam arrived three. Under an earlier 15-minute schedule GitHub created about
+eight runs a day out of ninety-six. So the push loop is not hourly in practice,
+the Actions-minute arithmetic above is a ceiling rather than a forecast, and
+anything that has to reach you within the hour needs a trigger from outside
+GitHub.
+
 **Keep one writer.** Don't make real, non-dry local runs while the schedules are
 on: two writers committing the price log and alert receipts will conflict, and
 the workflow fails on a push conflict rather than force-pushing. GitHub also
