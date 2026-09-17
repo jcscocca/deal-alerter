@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-17T07:57:26+00:00",
+  "updated_at": "2026-09-17T07:59:48+00:00",
   "alerts": {
     "ebay:v1|188539094888": {
       "deliveries": {
@@ -13,6 +13,11 @@
           "price": 5999.99,
           "verdict": 5,
           "alerted_at": "2026-08-08T11:55:46+00:00"
+        },
+        "email": {
+          "price": 5999.99,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
         },
         "ntfy": {
           "price": 5999.99,
@@ -46,6 +51,15 @@
           "price": 5966.0,
           "verdict": 2,
           "alerted_at": "2026-08-08T16:02:32+00:00"
+        }
+      }
+    },
+    "ebay:v1|198378890604": {
+      "deliveries": {
+        "email": {
+          "price": 1700.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
         }
       }
     },
@@ -94,10 +108,24 @@
     },
     "ebay:v1|206536612797": {
       "deliveries": {
+        "email": {
+          "price": 4699.0,
+          "verdict": 4,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        },
         "ntfy": {
           "price": 4699.0,
           "verdict": 4,
           "alerted_at": "2026-09-17T07:57:26+00:00"
+        }
+      }
+    },
+    "ebay:v1|227410277020": {
+      "deliveries": {
+        "email": {
+          "price": 5899.99,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
         }
       }
     },
@@ -110,8 +138,103 @@
         }
       }
     },
+    "ebay:v1|267540727531": {
+      "deliveries": {
+        "email": {
+          "price": 1699.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|267600568319": {
+      "deliveries": {
+        "email": {
+          "price": 1699.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|267787542577": {
+      "deliveries": {
+        "email": {
+          "price": 5399.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|277307992860": {
+      "deliveries": {
+        "email": {
+          "price": 5799.99,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|277881553263": {
+      "deliveries": {
+        "email": {
+          "price": 4899.99,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|278381537757": {
+      "deliveries": {
+        "email": {
+          "price": 4279.99,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|287590858455": {
+      "deliveries": {
+        "email": {
+          "price": 4400.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|287591287808": {
+      "deliveries": {
+        "email": {
+          "price": 1500.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|297490485196": {
+      "deliveries": {
+        "email": {
+          "price": 5629.99,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|307025161170": {
+      "deliveries": {
+        "email": {
+          "price": 5699.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
     "ebay:v1|307182488113": {
       "deliveries": {
+        "email": {
+          "price": 5135.0,
+          "verdict": 4,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        },
         "ntfy": {
           "price": 5135.0,
           "verdict": 4,
@@ -134,6 +257,15 @@
           "price": 5966.0,
           "verdict": 2,
           "alerted_at": "2026-08-08T16:02:32+00:00"
+        }
+      }
+    },
+    "ebay:v1|318814049093": {
+      "deliveries": {
+        "email": {
+          "price": 1698.89,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
         }
       }
     },
@@ -172,6 +304,24 @@
           "price": 8950.0,
           "verdict": 3,
           "alerted_at": "2026-08-08T11:55:46+00:00"
+        }
+      }
+    },
+    "ebay:v1|398171064336": {
+      "deliveries": {
+        "email": {
+          "price": 1600.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
+        }
+      }
+    },
+    "ebay:v1|407205046476": {
+      "deliveries": {
+        "email": {
+          "price": 4799.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-17T07:59:48+00:00"
         }
       }
     },
