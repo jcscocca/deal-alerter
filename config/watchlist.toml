@@ -1,12 +1,13 @@
 # What to hunt for.
 #
-# The Steam version of this project watched a fixed list of appids. Hardware
-# doesn't work that way: you don't want "this exact SKU", you want "any 24GB
-# Ampere card under $700, whoever is selling it". So a hunt is a *rule*.
+# Steam watches a fixed list of appids. Hardware doesn't work that way: you
+# don't want "this exact SKU", you want "any 24GB Ampere card under $700,
+# whoever is selling it". So a hunt is a *rule*.
 #
-# Every hunt needs either `parts` (catalog keys, see ada/catalog.py) or a
-# `class` filter. `target` is the price at or below which you always get
-# alerted regardless of what the history says -- the equivalent of targets.json.
+# Every hunt needs either `parts` (catalog keys, see
+# alerters/hardware/native/catalog.py) or a `class` filter. `target` is the price
+# at or below which you always get alerted regardless of what the history says
+# -- the equivalent of config/steam-targets.json.
 
 # ---------------------------------------------------------------------- tier 1
 # The recommendation: 96GB on one card, 300W, fits the Z790 tower untouched.
