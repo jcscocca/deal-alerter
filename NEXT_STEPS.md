@@ -3,8 +3,10 @@
 Written 2026-09-16 on the Windows machine, for picking up on the Mac. Work
 through the sections in order, and delete this file when section 5 is done.
 
-Credentials are yours to set. A Claude session should hand you the secret
-commands below rather than run them itself.
+Secret values must never appear in the conversation, because the transcript
+persists. A Claude session may run commands that move them blind, such as
+the grep-to-`gh secret set` pipeline below, but any command that needs a value
+typed or pasted is yours to run.
 
 ## Where things stand
 
