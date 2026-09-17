@@ -97,4 +97,4 @@ not the same rule with different constants.
 3. ~~Both alerters have run in parallel long enough to compare real alerts.~~
    **Dropped.** The old hardware alerter stopped collecting on 2026-08-17, so
    there was nothing left to run in parallel with, and every day spent waiting
-   was a day missing from the price log. Cut over directly on 2026-09-16.
+   was a day missing from the price log. Cut over directly instead.
