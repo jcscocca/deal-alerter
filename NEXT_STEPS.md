@@ -36,6 +36,14 @@ If it is already cloned, `git pull` instead. Commands below run from
 
 ## 1. The old hardware alerter on the Mac -- do this first
 
+**Done 2026-09-16 on the Mac, except stopping the agents.** Both agents were
+still loaded but had failed every run since 2026-08-19 because
+`~/Repos/ai-deal-alerter/.venv` no longer exists (digest exits 127 daily at
+09:00, fast exits 78 every 15 min). The Mac's log had 203 rows newer than the
+committed one and none missing, and no changes outside `state/`; both files are
+copied into `state/hardware/US/`, stats and the 681 tests pass. The only thing
+left in this section is the `launchctl bootout` block below.
+
 It ran from `~/Repos/ai-deal-alerter` under two launchd agents,
 `com.jscocca.ai-deal-alerter.fast` and `com.jscocca.ai-deal-alerter.digest`.
 
@@ -102,11 +110,13 @@ EOF
 
 ## 2. Secrets
 
-The Mac's old `.env` probably has what the Windows one lacked: the ntfy topic
-and eBay keys. This sends only the settings that have a value, and prints none:
+The Mac's old `.env` has every key `check.yml` reads, including Reddit API
+credentials the Windows one lacked (these should cut the Reddit throttling
+noted under "Later"). Its `SMTP_HOST`, `SMTP_PORT` and `NTFY_SERVER` match the
+workflow defaults, so no repository variables are needed. This sends only the settings that have a value, and prints none:
 
 ```bash
-grep -E '^(SMTP_USER|SMTP_PASSWORD|MAIL_FROM|MAIL_TO|NTFY_TOPIC|NTFY_TOKEN|DISCORD_WEBHOOK|EBAY_CLIENT_ID|EBAY_CLIENT_SECRET)=.+' ~/Repos/ai-deal-alerter/.env | gh secret set -f - -R jcscocca/deal-alerter
+grep -E '^(SMTP_USER|SMTP_PASSWORD|MAIL_FROM|MAIL_TO|NTFY_TOPIC|NTFY_TOKEN|DISCORD_WEBHOOK|EBAY_CLIENT_ID|EBAY_CLIENT_SECRET|REDDIT_CLIENT_ID|REDDIT_CLIENT_SECRET)=.+' ~/Repos/ai-deal-alerter/.env | gh secret set -f - -R jcscocca/deal-alerter
 ```
 
 The IsThereAnyDeal key is shown at isthereanydeal.com/apps/my:
