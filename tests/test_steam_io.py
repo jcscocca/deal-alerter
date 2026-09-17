@@ -125,6 +125,30 @@ class SteamIOTests(unittest.TestCase):
             client.json("GET", "/games/history/v2")
         self.assertNotIn("secret.example", str(caught.exception))
 
+    def test_rejected_key_error_keeps_itad_reason_without_the_key(self):
+        session = Mock()
+        response = Mock(status_code=403)
+        response.json.return_value = {"status_code": 403, "reason_phrase": "Invalid or expired api key"}
+        session.request.return_value = response
+        client = ItadClient("secret-key-value", "US", session=session)
+        with self.assertRaises(SourceError) as caught:
+            client.json("POST", "/games/prices/v3")
+        message = str(caught.exception)
+        self.assertIn("HTTP 403 (Invalid or expired api key)", message)
+        self.assertIn("ITAD_API_KEY", message)
+        self.assertIn("OAuth", message)
+        self.assertNotIn("secret-key-value", message)
+
+    def test_error_without_itad_reason_stays_well_formed(self):
+        for body in (requests.JSONDecodeError("Expecting value", "<html>", 0), {"status_code": 404}, []):
+            with self.subTest(body=body):
+                session = Mock()
+                session.request.return_value = Mock(status_code=404, **{"json.side_effect": [body]})
+                client = ItadClient("secret", "US", session=session)
+                with self.assertRaises(SourceError) as caught:
+                    client.json("GET", "/games/info/v2")
+                self.assertEqual(str(caught.exception), "ITAD /games/info/v2: HTTP 404")
+
     def test_cache_persists_only_on_real_run(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
