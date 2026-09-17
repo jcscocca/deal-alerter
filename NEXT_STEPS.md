@@ -17,9 +17,10 @@ typed or pasted is yours to run.
 - **Everything is switched on as of 2026-09-16.** `ENABLE_STEAM`,
   `ENABLE_HARDWARE` and `ENABLE_HARDWARE_FAST` are all true. The old Steam
   workflow is disabled and the old launchd agents are unloaded.
-- **Steam is blocked on its key.** `ITAD_API_KEY` is set but ITAD rejects it,
-  so every Steam run fails, and sends nothing, until section 3's key step is
-  done.
+- **Steam is on.** With the corrected `ITAD_API_KEY`, a dry run assessed the 2
+  discounted games of 20 wishlisted with no problems and nothing new to send,
+  because the old alerter already sent both on Sep 14. The first real run is
+  18:15 UTC.
 - **Hardware is on.** The price log holds 1,620 observations from Aug 8-19,
   including 203 that only existed on the Mac, and grows from the first
   scheduled run on.
@@ -113,8 +114,7 @@ EOF
 
 ## 2. Secrets
 
-**Done 2026-09-16, but `ITAD_API_KEY` is invalid; see section 3.** The command
-below set `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `MAIL_TO`, `NTFY_TOPIC`,
+**Done 2026-09-16.** The command below set `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `MAIL_TO`, `NTFY_TOPIC`,
 `EBAY_CLIENT_ID` and `EBAY_CLIENT_SECRET`. The old `.env` names `NTFY_TOKEN`,
 `DISCORD_WEBHOOK` and both Reddit keys but leaves them blank, so those stay
 unset. Its `SMTP_HOST`, `SMTP_PORT` and `NTFY_SERVER` match the workflow
@@ -149,13 +149,12 @@ the mail server is not Gmail on port 587, also set the repository variables
 
 ## 3. Steam cutover -- in this order
 
-**Done 2026-09-16 except the key.** The old workflow is disabled, its state as
-of its Sep 16 run is committed, and `ENABLE_STEAM` is on. The dry run failed
-with `steam: ITAD /games/prices/v3: HTTP 403`. ITAD answers a missing or
-invalid key with 403, and it does read the `ITAD-API-Key` header this client
-sends, so the stored key itself is wrong. Re-set it with section 2's clipboard
-command, then repeat the dry run below. Until then, each 18:15 UTC Steam run
-fails and sends nothing.
+**Done 2026-09-16.** The old workflow is disabled, its state as of its Sep 16
+run is committed, and `ENABLE_STEAM` is on. The first dry run failed with a
+bare `HTTP 403` because an OAuth client credential had been stored as the key.
+[#2](https://github.com/jcscocca/deal-alerter/pull/2) puts ITAD's reason and a
+hint about that mix-up back into the error. With the API key stored, the dry
+run assessed 2 games with 0 problems and "No new recommendations".
 
 Needs `ITAD_API_KEY`, `SMTP_USER`, `SMTP_PASSWORD` and `MAIL_TO`.
 
