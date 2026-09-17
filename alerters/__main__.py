@@ -10,6 +10,7 @@ from dealcore.config import load_dotenv
 from dealcore.notify import channels
 from dealcore.run import run
 from dealcore.state import AlertState
+from .hardware.manual import CONDITIONS as MANUAL_CONDITIONS
 from .hardware.plugin import HardwarePlugin
 from .steam.plugin import SteamPlugin
 
@@ -29,13 +30,30 @@ def main(argv: list[str] | None = None) -> int:
     modes.add_argument("--fast", action="store_true", help="push only")
     modes.add_argument("--digest", action="store_true", help="email only")
     parser.add_argument("--fixture", type=Path, help="Steam API transcript; always a dry run")
+    # Listings you found yourself. Recorded, then judged on every later run
+    # exactly like a search hit; the URL is stored and never fetched.
+    parser.add_argument("--add", metavar="URL", help="record a listing by hand and exit")
+    parser.add_argument("--price", type=float, help="asking price for --add")
+    parser.add_argument("--title", help="listing title for --add; the only evidence of what it is")
+    parser.add_argument("--condition", default="unknown", choices=MANUAL_CONDITIONS)
+    parser.add_argument("--sold", action="store_true", help="--add recorded a completed sale you witnessed")
+    parser.add_argument("--note", default="", help="free text stored with an --add entry")
     args = parser.parse_args(argv)
     factory = PLUGINS[args.domain]
     if args.domain == "steam" and (args.fast or args.stats):
         parser.error("Steam supports digest mode, not --fast or --stats")
     if args.domain != "steam" and (args.demo or args.fixture):
         parser.error("The supplied offline transcript is for Steam only")
-    dry = args.dry_run or args.demo or args.fixture is not None or args.stats
+    if args.add is not None:
+        if args.domain != "hardware":
+            parser.error("--add records hardware listings only")
+        if args.price is None or args.title is None:
+            parser.error("--add needs --price and --title")
+    elif args.price is not None or args.title is not None or args.sold:
+        parser.error("--price, --title and --sold only mean something with --add")
+    # Recording and reporting both stop short of delivery, so neither should
+    # demand SMTP credentials the run will never use.
+    dry = args.dry_run or args.demo or args.fixture is not None or args.stats or args.add is not None
     mode = "fast" if args.fast else "digest" if args.digest else factory.default_mode
     load_dotenv(ROOT / ".env")
     plugin = None
@@ -49,6 +67,10 @@ def main(argv: list[str] | None = None) -> int:
             plugin = factory(path, args.state_dir, fixture=fixture)
         else:
             plugin = factory(path, args.state_dir, daily=mode != "fast")
+        if args.add is not None:
+            plugin.add_manual(url=args.add, price=args.price, title=args.title,
+                              condition=args.condition, sold=args.sold, note=args.note)
+            return 0
         if args.stats:
             plugin.show_stats()
             return 0

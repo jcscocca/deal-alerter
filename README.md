@@ -82,6 +82,60 @@ and only HTTP(S) listing URLs can be opened.
 See `MIGRATION.md` for every module's destination, preserved safeguards, deliberate
 behavior changes and the limits of verification with signature-only inputs.
 
+## Hardware: beyond the imported behavior
+
+Four capabilities added after the port, from a review of a parallel
+implementation of the same idea. None changes how an existing listing is
+judged; the imported verdict engine is untouched apart from one extra number.
+
+**Listings you found yourself.** Every other source is a search, so the good
+listing posted to a local group or sent to you by a colleague is invisible to
+the price log as well as to you.
+
+    python -m alerters hardware --add "https://..." --price 640         --title "NVIDIA RTX 3090 Founders Edition 24GB" --condition used
+
+The URL is stored, never fetched, and the title you supply is the only evidence
+of what the thing is -- the same contract every other source works under. The
+command says immediately whether the title matched a catalog part and whether a
+hunt covers it, because an entry that matches nothing would otherwise be filed
+and silently never appear again. `--sold` records a completed sale you actually
+witnessed; sold and asking prices are separate populations in the log and
+nothing here can verify the claim, so that flag is your word. The store is
+`state/hardware/<country>/manual.jsonl`, one entry per line: delete a line to
+delete the entry, re-add a URL to correct it. Unlike a search hit, a manual
+entry does not age out -- you asked for it deliberately, so it stays.
+
+**Price against speed, not just capacity.** `$/GB` on its own recommends the
+wrong hardware: a 128GB box at 256 GB/s beats a 3090 four to one on capacity per
+dollar and generates tokens at a quarter of the rate. Every assessment now also
+carries `$/GB-TB/s` -- price over capacity times bandwidth -- and both figures
+appear on the card and the value axis. The useful case is the two disagreeing,
+which the reason sentence names outright: cheap per gigabyte and dear once speed
+counts is what slow memory looks like. It is a value heuristic, not tokens per
+second.
+
+**Prebuilts asking less than the card inside them.** A machine's price is
+refused as evidence about its GPU everywhere else in this plugin, and still is:
+the comparison runs the other way, with loose cards as the evidence and the
+machine as the candidate, and nothing new is recorded. Only prices this run was
+willing to log can set the benchmark, so on a cold history log the signal is
+conservative by design. A cross-condition comparison is labelled potential. An
+asking-price gap is not profit -- neither side has sold, and parting a machine
+out means finding a buyer for the rest of it.
+
+**A catalog that is not only NVIDIA.** Twelve parts added: the AMD pro cards
+(W7900, W7800, R9700), the 7900 XTX and Arc Pro B60, the previous-generation
+Mac Studio Ultras, the M3 Ultra 384GB, the 64GB unified boxes, and the ASUS
+Ascent GX10. Every one is a `reference_basis` estimate, so all are held below
+the push threshold until somebody checks one against sold data. `watchlist.toml`
+gained hunts for them; without one a part is matched and then never judged.
+
+Deliberately not ported: RAM kits and DIMM profiles. A memory kit is a
+host-dependent capacity ceiling rather than an accelerator, so it has no VRAM,
+no capability gain, and no fit answer -- the three questions this tool exists to
+ask. Carrying it would have meant a second scoring path through the matcher and
+verdict engine for a product that answers none of them.
+
 ## Tests and compatibility
 
     python -m unittest discover -s tests -v

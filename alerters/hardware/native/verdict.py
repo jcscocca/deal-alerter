@@ -23,7 +23,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import IntEnum
 
-from .catalog import Kind, Part, class_median_dollars_per_gb
+from .catalog import (
+    Kind,
+    Part,
+    class_median_dollars_per_gb,
+    class_median_dollars_per_gb_bandwidth,
+)
 from .config import Thresholds
 from .history import PriceStats
 from .rig import Fit, capability_gain, check_fit, host_vram_gb, largest_model_at
@@ -72,6 +77,10 @@ class Assessment:
     reason: str
 
     dollars_per_gb: float
+    # The same price against capacity *and* speed, in dollars per GB-TB/s.
+    # $/GB alone cannot tell a 3090 from a Mac mini; this can, and where the
+    # two figures disagree the listing is slow capacity rather than a bargain.
+    dollars_per_gb_bandwidth: float = 0.0
     # Where this price sits in our own log, 0-100. None until we have enough.
     percentile: float | None = None
     stats: PriceStats | None = None
@@ -195,6 +204,7 @@ def assess(
         loggable = False
 
     dollars_per_gb = unit_price / part.vram_gb
+    dollars_per_gb_bandwidth = unit_price / part.capacity_bandwidth
     percentile = stats.percentile_of(unit_price) if stats.trustworthy else None
     before, after, unlock = capability_gain(part)
     fit = check_fit(part, psu_headroom_w=psu_headroom_w)
@@ -204,6 +214,7 @@ def assess(
         part=part,
         unit_price=unit_price,
         dollars_per_gb=dollars_per_gb,
+        dollars_per_gb_bandwidth=dollars_per_gb_bandwidth,
         percentile=percentile,
         stats=stats,
         thresholds=thresholds,
@@ -237,6 +248,7 @@ def assess(
         headline=headline,
         reason=reason,
         dollars_per_gb=dollars_per_gb,
+        dollars_per_gb_bandwidth=dollars_per_gb_bandwidth,
         percentile=percentile,
         stats=stats,
         vram_before=before,
@@ -261,6 +273,7 @@ def _decide(
     part: Part,
     unit_price: float,
     dollars_per_gb: float,
+    dollars_per_gb_bandwidth: float,
     percentile: float | None,
     stats: PriceStats,
     thresholds: Thresholds,
@@ -281,7 +294,13 @@ def _decide(
     """The actual call, plus the sentences explaining it."""
 
     class_median = class_median_dollars_per_gb(part.kind)
-    value_note = _value_sentence(part, dollars_per_gb, class_median)
+    value_note = _value_sentence(
+        part,
+        dollars_per_gb,
+        class_median,
+        dollars_per_gb_bandwidth,
+        class_median_dollars_per_gb_bandwidth(part.kind),
+    )
 
     if percentile is not None:
         verdict, headline, reason = _decide_from_history(
@@ -594,29 +613,73 @@ def _decide_from_reference(
     return verdict, headline, basis
 
 
-def _value_sentence(part: Part, dollars_per_gb: float, class_median: float) -> str:
-    """One sentence putting $/GB in context, plus the bandwidth caveat.
+def _value_sentence(
+    part: Part,
+    dollars_per_gb: float,
+    class_median: float,
+    dollars_per_gb_bandwidth: float,
+    class_median_bandwidth: float,
+) -> str:
+    """Capacity per dollar, then capacity *and speed* per dollar.
 
     Capacity per dollar on its own is a trap: a 128GB unified box looks four
     times better than a 3090 by that measure and generates tokens a third as
-    fast. Saying both numbers together is the honest version.
-    """
-    parts = [f"{_fmt(dollars_per_gb)}/GB of VRAM"]
-    if class_median > 0:
-        delta = (dollars_per_gb - class_median) / class_median * 100
-        if delta <= -20:
-            parts.append(f"{abs(delta):.0f}% better than typical for its class")
-        elif delta >= 20:
-            parts.append(f"{delta:.0f}% worse than typical for its class")
-        else:
-            parts.append("about typical for its class")
+    fast. The docstring used to promise that saying both numbers together was
+    the honest version, and then said one number and a caveat. The combined
+    index is the second number -- price over GB x TB/s -- so the sentence
+    prices the thing the first measure ignores.
 
+    The interesting case is the two disagreeing. Cheap per GB and dear per
+    GB-TB/s is the signature of slow memory, which is the purchase this tool
+    exists to stop you making by accident at 3am.
+    """
+
+    def standing(value: float, median: float) -> tuple[str, float] | None:
+        """Where a figure sits against its class, as a phrase and a percentage.
+
+        Lower is better for both measures, so a negative delta is the good
+        direction and the phrase says so in words rather than making the reader
+        remember which way the sign points.
+        """
+        if median <= 0:
+            return None
+        delta = (value - median) / median * 100
+        if delta <= -20:
+            return f"{abs(delta):.0f}% better than typical for its class", delta
+        if delta >= 20:
+            return f"{delta:.0f}% worse than typical for its class", delta
+        return "about typical for its class", delta
+
+    capacity = standing(dollars_per_gb, class_median)
+    combined = standing(dollars_per_gb_bandwidth, class_median_bandwidth)
+
+    clauses = [f"{_fmt(dollars_per_gb)}/GB of VRAM"]
+    if capacity:
+        clauses.append(capacity[0])
     # Not .capitalize() -- that lowercases the rest of the string and turns
     # "$24/GB of VRAM" into "$24/gb of vram".
-    joined = ", ".join(parts)
+    joined = ", ".join(clauses)
     sentence = joined[:1].upper() + joined[1:] + "."
 
-    if part.kind is Kind.UNIFIED:
+    index = f"{_fmt(dollars_per_gb_bandwidth)} per GB-TB/s"
+    sentence += (
+        f" Counting bandwidth too, {index}"
+        + (f", {combined[0]}." if combined else ".")
+    )
+
+    if capacity and combined and capacity[1] <= -20 and combined[1] >= 20:
+        sentence += (
+            f" Cheap per gigabyte and dear once speed counts, at "
+            f"{part.bandwidth_gb_s:,} GB/s: this holds large models rather than "
+            "running them quickly."
+        )
+    elif capacity and combined and combined[1] <= -20 and capacity[1] >= 20:
+        sentence += (
+            f" Dear per gigabyte but cheap once speed counts, at "
+            f"{part.bandwidth_gb_s:,} GB/s: you are buying bandwidth here, not "
+            "capacity."
+        )
+    elif part.kind is Kind.UNIFIED:
         sentence += (
             f" Remember the tradeoff: {part.bandwidth_gb_s} GB/s here against "
             "roughly 1,000 GB/s on a discrete card, so generation is slower per "

@@ -12,7 +12,9 @@ from dealcore.run import RunOptions
 from dealcore.state import atomic_write
 from dealcore.types import AccumulatedHistory, Assessment, Card, FetchResult, Listing, Report
 from dealcore.verdict import Improvement, band, money
+from . import manual
 from .identity import group_id, normalise_key
+from .manual import ManualSource
 
 
 @dataclass(frozen=True)
@@ -54,7 +56,11 @@ class HardwarePlugin:
             raise ValueError("Hardware catalog references are USD; this adapter requires country=US")
         self.state_dir = state_root / self.name / self.cfg.country
         self.log_path, self.daily = self.state_dir / "prices.jsonl", daily
-        self.sources = tuple(SourceAdapter(source) for source in build_sources(self.cfg))
+        self.manual_path = self.state_dir / "manual.jsonl"
+        # Last, so a listing you entered by hand loses a dedup tie to the same
+        # listing found by a real source, which knows its condition and seller.
+        self.sources = tuple(SourceAdapter(source) for source in build_sources(self.cfg)) + (
+            SourceAdapter(ManualSource(self.manual_path)),)
         self.options = RunOptions(band(self.bands, self.cfg.digest_at), band(self.bands, self.cfg.push_at),
                                   Improvement(verdict.DOLLAR, 4.0), self.cfg.remind_after_days,
                                   include_others=True)
@@ -80,7 +86,10 @@ class HardwarePlugin:
 
     def prepare(self, listing: Listing) -> Candidate | None:
         self.seen += 1
-        if listing.age_hours > self.cfg.max_listing_age_hours:
+        # A manual entry is a standing instruction rather than a search hit:
+        # you typed it in deliberately and it stays until you delete the line.
+        # Ageing it out would quietly stop watching a listing you asked to watch.
+        if listing.source != "manual" and listing.age_hours > self.cfg.max_listing_age_hours:
             return None
         result = self.matcher(listing.title, body=listing.body, price=listing.price,
                               multi_variant=listing.multi_variant)
@@ -122,7 +131,8 @@ class HardwarePlugin:
         return Assessment(self.key(listing), item.unit_price, item.verdict, item,
             rank=(float(item.loggable), -item.dollars_per_gb), alertable=upgrade,
             loggable=item.loggable, axes=(("cheapness", item.reason),
-                ("value", f"{money(item.dollars_per_gb, whole_above=100)}/GB"),
+                ("value", f"{money(item.dollars_per_gb, whole_above=100)}/GB, "
+                          f"{money(item.dollars_per_gb_bandwidth, whole_above=100)}/GB-TB/s"),
                 ("capability", item.unlock)))
 
     def append(self, pairs: list[tuple[Candidate, Assessment]]) -> None:
@@ -137,11 +147,66 @@ class HardwarePlugin:
                 title=listing.title, quantity=result.quantity, sold=listing.sold, seen_at=listing.posted_at)
         self.log.commit()
 
-    def card(self, assessment: Assessment) -> Card:
+    def arbitrage(self, assessments: list[Assessment]) -> dict[str, str]:
+        """Prebuilts asking less than the cheapest loose card they contain.
+
+        This is the one case where a whole machine tells you something. A system
+        price is refused as evidence about the card inside it -- that is what
+        `is_system` does everywhere else in this plugin -- but the comparison
+        runs the other way here: the loose cards are the evidence and the
+        machine is the candidate. Nothing is recorded, so the refusal stands.
+
+        Only loose cards this run was willing to log count as the benchmark. An
+        untrusted price is not a price, and using one would either invent an
+        opportunity out of a bait listing or bury a real one behind it.
+
+        An asking-price gap is not profit. Neither side has sold, the machine
+        may not hold the card its title claims, and parting one out means
+        finding a buyer for the remaining computer.
+        """
+        loose: dict[str, list[Assessment]] = {}
+        for item in assessments:
+            detail = item.detail
+            if detail.is_system or detail.is_bundle or detail.multi_variant:
+                continue
+            if not item.loggable:
+                continue
+            loose.setdefault(detail.part.key, []).append(item)
+
+        signals: dict[str, str] = {}
+        for item in assessments:
+            detail = item.detail
+            if not detail.is_system:
+                continue
+            pool = loose.get(detail.part.key, [])
+            # Condition drives used-card prices harder than anything else, so a
+            # same-condition comparison is the only one worth calling confirmed.
+            matched = [row for row in pool
+                       if row.detail.condition == detail.condition
+                       and detail.condition not in ("unknown", "parts")]
+            pool = matched or pool
+            if not pool:
+                continue
+            cheapest = min(pool, key=lambda row: row.detail.unit_price)
+            saving = cheapest.detail.unit_price - detail.unit_price
+            if saving <= self.verdict.DOLLAR:
+                continue
+            headline = (f"Whole machine at {money(detail.unit_price, decimals=0)} "
+                        f"undercuts the cheapest loose {detail.part.name} this run at "
+                        f"{money(cheapest.detail.unit_price, decimals=0)} -- "
+                        f"{money(saving, decimals=0)} of room before the rest of the PC costs anything.")
+            signals[item.key] = headline + (
+                " Potential only: conditions differ or are unstated, so the two prices are not like for like."
+                if not matched else
+                " Same condition on both sides. Confirm the machine actually contains the card before anything else.")
+        return signals
+
+    def card(self, assessment: Assessment, signal: str | None = None) -> Card:
         item = assessment.detail
         facts = [item.title, f"via {item.source}; {item.condition}",
-                 f"{money(item.dollars_per_gb, decimals=0)}/GB; {item.part.vram_gb}GB; "
-                 f"{item.part.bandwidth_gb_s:,} GB/s", item.unlock]
+                 f"{money(item.dollars_per_gb, decimals=0)}/GB; "
+                 f"{money(item.dollars_per_gb_bandwidth, decimals=0)}/GB-TB/s; "
+                 f"{item.part.vram_gb}GB; {item.part.bandwidth_gb_s:,} GB/s", item.unlock]
         if item.quantity > 1:
             facts.append(f"Quantity {item.quantity}; lot total {money(item.total_price, decimals=0)}")
         warnings = []
@@ -156,6 +221,8 @@ class HardwarePlugin:
             warnings.append(f"Mining risk: {item.mining_risk}")
         if item.multi_variant:
             warnings.append("Confirm which option this price buys; not recorded in price history.")
+        if signal:
+            warnings.append(signal)
         models = sorted(self.rig.LADDER, key=lambda model: model.params_b)
         before, after = self.rig.largest_model_at(item.vram_before), self.rig.largest_model_at(item.vram_after)
         rung = lambda model: models.index(model) + 1 if model else 0
@@ -182,13 +249,23 @@ class HardwarePlugin:
                              2 if item.verdict == self.bands.PASS else 3)
 
     def report(self, buys: list[Assessment], others: list[Assessment], problems: list[str]) -> Report:
-        cards = tuple(self.card(item) for item in buys)
+        signals = self.arbitrage(buys + others)
+        cards = tuple(self.card(item, signals.get(item.key)) for item in buys)
         subject = (f"{cards[0].badge}: {cards[0].title} at {cards[0].price}" if len(cards) == 1 else
                    f"{len(cards)} new AI hardware recommendations")
-        return Report(subject, "AI workstation deals",
-                      f"{self.matched} of {self.seen} unique listings matched your watchlist.",
+        # A prebuilt is normally a PASS and lands in `others`, which is cut to
+        # fifteen. Undercutting its own GPU is the only reason to read that far,
+        # so those rows go first; sorted() is stable, so the rest keep their order.
+        rest = sorted(others, key=lambda item: item.key not in signals)
+        found = sum(1 for item in buys + others if item.key in signals)
+        summary = f"{self.matched} of {self.seen} unique listings matched your watchlist."
+        if found:
+            summary += (f" {found} prebuilt{'s' if found != 1 else ''} priced under the cheapest "
+                        "loose card of the same GPU.")
+        return Report(subject, "AI workstation deals", summary,
                       f"{self.log.total_observations():,} prices logged; condition buckets remain separate.",
-                      cards, tuple(self.card(item) for item in others[:15]), tuple(problems))
+                      cards, tuple(self.card(item, signals.get(item.key)) for item in rest[:15]),
+                      tuple(problems))
 
     def persist(self) -> None:
         if self.daily:
@@ -199,6 +276,26 @@ class HardwarePlugin:
         path = Path(self.temporary.name) / "prices.jsonl"
         self.log.export_jsonl(path)
         atomic_write(self.log_path, path.read_text(encoding="utf-8"))
+
+    def add_manual(self, **fields) -> None:
+        """Record a listing you found yourself, and say what it will be judged as.
+
+        The match runs here rather than at the next poll because a title that
+        names nothing in the catalog, or a part no hunt is watching, would
+        otherwise be filed and silently never appear again.
+        """
+        entry = manual.add(self.manual_path, **fields)
+        print(f"Recorded {entry.url}")
+        result = self.matcher(entry.title, price=entry.price)
+        if result.junk or result.part is None:
+            print("  No catalog part in that title, so nothing will be judged. "
+                  "Give the title the listing's own wording, or add the part to catalog.py.")
+            return
+        watched = self.watched.get(result.part.key)
+        print(f"  Matched {result.part.name}"
+              + (f" x{result.quantity}" if result.quantity > 1 else "")
+              + (f", hunted by \"{watched.name}\"." if watched else
+                 ". No hunt covers this part, so it will not be judged -- add it to watchlist.toml."))
 
     def show_stats(self) -> None:
         print(f"{self.log.total_observations():,} observations in {self.log_path}")
