@@ -200,9 +200,9 @@ of scheduled runs shows how often they cross 120 seconds. The first real runs
 should push at most 2 listings, both Mac Studio M3 Ultra 96GB on eBay, and
 email about 23 deals at STRONG or better.
 
-**First scheduled runs, 2026-09-17.** GitHub took almost six hours after #2
-merged to pick up the new schedule, then fired both hardware runs back to back
-at 07:57 UTC:
+**First scheduled runs, 2026-09-17.** GitHub started no scheduled run for
+almost six hours after #1 changed the schedule, then ran both hardware jobs
+back to back at 07:57 UTC:
 
 | Run    | Assessed | Problems | Job time | Sent                  |
 |--------|----------|----------|----------|-----------------------|
