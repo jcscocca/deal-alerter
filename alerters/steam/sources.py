@@ -82,6 +82,21 @@ def required_money(raw: dict) -> Money:
     return result
 
 
+def http_error(path: str, response: requests.Response) -> SourceError:
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    reason = body.get("reason_phrase") if isinstance(body, dict) else None
+    message = f"ITAD {path}: HTTP {response.status_code}"
+    if isinstance(reason, str) and reason:
+        message += f" ({reason})"
+    if response.status_code in (401, 403):
+        message += ("; check that ITAD_API_KEY is the API key from isthereanydeal.com/apps,"
+                    " not its OAuth client ID or secret")
+    return SourceError(message)
+
+
 class ItadClient:
     """The same API client may serve two capabilities without merging them."""
     def __init__(self, key: str, country: str, *, replay: dict | None = None,
@@ -114,7 +129,7 @@ class ItadClient:
                 time.sleep(max(delay, 0))
                 continue
             if response.status_code >= 400:
-                raise SourceError(f"ITAD {path}: HTTP {response.status_code}")
+                raise http_error(path, response)
             try:
                 return response.json()
             except ValueError:
