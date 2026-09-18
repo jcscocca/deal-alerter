@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-09-18T06:33:11+00:00",
+  "updated_at": "2026-09-18T07:37:42+00:00",
   "alerts": {
     "ebay:v1|188539094888": {
       "deliveries": {
@@ -173,9 +173,9 @@
     "ebay:v1|277307992860": {
       "deliveries": {
         "email": {
-          "price": 5799.99,
+          "price": 5449.99,
           "verdict": 3,
-          "alerted_at": "2026-09-17T07:59:48+00:00"
+          "alerted_at": "2026-09-18T07:37:42+00:00"
         }
       }
     },
@@ -218,9 +218,18 @@
     "ebay:v1|297490485196": {
       "deliveries": {
         "email": {
-          "price": 5629.99,
+          "price": 5299.99,
           "verdict": 3,
-          "alerted_at": "2026-09-17T07:59:48+00:00"
+          "alerted_at": "2026-09-18T07:37:42+00:00"
+        }
+      }
+    },
+    "ebay:v1|298509866371": {
+      "deliveries": {
+        "email": {
+          "price": 5579.0,
+          "verdict": 3,
+          "alerted_at": "2026-09-18T07:37:42+00:00"
         }
       }
     },
