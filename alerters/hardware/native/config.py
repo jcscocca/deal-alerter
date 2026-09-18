@@ -108,6 +108,17 @@ class Thresholds:
     reference_good_ratio: float = 1.05
     reference_fair_ratio: float = 1.20
 
+    # A sold anchor only means what it says while asks still sit above it. Once
+    # the last 30 days of asks have fallen to it, a successor has usually
+    # shipped and the anchor describes the old market: every ratio against it
+    # reads a band too generous and the tool rings phones over the going rate.
+    # Measured 2026-09-17, after the M5 Ultra: Mac Studio M3 Ultra asks ran
+    # 0.95-1.01x their August sold averages, while the 512GB part it did not
+    # replace still asked 1.78x. Anything between those separates them; 1.05
+    # leaves a little margin on the stale side.
+    stale_anchor_ask_ratio: float = 1.05
+    stale_anchor_min_recent: int = 5
+
 
 @dataclass(frozen=True)
 class Hunt:

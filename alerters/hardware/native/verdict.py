@@ -323,6 +323,16 @@ def _decide(
             f" Held below push: the {_fmt(part.reference_price)} it is measured "
             "against is an unverified estimate rather than a sold average."
         )
+    # An anchor the market has walked away from is worth no more than an
+    # unverified one, and goes quiet the same way until the number is refreshed.
+    elif _anchor_is_stale(part, stats, thresholds) and verdict > Verdict.STRONG:
+        verdict = Verdict.STRONG
+        reason += (
+            f" Held below push: the last 30 days of asks median "
+            f"{_fmt(stats.recent_median)}, at or below the "
+            f"{_fmt(part.reference_price)} sold average this is measured "
+            "against, so that anchor is treated as out of date."
+        )
 
     reason = f"{reason} {value_note}"
 
@@ -558,6 +568,22 @@ def _verdict_from_anchor(
     if ratio <= thresholds.reference_fair_ratio:
         return Verdict.FAIR
     return Verdict.PASS
+
+
+def _anchor_is_stale(part: Part, stats: PriceStats, thresholds: Thresholds) -> bool:
+    """Whether recent asking prices have caught up with a sold anchor.
+
+    Asks sit above what a thing sells for, so a sold average they have fallen
+    to is describing a market that has moved on. Measured 2026-09-17, after the
+    M5 Ultra shipped: Mac Studio M3 Ultra asks sat at 0.95-1.01x their August
+    sold averages, while the 512GB part that successor did not replace still
+    asked 1.78x its own.
+    """
+    if part.reference_basis != "sold" or stats.recent_median is None:
+        return False
+    if stats.recent_count < thresholds.stale_anchor_min_recent:
+        return False
+    return stats.recent_median <= part.reference_price * thresholds.stale_anchor_ask_ratio
 
 
 def _decide_from_reference(
