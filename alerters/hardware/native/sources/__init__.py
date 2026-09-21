@@ -32,7 +32,9 @@ def build_sources(cfg) -> list[Source]:
             client_id=cfg.reddit_client_id,
             client_secret=cfg.reddit_client_secret,
         ),
-        SlickdealsSource(queries=cfg.search_queries),
+        SlickdealsSource(
+            queries=cfg.search_queries, max_age_hours=cfg.max_listing_age_hours
+        ),
         AppleRefurbSource(),
     ]
     if cfg.ebay_client_id and cfg.ebay_client_secret:

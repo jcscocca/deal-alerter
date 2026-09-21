@@ -11,6 +11,10 @@ Two quirks worth knowing, both observed live while building this:
     title against the catalog, and system_listing() catches the prebuilts.
   * The feed carries no price field. The price is in the title, so match.py
     scrapes it, and titles without one get dropped downstream.
+  * The feed carries no expiry either. "CyberPowerPC ... RTX 5090 ... $4299"
+    (thread 20043531) reached the 2026-09-21 digest hours after Slickdeals
+    marked it expired. The thread page says so as "isExpiredDeal":"Yes", so
+    every thread young enough to survive the age filter gets that page read.
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ from __future__ import annotations
 import html
 import re
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
 import requests
@@ -27,6 +31,7 @@ from .base import Listing, SourceError
 
 SEARCH_URL = "https://slickdeals.net/newsearch.php"
 TIMEOUT = 30
+EXPIRED_RE = re.compile(r'"isExpiredDeal"\s*:\s*"Yes"')
 UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -34,9 +39,10 @@ UA = (
 
 
 class SlickdealsSource:
-    def __init__(self, queries: tuple[str, ...]) -> None:
+    def __init__(self, queries: tuple[str, ...], max_age_hours: float = 72) -> None:
         self.name = "slickdeals"
         self.queries = queries
+        self.max_age = timedelta(hours=max_age_hours)
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": UA})
 
@@ -53,6 +59,8 @@ class SlickdealsSource:
                     if listing.listing_id in seen:
                         continue
                     seen.add(listing.listing_id)
+                    if self._is_expired(listing):
+                        continue
                     listings.append(listing)
             except SourceError as exc:
                 failures.append(f"{query!r}: {exc}")
@@ -60,6 +68,18 @@ class SlickdealsSource:
         if failures and not listings:
             raise SourceError("; ".join(failures))
         return listings
+
+    def _is_expired(self, listing: Listing) -> bool:
+        # Only threads the age filter will keep are worth a page each -- most of
+        # a feed is weeks old. A page that won't load keeps the deal: a missed
+        # expiry costs one stale row, a dropped deal costs the deal.
+        if datetime.now(timezone.utc) - listing.posted_at > self.max_age:
+            return False
+        try:
+            resp = self.session.get(listing.url.split("?", 1)[0], timeout=TIMEOUT)
+        except requests.RequestException:
+            return False
+        return resp.status_code == 200 and bool(EXPIRED_RE.search(resp.text))
 
     def _search(self, query: str) -> list[Listing]:
         try:
