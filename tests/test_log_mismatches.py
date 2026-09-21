@@ -97,6 +97,28 @@ class TestMobileModuleIsNotTheDesktopCard:
         )
         assert result.part is None
 
+    def test_legion_9i_laptop_is_dropped(self) -> None:
+        """Logged 2026-09-20 at $4,800 as a new desktop RTX 5090 -- the listing
+        sits in eBay's PC Laptops category. Two holes, each enough alone: the
+        family pattern wanted a bare digit and Lenovo writes "9i", and the
+        screen size carries a double prime (U+2033) rather than an inch mark."""
+        result = match("Legion 9i Gen 10 Intel (18″) with RTX 5090", price=4800.0)
+        assert result.part is None
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "Lenovo Legion 9i Gen 10 with RTX 5090",
+            "Gen 10 Intel (18″) with RTX 5090",
+        ],
+    )
+    def test_each_hole_alone_is_closed(self, title: str) -> None:
+        assert match(title, price=4800.0).part is None
+
+    def test_a_desktop_5090_still_matches(self) -> None:
+        result = match("MSI GeForce RTX 5090 32GB Gaming Trio OC", price=3500.0)
+        assert result.part is not None and result.part.key == "rtx_5090"
+
     def test_the_desktop_card_still_matches(self) -> None:
         result = match(
             "NVIDIA RTX PRO 5000 Blackwell 48GB GDDR7 PCIe 5.0 Graphics Card",

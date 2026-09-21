@@ -249,7 +249,7 @@ MOBILE_PATTERNS = (
     r"\blaptop\b",
     r"\bnotebook\b",
     r"\bmobile\s+(?:gpu|graphics)\b",
-    r"\d{2}(?:\.\d)?\s*[\"”]",  # screen size: 16" / 18"
+    r"\d{2}(?:\.\d)?\s*[\"”″]",  # screen size: 16" / 18" / 18″
     r"\b\d{2}(?:\.\d)?[- ]inch\b",
     r"\b\d{2,3}\s?hz\b",  # refresh rate
     r"\b(?:qhd|uhd|fhd|wqxga)\+?\b",
@@ -267,7 +267,9 @@ MOBILE_PATTERNS = (
     r"\bzbook\b",
     r"\belitebook\b",
     r"\bprobook\b",
-    r"\blegion\s+(?:pro\s+)?\d\b",
+    # "9i" too: "Legion 9i Gen 10 Intel (18″) with RTX 5090" was logged as a
+    # new desktop 5090 at $4,800 on 2026-09-20.
+    r"\blegion\s+(?:pro\s+)?\di?\b",
     r"\bmacbook\b",
     r"\bblade\s+1[45678]\b",  # Razer Blade
     r"\brog\s+(?:zephyrus|strix\s+scar|flow)\b",
