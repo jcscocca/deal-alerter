@@ -77,3 +77,20 @@ def test_graded_refurbished_is_refurbished(condition: str) -> None:
 def test_names_that_already_mapped_still_do(condition: str, expected: str) -> None:
     for listing in _listings(_item(condition)):
         assert listing.condition_hint == expected, listing.source
+
+
+@pytest.mark.parametrize(
+    "condition,expected",
+    [
+        # Plain "Used" matched nothing either, so every used eBay listing fell
+        # back to whatever its title claimed. eBay's stated condition is the
+        # one to trust.
+        ("Used", "used"),
+        ("Pre-owned", "used"),
+        ("Pre-owned - Good", "used"),
+        ("New other (see details)", "open_box"),
+    ],
+)
+def test_every_ebay_condition_maps(condition: str, expected: str) -> None:
+    for listing in _listings(_item(condition)):
+        assert listing.condition_hint == expected, listing.source

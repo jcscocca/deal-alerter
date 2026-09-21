@@ -46,6 +46,9 @@ CONDITION_MAP = {
     "VERY_GOOD_REFURBISHED": "refurbished",
     "GOOD_REFURBISHED": "refurbished",
     "SELLER_REFURBISHED": "refurbished",
+    "USED": "used",
+    "PRE_OWNED": "used",
+    "PRE_OWNED_GOOD": "used",
     "USED_EXCELLENT": "used",
     "USED_VERY_GOOD": "used",
     "USED_GOOD": "used",
@@ -60,8 +63,11 @@ def _condition_of(item: dict) -> str:
     # eBay writes the graded refurbished tiers as "Very Good - Refurbished".
     # Turning only spaces into underscores left "VERY_GOOD_-_REFURBISHED",
     # which matches no key, so refurbished MacBooks in the 2026-09-21 digest
-    # read as unknown and were judged and logged against used prices.
-    key = re.sub(r"[\s-]+", "_", (item.get("condition") or "").strip().upper())
+    # read as unknown and were judged and logged against used prices. Plain
+    # "Used" and "New other (see details)" missed too, which left the title to
+    # decide; eBay's stated condition is the one to trust.
+    raw = re.sub(r"\(.*?\)", "", item.get("condition") or "")
+    key = re.sub(r"[\s-]+", "_", raw.strip().upper())
     return CONDITION_MAP.get(key, "")
 
 
