@@ -9,6 +9,7 @@ here came from a real listing seen while building the matcher.
 |---|---|
 | `Acer Predator Helios AI: 16" QHD+ 240Hz, RTX 5090` | Laptop. The mobile 5090 is *different silicon* -- 24GB, half the power. Rejected outright, not just flagged |
 | `HP Omen 45L ... RTX 5090, 64GB RAM, 2TB SSD` | Prebuilt. Never says "desktop"; detected by CPU and storage. Shown, never logged as a GPU price |
+| `AMD RYZEN 9 9950X3D2 Gaming PC NVIDIA RTX 5090 ...` at $1,999.99 | Prebuilt with a drop-down for the graphics card. eBay quoted the no-GPU option, and the 5090 option was out of stock. A whole machine sold as a variation listing is dropped, since its price belongs to an option the title never names |
 | `Seasonic Focus GX 850W PSU \| PCIe 5.1 \| RTX 5080 &...` | A PSU naming a GPU for compatibility |
 | `Lot of 6 RTX 3090 mining rig - $3600` | Six cards at $600 each. Scored per unit; read as one card it looks terrible and gets discarded |
 | `RTX 3090 *BOX ONLY*` | Cardboard |
