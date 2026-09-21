@@ -19,6 +19,7 @@ Free production keyset: https://developer.ebay.com/ -> create app -> App ID
 from __future__ import annotations
 
 import base64
+import re
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -53,6 +54,16 @@ CONDITION_MAP = {
     "PRE_OWNED_FAIR": "used",
     "FOR_PARTS_OR_NOT_WORKING": "parts",
 }
+
+
+def _condition_of(item: dict) -> str:
+    # eBay writes the graded refurbished tiers as "Very Good - Refurbished".
+    # Turning only spaces into underscores left "VERY_GOOD_-_REFURBISHED",
+    # which matches no key, so refurbished MacBooks in the 2026-09-21 digest
+    # read as unknown and were judged and logged against used prices.
+    key = re.sub(r"[\s-]+", "_", (item.get("condition") or "").strip().upper())
+    return CONDITION_MAP.get(key, "")
+
 
 # Seller thresholds. eBay publishes these on every item summary, so they cost
 # nothing extra -- the previous version fetched them and threw them away.
@@ -250,9 +261,7 @@ class EbaySource:
                     # rather than dropping them on the age filter.
                     posted_at=now,
                     price=price,
-                    condition_hint=CONDITION_MAP.get(
-                        (item.get("condition") or "").upper().replace(" ", "_"), ""
-                    ),
+                    condition_hint=_condition_of(item),
                     seller_risk=risk,
                     seller_note=note,
                     # Logged, as of 2026-08-08. These were excluded when the
@@ -349,9 +358,7 @@ class EbaySource:
                     url=item.get("itemWebUrl", ""),
                     posted_at=sold_at,
                     price=price,
-                    condition_hint=CONDITION_MAP.get(
-                        (item.get("condition") or "").upper().replace(" ", "_"), ""
-                    ),
+                    condition_hint=_condition_of(item),
                     sold=True,
                     loggable=not variant,
                     multi_variant=variant,
