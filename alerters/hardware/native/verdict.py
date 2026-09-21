@@ -427,11 +427,12 @@ def _decide(
             "it anyway -- read the listing."
         )
 
-    # Not capped, unlike the two above. Where the title names one card, every
-    # option under it is that card in some other condition or capacity, so the
-    # price is a real price for a real thing and holding a genuine steal out of
-    # push would cost more than the caveat does. Where the title names several
-    # cards the listing never reaches here at all -- match() drops it.
+    # Not capped, unlike the two above. Where a bare card's title names one
+    # card, every option under it is that card in some other condition or
+    # capacity, so the price is a real price for a real thing and holding a
+    # genuine steal out of push would cost more than the caveat does. Where the
+    # title names several cards, or the listing is a whole machine, it never
+    # reaches here at all -- match() drops both.
     if multi_variant:
         reason += (
             " The seller offers several options under this one listing and eBay "

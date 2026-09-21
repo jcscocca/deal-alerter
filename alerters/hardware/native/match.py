@@ -732,8 +732,14 @@ def match(
     # Dropped outright rather than downgraded, on the same grounds as a mobile
     # or accessory match -- the card named is not the card on offer, and a
     # wrong identity is worse than no match at all.
+    #
+    # A prebuilt is the same menu with one name on it: the title names the
+    # flagship build and the dropdown is the graphics card. Observed
+    # 2026-09-17, "AMD RYZEN 9 9950X3D2 Gaming PC NVIDIA RTX 5090" quoted
+    # $1,999.99 for its no-GPU option, beside a 5090 option that was out of
+    # stock, and read as a 5090 machine undercutting every loose 5090.
     several_models = names_multiple_models(sale_text)
-    if multi_variant and several_models:
+    if multi_variant and (several_models or is_system_listing(title, part)):
         return MatchResult(None, None, "unknown", 0, junk=True, matched_on=matched_on)
 
     resolved_price = price if price is not None else extract_price(title)

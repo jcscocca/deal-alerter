@@ -112,6 +112,69 @@ class TestTheObservedListing:
         assert result.part.key == "l40s"
 
 
+class TestPrebuiltMenus:
+    """A prebuilt sold as a variation listing is a menu with one name on it.
+
+    In the digest on 2026-09-17 as a GOOD RTX 5090 that hit its target and
+    undercut the cheapest loose 5090 in the run by $3,850:
+
+      AMD RYZEN 9 9950X3D2 Gaming PC NVIDIA RTX 5090 16GB DDR5 RAM - 512GB SSD+WiFi 7
+
+    The dropdown is the graphics card: no GPU, 5060, 5060 Ti, 5070, 5070 Ti,
+    5080, and a 5090 marked out of stock. The $1,999.99 eBay quoted is the
+    option with no GPU at all. Five more machines in the same digest had the
+    same shape and led "Also seen" as prebuilts undercutting their own card.
+    The title names only the flagship build, so the menu rule above never saw
+    more than one card.
+    """
+
+    OBSERVED = (
+        "AMD RYZEN 9 9950X3D2 Gaming PC NVIDIA RTX 5090 16GB DDR5 RAM - 512GB SSD+WiFi 7",
+        "Intel Ultra 9 285K RTX 5090 32GB DDR5 | 2TB SSD | AI Creator / Gaming PC/WiFi 6",
+        "Intel ULTRA 9 285K AI Workstation PC - NVIDIA RTX 5090 64GB DDR5 4TB SSD WIFI 7!",
+        "AMD RYZEN 9 9950X3D Gaming PC - NVIDIA RTX 5090 - 32GB DDR5 RAM+4TB SSD+WiFi 7!!",
+        "Ryzen 7 9850X3D AI Workstation PC RTX 5090 128GB DDR5 2TB Gen4 WiFi CreatorPC",
+        "AMD Ryzen 9 9950X3D AI Workstation PC RTX 5090 128GB DDR5 2TB Gen4 WiFi7 Creator",
+    )
+
+    @pytest.mark.parametrize("title", OBSERVED)
+    def test_a_prebuilt_menu_is_dropped(self, title: str) -> None:
+        result = match(title, price=1999.99, multi_variant=True)
+        assert result.part is None
+        assert result.junk
+
+    def test_one_price_for_one_build_is_still_a_system(self) -> None:
+        """Without the variation signal the price is the machine's own, so it
+        stays visible as a prebuilt: capped, never logged, as before."""
+        result = match(self.OBSERVED[0], price=1999.99)
+        assert result.part is not None
+        assert result.part.key == "rtx_5090"
+        assert result.is_system
+
+    def test_the_pipeline_never_assesses_the_menu(self, tmp_path) -> None:
+        from tests.hardware_pipeline import evaluate
+
+        def machine(listing_id: str, multi_variant: bool) -> Listing:
+            return Listing(
+                listing_id=listing_id,
+                source="ebay",
+                title=self.OBSERVED[0],
+                url="https://example.invalid",
+                posted_at=datetime.now(timezone.utc),
+                price=1999.99,
+                condition_hint="new",
+                loggable=not multi_variant,
+                multi_variant=multi_variant,
+            )
+
+        assessments, _ = evaluate(
+            tmp_path / "state",
+            [machine("v1|100000000001|200000000001", True), machine("v1|100000000002|0", False)],
+            record=False,
+        )
+        assert [item.listing_id for item in assessments] == ["v1|100000000002|0"]
+
+
 class TestVariationIds:
     @pytest.mark.parametrize(
         ("item_id", "expected"),
