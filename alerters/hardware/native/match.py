@@ -190,7 +190,7 @@ SYSTEM_PATTERNS = (
     # was logged as a bare 5090, eleven such rows in a 1,041-row log. They were
     # purged on 2026-08-13 only because they happened to be variation listings
     # too; the same title on an ordinary listing still scored as a card.
-    r"\bai\s+work\s*station\b",
+    # Checked separately in is_system_listing, against CARD_WORD_RE.
     r"\bsystem\b",
     # How enterprise gear is sold. Found by auditing the price log on
     # 2026-08-08: a "DGX Station RTX-6000 ADA" at $12,550 and an "A6000 +
@@ -206,6 +206,17 @@ SYSTEM_PATTERNS = (
     r"\b\d+u\s+server\b",
 )
 SYSTEM_RE = re.compile("|".join(SYSTEM_PATTERNS), re.IGNORECASE)
+AI_WORKSTATION_RE = re.compile(r"\bai\s+work\s*station\b", re.IGNORECASE)
+# ...unless the listing calls itself a card. Sellers of bare cards borrow the
+# builders' phrase too: "NVIDIA RTX 6000 ADA-Lovelace 48GB Professional Graphics
+# GPU Card AI Workstation" ($7,994) and "NVIDIA RTX PRO 6000 Blackwell 96GB
+# GDDR7 ECC AI Workstation GPU NEW" ($17,000) both reached the 2026-09-21 digest
+# as whole machines undercutting the loose card -- and were never logged. A
+# rig quoting RAM or storage stays a rig whatever it calls its GPU.
+CARD_WORD_RE = re.compile(
+    r"\b(?:graphics|video|gpu)\s+card\b|\bgraphics\s+gpu\b|\bwork\s*station\s+gpu\b",
+    re.IGNORECASE,
+)
 
 # A CPU model plus memory or storage means the listing is a whole computer even
 # when it never says so. Observed live: "HP Omen 45L NVIDIA GeForce RTX 5090,
@@ -423,6 +434,10 @@ def is_system_listing(text: str, part: Part | None) -> bool:
     if part is None or part.kind.value == "unified":
         return False
     if SYSTEM_RE.search(text):
+        return True
+    if AI_WORKSTATION_RE.search(text) and (
+        STORAGE_RE.search(text) or not CARD_WORD_RE.search(text)
+    ):
         return True
     # The implicit case: a CPU and memory/storage named alongside the GPU.
     if CPU_RE.search(text) and STORAGE_RE.search(text):

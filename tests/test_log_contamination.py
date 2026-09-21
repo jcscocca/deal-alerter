@@ -131,6 +131,47 @@ class TestAiWorkstations:
         assert result.part is not None, title
         assert not result.is_system, title
 
+    @pytest.mark.parametrize(
+        "title,price,key",
+        [
+            # Both in the 2026-09-21 digest as "Whole machine at $X undercuts
+            # the cheapest loose ..." -- bare cards, sold as cards, whose
+            # sellers tacked the builders' phrase onto the title. Neither names
+            # a CPU, RAM or storage; the card word is what gives them away.
+            (
+                "NVIDIA RTX 6000 ADA-Lovelace 48GB Professional Graphics GPU Card AI Workstation",
+                7994.0,
+                "rtx_6000_ada",
+            ),
+            (
+                "NVIDIA RTX PRO 6000 Blackwell 96GB GDDR7 ECC AI Workstation GPU NEW",
+                16999.99,
+                "rtx_pro_6000_blackwell",
+            ),
+        ],
+    )
+    def test_a_card_calling_itself_an_ai_workstation_gpu_is_a_card(
+        self, title: str, price: float, key: str
+    ) -> None:
+        result = match(title, price=price)
+        assert result.part is not None and result.part.key == key, title
+        assert not result.is_system, title
+
+    def test_a_machine_that_names_its_graphics_card_is_still_a_machine(self) -> None:
+        """The card word only excuses the builders' phrase. A CPU, RAM or
+        storage beside it still makes the listing a computer."""
+        result = match(
+            "Ryzen 9 9950X AI Workstation RTX 5090 32GB Graphics Card", price=4000.0
+        )
+        assert result.is_system
+
+    def test_a_cpu_less_rig_quoting_memory_is_still_a_machine(self) -> None:
+        result = match(
+            "AI Workstation w/ RTX 5090 32GB Graphics Card 128GB RAM 4TB NVMe",
+            price=6000.0,
+        )
+        assert result.is_system
+
 
 class TestVendorPartNumbers:
     """A part number is not a second card.
