@@ -175,6 +175,74 @@ class TestPrebuiltMenus:
         assert [item.listing_id for item in assessments] == ["v1|100000000002|0"]
 
 
+class TestMemoryRangeMenus:
+    """A unified-memory machine sold as a menu of memory sizes.
+
+    In the digest on 2026-09-24 as a GOOD M3 Max 128GB that hit its target at
+    39% under reference:
+
+      2023 Apple MacBook Pro M3 Max 16.2-inch 36GB-128GB RAM, 1TB-8TB SSD, All Colors
+
+    The dropdown is the memory: 36, 48, 64, 96 and 128GB, every option but
+    36GB out of stock. The $2,199 eBay quoted buys the 36GB machine. On a
+    Mac the memory is the part, so a title spanning a range of it names no
+    single part, and the matcher took the top of the range.
+    """
+
+    OBSERVED = "2023 Apple MacBook Pro M3 Max 16.2-inch 36GB-128GB RAM, 1TB-8TB SSD, All Colors"
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            OBSERVED,
+            "Apple MacBook Pro 16 M3 Max 36GB - 128GB RAM 1TB SSD",
+            "Apple MacBook Pro 16 M3 Max 36-128GB RAM 1TB SSD",
+            "Apple MacBook Pro 16 M3 Max 36GB to 128GB RAM 1TB SSD",
+        ],
+    )
+    def test_a_memory_range_menu_is_dropped(self, title: str) -> None:
+        result = match(title, price=2199.0, multi_variant=True)
+        assert result.part is None
+        assert result.junk
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "Apple MacBook Pro 16 M3 Max 128GB RAM 1TB-8TB SSD",
+            "Apple MacBook Pro 16 M3 Max 128GB RAM 512GB-1024GB SSD",
+        ],
+    )
+    def test_a_storage_range_alone_still_matches(self, title: str) -> None:
+        """Storage options don't change the part; the memory is fixed."""
+        result = match(title, price=2199.0, multi_variant=True)
+        assert result.part is not None
+        assert result.part.key == "macbook_pro_m3_max_128"
+        assert not result.junk
+
+    @pytest.mark.parametrize(
+        ("title", "key"),
+        [
+            ("Apple Mac mini M4 Pro 64GB-512GB", "mac_mini_m4_pro_64"),
+            ("Apple Mac Studio M4 Max 128GB-512GB", "mac_studio_m4_max_128"),
+        ],
+    )
+    def test_memory_then_storage_is_not_a_range(self, title: str, key: str) -> None:
+        result = match(title, price=2199.0, multi_variant=True)
+        assert result.part is not None
+        assert result.part.key == key
+
+    def test_a_card_title_with_a_dash_before_its_vram_still_matches(self) -> None:
+        result = match("EVGA GeForce RTX 3090 - 24GB GDDR6X", price=800.0, multi_variant=True)
+        assert result.part is not None
+        assert result.part.key == "rtx_3090"
+
+    def test_without_the_variation_signal_it_matches_as_before(self) -> None:
+        result = match(self.OBSERVED, price=2199.0)
+        assert result.part is not None
+        assert result.part.key == "macbook_pro_m3_max_128"
+        assert not result.junk
+
+
 class TestVariationIds:
     @pytest.mark.parametrize(
         ("item_id", "expected"),
