@@ -27,6 +27,7 @@ class Detail:
     is_system: bool = False
     is_bundle: bool = False
     multi_variant: bool = False
+    title: str = ""
     part: NS = field(default_factory=lambda: NS(key="rtx_3090", name="RTX 3090 24GB"))
 
 
@@ -96,3 +97,35 @@ class TestConditionHonesty:
         found = signals(row("pc", 500, is_system=True, condition="unknown"),
                         row("card", 700, condition="unknown"))
         assert "Potential only" in found["pc"]
+
+
+WORKSTATION = NS(key="rtx_pro_6000_blackwell", name="RTX PRO 6000 Blackwell Workstation")
+MAXQ = NS(key="rtx_pro_6000_blackwell_maxq", name="RTX PRO 6000 Blackwell Max-Q")
+
+
+class TestAnUnnamedEditionIsNotTheWorkstationCard:
+    def test_a_prebuilt_that_never_names_the_edition_is_held_to_the_max_q(self) -> None:
+        # eBay 377092731100, seen 2026-09-24: the VRLA Tech box held a Max-Q
+        # per its item specifics, and loose new Max-Qs were at $15,000.
+        found = signals(
+            row("pc", 16919.96, is_system=True, condition="new", part=WORKSTATION,
+                title="Intel Core Ultra 7 265K RTX PRO 6000 Blackwell 32GB DDR5 Workstation for Enscape"),
+            row("ws", 17000, condition="new", part=WORKSTATION,
+                title="NVIDIA RTX PRO 6000 Blackwell Workstation Edition 96GB GDDR7"),
+            row("mq", 14999.99, condition="new", part=MAXQ,
+                title="New NVIDIA RTX PRO 6000 Blackwell Max-Q 96GB GDDR7 Graphics Card PG153B"),
+        )
+        assert not found
+
+    def test_a_prebuilt_that_names_the_workstation_edition_keeps_the_headline(self) -> None:
+        for title in ("RTX PRO 6000 Blackwell Workstation Edition 96GB Threadripper Workstation",
+                      "Threadripper 9970X RTX PRO 6000 Blackwell 600W 96GB Workstation"):
+            found = signals(
+                row("pc", 16000, is_system=True, condition="new", part=WORKSTATION, title=title),
+                row("ws", 17000, condition="new", part=WORKSTATION,
+                    title="NVIDIA RTX PRO 6000 Blackwell Workstation Edition 96GB GDDR7"),
+                row("mq", 14999.99, condition="new", part=MAXQ,
+                    title="New NVIDIA RTX PRO 6000 Blackwell Max-Q 96GB GDDR7 Graphics Card PG153B"),
+            )
+            assert "$1,000 of room" in found["pc"]
+            assert "RTX PRO 6000 Blackwell Workstation this run" in found["pc"]

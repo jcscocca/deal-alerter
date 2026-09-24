@@ -4,6 +4,7 @@ No approximation of match.py lives here. Its original code is a prerequisite.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -179,6 +180,14 @@ class HardwarePlugin:
             if not detail.is_system:
                 continue
             pool = loose.get(detail.part.key, [])
+            # eBay 377092731100, seen 2026-09-24: "... RTX PRO 6000 Blackwell
+            # 32GB DDR5 Workstation for Enscape" held a Max-Q per its item
+            # specifics, yet was headlined as undercutting the 600W card. A
+            # prebuilt that never names the edition may hold either, so it is
+            # held to the cheaper one. "Workstation" alone describes the PC.
+            if (detail.part.key == "rtx_pro_6000_blackwell"
+                    and not re.search(r"workstation edition|\b600 ?w\b", detail.title.lower())):
+                pool = pool + loose.get("rtx_pro_6000_blackwell_maxq", [])
             # Condition drives used-card prices harder than anything else, so a
             # same-condition comparison is the only one worth calling confirmed.
             matched = [row for row in pool
@@ -192,7 +201,7 @@ class HardwarePlugin:
             if saving <= self.verdict.DOLLAR:
                 continue
             headline = (f"Whole machine at {money(detail.unit_price, decimals=0)} "
-                        f"undercuts the cheapest loose {detail.part.name} this run at "
+                        f"undercuts the cheapest loose {cheapest.detail.part.name} this run at "
                         f"{money(cheapest.detail.unit_price, decimals=0)} -- "
                         f"{money(saving, decimals=0)} of room before the rest of the PC costs anything.")
             signals[item.key] = headline + (
