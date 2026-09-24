@@ -265,6 +265,48 @@ class TestTitlesAreKept:
         row = second.conn.execute("SELECT title FROM observations").fetchone()
         assert row["title"] == "EVGA GeForce RTX 3090 FTW3 24GB"
 
+    def test_a_retitled_listing_moves_to_the_part_its_new_title_names(
+        self, history: History
+    ) -> None:
+        """Observed 2026-09-23: eBay 307194131331 was first seen as "NVIDIA
+        GeForce RTX 3090 Founders Edition 24GB VRAM - Used Good Condition", then
+        the seller added the "Ti" it had always been. The row took the new
+        title and kept rtx_3090, so a 3090 Ti's $1,540 sat in the 3090 log
+        under a title saying otherwise."""
+        for part_key, title in (
+            ("rtx_3090", "NVIDIA GeForce RTX 3090 Founders Edition 24GB VRAM - Used Good Condition"),
+            ("rtx_3090_ti", "NVIDIA GeForce RTX 3090 Ti Founders Edition 24GB VRAM - Used Good Condition"),
+        ):
+            history.record(
+                part_key=part_key,
+                condition="used",
+                unit_price=1540.0,
+                source="ebay",
+                listing_id="v1|307194131331|0",
+                title=title,
+            )
+        history.commit()
+        rows = history.conn.execute("SELECT part_key, title FROM observations").fetchall()
+        assert [(row["part_key"], row["title"]) for row in rows] == [
+            ("rtx_3090_ti", "NVIDIA GeForce RTX 3090 Ti Founders Edition 24GB VRAM - Used Good Condition"),
+        ]
+
+    def test_a_retitle_naming_the_same_part_leaves_the_row_alone(
+        self, history: History
+    ) -> None:
+        for title in ("EVGA GeForce RTX 3090 FTW3 24GB", "EVGA RTX 3090 FTW3 Ultra 24GB - Tested"):
+            history.record(
+                part_key="rtx_3090",
+                condition="used",
+                unit_price=800.0,
+                source="ebay",
+                listing_id="v1|1|0",
+                title=title,
+            )
+        history.commit()
+        assert history.total_observations() == 1
+        assert history.stats("rtx_3090", "used").low == 800.0
+
     def test_a_log_written_before_titles_still_loads(self, tmp_path) -> None:
         log = tmp_path / "prices.jsonl"
         log.write_text(
