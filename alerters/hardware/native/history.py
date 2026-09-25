@@ -200,6 +200,11 @@ class History:
         and the rest just bump last_seen -- one listing, one vote. A *price
         change* on the same listing does insert, because that's genuinely new
         information about what the seller will accept.
+
+        A repeat sighting also takes the latest part key along with the latest
+        title, so the two never disagree. Observed 2026-09-23: eBay 307194131331
+        was retitled from "RTX 3090 Founders Edition" to "RTX 3090 Ti Founders
+        Edition" and the row kept rtx_3090 under the Ti title.
         """
         now = (seen_at or datetime.now(timezone.utc)).isoformat(timespec="seconds")
         self.conn.execute(
@@ -210,6 +215,7 @@ class History:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(source, listing_id, unit_price)
             DO UPDATE SET last_seen = excluded.last_seen,
+                          part_key = excluded.part_key,
                           title = COALESCE(NULLIF(excluded.title, ''), title)
             """,
             (
