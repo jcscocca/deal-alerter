@@ -47,6 +47,13 @@ JUNK_PATTERNS = (
     r"\breplica\b",
     r"\bdummy\b",
     r"\b3d\s*print",
+    # A Mac still enrolled in another company's device management: observed
+    # 2026-09-24, "M2 Ultra,128gb Ram,1Tb. MDM Bypass *READ*" at $3,500, whose
+    # seller says the lock returns on any factory reset. "No MDM" and
+    # "MDM-free" are the opposite promise, so they don't count.
+    r"(?<!no )(?<!not )(?<!non-)(?<!without )\bmdm\b(?![- ]?free)",
+    # Pre-production boards: "W7900 48Gb GDDR6 Navi31 Eng Sample Video Card".
+    r"\beng(?:ineering)?\.?\s+samples?\b",
     # The eBay water-cooling dialect. Block sellers rarely say "water block" --
     # observed live: "EKWB Quantum Vector RTX 3080/3090 Referenc D-RGB Nickel
     # Plexi Active" contains no junk word above. The brands are anchored to the

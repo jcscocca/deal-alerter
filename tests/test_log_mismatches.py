@@ -151,3 +151,41 @@ class TestBlankTitleIsNotAMatch:
         result = match(title, price=2686.0)
         assert result.part is None
         assert result.junk
+
+
+class TestLockedAndPreProductionListingsAreNotTheProduct:
+    """Found by the 2026-09-24 deal audit.
+
+    An MDM-enrolled Mac still belongs to the company that enrolled it: the
+    bypass holds only until the SSD is erased, then the lock comes back. The
+    seller's own words (318910790995): "the MDM will appear again IF you
+    factory reset". It priced at $3,500 against ~$4,200 for a clean M2 Ultra
+    128GB and got a STRONG digest slot. An engineering sample is a
+    pre-production board sold without the retail card's firmware or support.
+    """
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "2023 Mac Studio 24 Cores, 60 Cores GPU M2 Ultra,128gb Ram,1Tb. MDM Bypass *READ*",
+            "2025 Mac Studio (1TB SSD, M4 Max, 128GB )16 Core CPU , 40 Core GPU, MDM , READ",
+            "AMD Radeon PRO W7900 48Gb GDDR6 Navi31 Eng Sample Video Card",
+            "NVIDIA RTX 6000 Ada 48GB Engineering Sample",
+        ],
+    )
+    def test_they_are_dropped(self, title: str) -> None:
+        assert match(title, price=3500).junk
+
+    @pytest.mark.parametrize(
+        "title,part",
+        [
+            ("Apple Mac Studio M2 Ultra 128GB 1TB - No MDM, Clean Title", "mac_studio_m2_ultra_128"),
+            ("Mac Studio M4 Max 128GB 1TB Not MDM Locked", "mac_studio_m4_max_128"),
+            ("Mac Studio M4 Max 128GB 1TB, MDM-free, iCloud off", "mac_studio_m4_max_128"),
+            ("AMD Radeon PRO W7900 48GB GDDR6 Retail Graphics Card", "radeon_pro_w7900"),
+        ],
+    )
+    def test_a_seller_saying_it_is_clean_still_matches(self, title: str, part: str) -> None:
+        result = match(title, price=4000)
+        assert not result.junk
+        assert result.part.key == part
