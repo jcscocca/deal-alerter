@@ -213,8 +213,18 @@ AI_WORKSTATION_RE = re.compile(r"\bai\s+work\s*station\b", re.IGNORECASE)
 # GDDR7 ECC AI Workstation GPU NEW" ($17,000) both reached the 2026-09-21 digest
 # as whole machines undercutting the loose card -- and were never logged. A
 # rig quoting RAM or storage stays a rig whatever it calls its GPU.
+#
+# A card can also say so by its memory. "NVIDIA RTX PRO 6000 Blackwell 96GB
+# GDDR7 ECC AI Workstation" ($3,999, eBay 188939006524, seen 2026-09-17) was the
+# third bare card wearing the phrase and the one the card word above does not
+# reach: it never writes GPU, card or graphics, so nothing contradicted the
+# phrase. It led the digest as a whole machine and was never logged -- the
+# cheapest RTX PRO 6000 asking price of that week left no row at all. GDDR and
+# HBM are memory only a card carries; a machine quotes DDR5 and an SSD, which
+# STORAGE_RE reads first.
 CARD_WORD_RE = re.compile(
-    r"\b(?:graphics|video|gpu)\s+card\b|\bgraphics\s+gpu\b|\bwork\s*station\s+gpu\b",
+    r"\b(?:graphics|video|gpu)\s+card\b|\bgraphics\s+gpu\b|\bwork\s*station\s+gpu\b"
+    r"|\b(?:gddr|hbm)\d",
     re.IGNORECASE,
 )
 
