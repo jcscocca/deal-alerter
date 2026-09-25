@@ -6,20 +6,22 @@ name: Check deals
 # its own with nobody touching the code.
 on:
   schedule:
-    # Steam, daily at 18:15 UTC: Steam flips sale pricing around 10:00 PT, so
+    # Steam, daily at 18:22 UTC: Steam flips sale pricing around 10:00 PT, so
     # this lands shortly after new discounts go live.
-    - cron: '15 18 * * *'
+    - cron: '22 18 * * *'
     # Hardware digest, daily. Email only; lateness costs nothing here.
-    - cron: '47 2 * * *'
-    # Hardware fast loop, push only: hourly from 14:00 to 06:00 UTC, which is
-    # 7am-11pm Pacific in summer. Measured 2026-09-16, a run takes ~110s before
-    # eBay's searches (Reddit's anonymous throttling is ~80% of it) and GitHub
-    # bills whole minutes, so call it 3. Around the clock that is ~2,300
-    # minutes a month with the other schedules, over the Free plan's 2,000 for
-    # private repositories -- and when the quota runs out, every workflow here
-    # stops until the next cycle, Steam included. Waking hours come to ~1,650.
-    # With more minutes, '37 * * * *' is the change; mind the two matches below.
-    - cron: '37 0-6,14-23 * * *'
+    # Both dailies sit off the 15-minute ticks: the queue below keeps one
+    # pending run, and a fast run arriving behind a pending daily cancels it.
+    - cron: '52 2 * * *'
+    # Hardware fast loop, push only, every 15 minutes around the clock. The
+    # repository went public on 2026-09-25, so Actions minutes cost nothing.
+    # eBay's Browse API allows 5,000 calls a day and a run makes one per search
+    # query (24), so 96 runs come to ~2,300. Reddit's anonymous RSS throttling
+    # was ~80% of a run, so this loop leaves it out and it gets its own below.
+    # GitHub drops many scheduled runs; see the README before trusting the 15.
+    - cron: '*/15 * * * *'
+    # Reddit, hourly, push only.
+    - cron: '7 * * * *'
   workflow_dispatch:
     inputs:
       domain:
@@ -33,6 +35,11 @@ on:
       dry_run:
         type: boolean
         default: true
+      # Comma-separated source names (reddit, slickdeals, apple-refurb, ebay);
+      # empty runs them all.
+      sources:
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -48,12 +55,13 @@ jobs:
     # One switch per schedule, so each can go live as soon as its own secrets
     # exist. ENABLE_HARDWARE is the daily digest and needs only SMTP;
     # ENABLE_HARDWARE_FAST needs NTFY_TOPIC or DISCORD_WEBHOOK, and without one
-    # every hourly run would fail on configuration.
+    # every fast run would fail on configuration.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.schedule == '15 18 * * *' && vars.ENABLE_STEAM == 'true') ||
-      (github.event.schedule == '47 2 * * *' && vars.ENABLE_HARDWARE == 'true') ||
-      (github.event.schedule == '37 0-6,14-23 * * *' && vars.ENABLE_HARDWARE_FAST == 'true')
+      (github.event.schedule == '22 18 * * *' && vars.ENABLE_STEAM == 'true') ||
+      (github.event.schedule == '52 2 * * *' && vars.ENABLE_HARDWARE == 'true') ||
+      ((github.event.schedule == '*/15 * * * *' || github.event.schedule == '7 * * * *') &&
+        vars.ENABLE_HARDWARE_FAST == 'true')
     runs-on: ubuntu-latest
     env:
       STEAM_ID: ${{ secrets.STEAM_ID }}
@@ -90,15 +98,18 @@ jobs:
           DOMAIN: ${{ inputs.domain }}
           MODE: ${{ inputs.mode }}
           DRY: ${{ inputs.dry_run }}
+          HARDWARE_SOURCES: ${{ inputs.sources }}
         run: |
           if [ "$EVENT" != workflow_dispatch ]; then
             case "$SCHEDULE" in
-              '15 18 * * *') DOMAIN=steam; MODE=digest ;;
-              '47 2 * * *') DOMAIN=hardware; MODE=digest ;;
-              '37 0-6,14-23 * * *') DOMAIN=hardware; MODE=fast ;;
+              '22 18 * * *') DOMAIN=steam; MODE=digest ;;
+              '52 2 * * *') DOMAIN=hardware; MODE=digest ;;
+              '*/15 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=ebay,slickdeals,apple-refurb ;;
+              '7 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=reddit ;;
               *) echo "Unrecognised schedule: $SCHEDULE" >&2; exit 1 ;;
             esac
           fi
+          export HARDWARE_SOURCES
           flags=("--$MODE" --quiet-when-empty)
           if [ "$DRY" = true ]; then flags+=(--dry-run); fi
           python -m alerters "$DOMAIN" "${flags[@]}"

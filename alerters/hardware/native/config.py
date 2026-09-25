@@ -156,6 +156,8 @@ class Config:
     thresholds: Thresholds = field(default_factory=Thresholds)
     reddit_subs: tuple[str, ...] = ("buildapcsales", "homelabsales", "hardwareswap")
     prebuilt_push_margin_pct: float = 5.0
+    # Empty means every source. Set per schedule by check.yml.
+    sources: frozenset[str] = frozenset()
 
     @property
     def search_queries(self) -> tuple[str, ...]:
@@ -211,6 +213,8 @@ class Config:
             ebay_client_secret=os.environ.get("EBAY_CLIENT_SECRET", "").strip(),
             reddit_client_id=os.environ.get("REDDIT_CLIENT_ID", "").strip(),
             reddit_client_secret=os.environ.get("REDDIT_CLIENT_SECRET", "").strip(),
+            sources=frozenset(name.strip() for name in os.environ.get("HARDWARE_SOURCES", "").split(",")
+                              if name.strip()),
             country=general.get("country", "US"),
             currency_symbol=general.get("currency_symbol", "$"),
             max_listing_age_hours=int(general.get("max_listing_age_hours", 72)),

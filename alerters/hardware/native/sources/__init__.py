@@ -19,6 +19,9 @@ __all__ = [
 ]
 
 
+SOURCE_NAMES = frozenset({"reddit", "slickdeals", "apple-refurb", "ebay"})
+
+
 def build_sources(cfg) -> list[Source]:
     """Assemble the source list from config, skipping any that lack credentials.
 
@@ -46,4 +49,13 @@ def build_sources(cfg) -> list[Source]:
                 price_floors=cfg.query_price_floors,
             )
         )
+    # HARDWARE_SOURCES narrows a run to some of them, so Reddit's throttled
+    # anonymous feed can run on its own loop instead of holding up eBay's. A
+    # name that matches nothing is refused: a typo would otherwise run nothing,
+    # every 15 minutes, without a word.
+    if cfg.sources:
+        unknown = cfg.sources - SOURCE_NAMES
+        if unknown:
+            raise ValueError(f"Unknown HARDWARE_SOURCES: {', '.join(sorted(unknown))}")
+        sources = [source for source in sources if source.name in cfg.sources]
     return sources

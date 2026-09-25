@@ -162,19 +162,21 @@ live as soon as its secrets exist:
 
 | Schedule (UTC) | Runs | Switch | Needs |
 |---|---|---|---|
-| 18:15 daily | Steam | `ENABLE_STEAM` | `STEAM_ID`, `ITAD_API_KEY`, SMTP |
-| 02:47 daily | Hardware digest | `ENABLE_HARDWARE` | SMTP, and eBay keys unless you can do without eBay |
-| :37 past, 14:00-06:00 | Hardware push | `ENABLE_HARDWARE_FAST` | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
+| 18:22 daily | Steam | `ENABLE_STEAM` | `STEAM_ID`, `ITAD_API_KEY`, SMTP |
+| 02:52 daily | Hardware digest | `ENABLE_HARDWARE` | SMTP, and eBay keys unless you can do without eBay |
+| Every 15 minutes | Hardware push: eBay, Slickdeals, Apple refurb | `ENABLE_HARDWARE_FAST` | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
+| :07 past, hourly | Hardware push: Reddit | `ENABLE_HARDWARE_FAST` | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
 
 ```bash
 gh variable set ENABLE_STEAM --body true
 ```
 
-Steam runs just after Steam's 10:00 PT price flip. The push window is 7am to
-11pm Pacific because of Actions minutes: a hardware run bills about three, so
-hourly around the clock would pass the Free plan's 2,000 a month for a private
-repository, and when the quota runs out every workflow stops until the next
-cycle. With more minutes to spend, the comment in `check.yml` says what to change.
+Steam runs just after Steam's 10:00 PT price flip. The repository is public, so
+Actions minutes are free and the push loop runs around the clock. Its limit is
+eBay's instead: 5,000 Browse calls a day, and a run makes one per search query.
+Reddit's anonymous feed is throttled hard enough to be most of a run, so it has
+its own hourly loop; `HARDWARE_SOURCES` (a comma-separated list, also a Run
+workflow input) is what splits them.
 
 To try a run by hand: Actions, Check deals, Run workflow. It defaults to a dry
 run and keeps the HTML preview as a downloadable artifact.
@@ -187,7 +189,7 @@ the hourly push loop produced one run in the eight slots between 14:00 and
 21:00 UTC, the daily hardware digest arrived five hours after its slot, and
 Steam arrived three. Under an earlier 15-minute schedule GitHub created about
 eight runs a day out of ninety-six. So the push loop is not hourly in practice,
-the Actions-minute arithmetic above is a ceiling rather than a forecast, and
+the schedule above is a ceiling rather than a forecast, and
 anything that has to reach you within the hour needs a trigger from outside
 GitHub.
 
