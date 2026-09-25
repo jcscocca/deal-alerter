@@ -155,6 +155,7 @@ class Config:
     hunts: tuple[Hunt, ...] = ()
     thresholds: Thresholds = field(default_factory=Thresholds)
     reddit_subs: tuple[str, ...] = ("buildapcsales", "homelabsales", "hardwareswap")
+    prebuilt_push_margin_pct: float = 5.0
 
     @property
     def search_queries(self) -> tuple[str, ...]:
@@ -216,6 +217,7 @@ class Config:
             digest_at=alerts.get("digest_at", "GOOD"),
             push_at=alerts.get("push_at", "STRONG"),
             remind_after_days=int(alerts.get("remind_after_days", 7)),
+            prebuilt_push_margin_pct=float(alerts.get("prebuilt_push_margin_pct", 5.0)),
             enforce_fit=bool(fit.get("enforce", False)),
             psu_headroom_w=int(fit.get("psu_headroom_w", 150)),
             hunts=load_watchlist(watchlist_path),

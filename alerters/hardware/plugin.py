@@ -165,6 +165,22 @@ class HardwarePlugin:
         may not hold the card its title claims, and parting one out means
         finding a buyer for the remaining computer.
         """
+        signals: dict[str, str] = {}
+        for item, cheapest, matched in self.undercuts(assessments):
+            detail = item.detail
+            saving = cheapest.detail.unit_price - detail.unit_price
+            headline = (f"Whole machine at {money(detail.unit_price, decimals=0)} "
+                        f"undercuts the cheapest loose {cheapest.detail.part.name} this run at "
+                        f"{money(cheapest.detail.unit_price, decimals=0)} -- "
+                        f"{money(saving, decimals=0)} of room before the rest of the PC costs anything.")
+            signals[item.key] = headline + (
+                " Potential only: conditions differ or are unstated, so the two prices are not like for like."
+                if not matched else
+                " Same condition on both sides. Confirm the machine actually contains the card before anything else.")
+        return signals
+
+    def undercuts(self, assessments: list[Assessment]):
+        """Each prebuilt under its cheapest loose card: (machine, card, same condition)."""
         loose: dict[str, list[Assessment]] = {}
         for item in assessments:
             detail = item.detail
@@ -174,7 +190,6 @@ class HardwarePlugin:
                 continue
             loose.setdefault(detail.part.key, []).append(item)
 
-        signals: dict[str, str] = {}
         for item in assessments:
             detail = item.detail
             if not detail.is_system:
@@ -200,15 +215,30 @@ class HardwarePlugin:
             saving = cheapest.detail.unit_price - detail.unit_price
             if saving <= self.verdict.DOLLAR:
                 continue
-            headline = (f"Whole machine at {money(detail.unit_price, decimals=0)} "
-                        f"undercuts the cheapest loose {cheapest.detail.part.name} this run at "
-                        f"{money(cheapest.detail.unit_price, decimals=0)} -- "
-                        f"{money(saving, decimals=0)} of room before the rest of the PC costs anything.")
-            signals[item.key] = headline + (
-                " Potential only: conditions differ or are unstated, so the two prices are not like for like."
-                if not matched else
-                " Same condition on both sides. Confirm the machine actually contains the card before anything else.")
-        return signals
+            yield item, cheapest, bool(matched)
+
+    def promote(self, assessments: list[Assessment]) -> list[Assessment]:
+        """Lift a prebuilt that undercuts its own loose card, like for like, to push.
+
+        judge() caps every machine at GOOD, below push_at, so a prebuilt priced
+        under every loose card of its GPU surfaced only in the next day's "Also
+        seen". Reported 2026-09-24: an RTX 5090 prebuilt deal was gone before
+        anything said a word about it. Only a same-condition
+        comparison that clears prebuilt_push_margin_pct counts, and a machine
+        under the suspicious-price line stays held back: "$2,000 RTX 5090 PC"
+        is a scam's shape, not a find. A lifted machine's headline is kept for
+        its push, which is reported on its own and cannot see the card it beat.
+        """
+        margin = self.cfg.prebuilt_push_margin_pct / 100
+        floor = self.cfg.thresholds.suspicious_price_ratio
+        lifted: dict[str, Assessment] = {}
+        for item, cheapest, matched in self.undercuts(assessments):
+            bar, price = cheapest.detail.unit_price, item.detail.unit_price
+            if matched and item.alertable and bar * floor <= price <= bar * (1 - margin):
+                verdict = max(item.verdict, self.bands.EXCEPTIONAL)
+                lifted[item.key] = replace(item, verdict=verdict, detail=replace(item.detail, verdict=verdict))
+        self.signals = {key: line for key, line in self.arbitrage(assessments).items() if key in lifted}
+        return [lifted.get(item.key, item) for item in assessments]
 
     def card(self, assessment: Assessment, signal: str | None = None) -> Card:
         item = assessment.detail
@@ -258,7 +288,7 @@ class HardwarePlugin:
                              2 if item.verdict == self.bands.PASS else 3)
 
     def report(self, buys: list[Assessment], others: list[Assessment], problems: list[str]) -> Report:
-        signals = self.arbitrage(buys + others)
+        signals = {**getattr(self, "signals", {}), **self.arbitrage(buys + others)}
         cards = tuple(self.card(item, signals.get(item.key)) for item in buys)
         subject = (f"{cards[0].badge}: {cards[0].title} at {cards[0].price}" if len(cards) == 1 else
                    f"{len(cards)} new AI hardware recommendations")
