@@ -336,6 +336,16 @@ MODEL_NUMBER_PATTERNS = (
 )
 MODEL_NUMBER_RE = re.compile("|".join(MODEL_NUMBER_PATTERNS), re.IGNORECASE)
 
+# "36GB-128GB RAM", "36GB to 128GB RAM", "36-128GB Unified Memory". The memory
+# word is required: "Mac mini M4 Pro 64GB-512GB" is one machine's memory and
+# storage, not a range. The bare-first form must be tight and ascending, or
+# "RTX 5090 - 32GB" reads as a range.
+MEMORY_RANGE_RE = re.compile(
+    r"\b(\d{1,4})(?:\s?gb\s?(?:-|–|to)\s?|[-–])(\d{2,4})\s?gb\b"
+    r"(?=\s*(?:ram|memory|unified)\b)",
+    re.IGNORECASE,
+)
+
 
 @dataclass
 class MatchResult:
@@ -498,6 +508,10 @@ def names_multiple_models(text: str) -> bool:
     two, and a title that repeats its own model number stays a single product.
     """
     return len({found.group(0).lower() for found in MODEL_NUMBER_RE.finditer(text)}) > 1
+
+
+def names_memory_range(text: str) -> bool:
+    return any(int(low) < int(high) for low, high in MEMORY_RANGE_RE.findall(text))
 
 
 def _candidate_terms(part: Part) -> list[str]:
@@ -755,8 +769,15 @@ def match(
     # 2026-09-17, "AMD RYZEN 9 9950X3D2 Gaming PC NVIDIA RTX 5090" quoted
     # $1,999.99 for its no-GPU option, beside a 5090 option that was out of
     # stock, and read as a 5090 machine undercutting every loose 5090.
+    #
+    # So is a memory range: on a unified-memory machine the capacity is the
+    # part. Observed 2026-09-24, "MacBook Pro M3 Max 16.2-inch 36GB-128GB RAM"
+    # quoted $2,199 for its 36GB option, with every larger size out of stock,
+    # and read as an M3 Max 128GB at 39% under reference.
     several_models = names_multiple_models(sale_text)
-    if multi_variant and (several_models or is_system_listing(title, part)):
+    if multi_variant and (
+        several_models or is_system_listing(title, part) or names_memory_range(sale_text)
+    ):
         return MatchResult(None, None, "unknown", 0, junk=True, matched_on=matched_on)
 
     resolved_price = price if price is not None else extract_price(title)
