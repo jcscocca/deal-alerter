@@ -13,9 +13,10 @@ and a comparison across different conditions says so.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import SimpleNamespace as NS
 
+from alerters.hardware.native.verdict import Verdict
 from alerters.hardware.plugin import HardwarePlugin
 from dealcore.types import Assessment
 
@@ -28,6 +29,7 @@ class Detail:
     is_bundle: bool = False
     multi_variant: bool = False
     title: str = ""
+    verdict: int = 0
     part: NS = field(default_factory=lambda: NS(key="rtx_3090", name="RTX 3090 24GB"))
 
 
@@ -129,3 +131,66 @@ class TestAnUnnamedEditionIsNotTheWorkstationCard:
             )
             assert "$1,000 of room" in found["pc"]
             assert "RTX PRO 6000 Blackwell Workstation this run" in found["pc"]
+
+
+def promoted(*rows: Assessment, margin_pct: float = 5.0) -> dict[str, Assessment]:
+    plugin = HardwarePlugin.__new__(HardwarePlugin)
+    plugin.verdict, plugin.bands = NS(DOLLAR=1.01), Verdict
+    plugin.cfg = NS(prebuilt_push_margin_pct=margin_pct, thresholds=NS(suspicious_price_ratio=0.70))
+    out = {item.key: item for item in plugin.promote(list(rows))}
+    assert list(out) == [item.key for item in rows]
+    return out
+
+
+def machine(price: float, **detail) -> Assessment:
+    return replace(row("pc", price, is_system=True, **detail), verdict=Verdict.GOOD)
+
+
+class TestAnUndercuttingPrebuiltPushes:
+    """judge() caps every machine at GOOD, under push_at. A prebuilt priced
+    under the cheapest loose card of its own GPU reached only the digest's
+    "Also seen", so it was never pushed, however good it was."""
+
+    def test_a_like_for_like_undercut_is_lifted_to_push(self) -> None:
+        found = promoted(machine(5400), row("card", 6000))
+        assert found["pc"].verdict == Verdict.EXCEPTIONAL
+        assert found["pc"].detail.verdict == Verdict.EXCEPTIONAL
+        assert found["card"].verdict == 0
+
+    def test_the_headline_is_kept_for_the_push_on_its_own(self) -> None:
+        plugin = HardwarePlugin.__new__(HardwarePlugin)
+        plugin.verdict, plugin.bands = NS(DOLLAR=1.01), Verdict
+        plugin.cfg = NS(prebuilt_push_margin_pct=5.0, thresholds=NS(suspicious_price_ratio=0.70))
+        plugin.promote([machine(5400), row("card", 6000)])
+        assert "undercuts the cheapest loose" in plugin.signals["pc"]
+
+    def test_only_a_lifted_machine_carries_its_headline_forward(self) -> None:
+        # The digest leaves out loose cards that were already mailed, so a
+        # headline measured against one of them must not leak into it.
+        plugin = HardwarePlugin.__new__(HardwarePlugin)
+        plugin.verdict, plugin.bands = NS(DOLLAR=1.01), Verdict
+        plugin.cfg = NS(prebuilt_push_margin_pct=5.0, thresholds=NS(suspicious_price_ratio=0.70))
+        plugin.promote([machine(5800), row("card", 6000)])
+        assert plugin.signals == {}
+
+    def test_inside_the_margin_it_stays_in_the_digest(self) -> None:
+        assert promoted(machine(5800), row("card", 6000))["pc"].verdict == Verdict.GOOD
+
+    def test_the_margin_is_configurable(self) -> None:
+        assert promoted(machine(5800), row("card", 6000), margin_pct=2.0)["pc"].verdict == Verdict.EXCEPTIONAL
+
+    def test_a_cross_condition_comparison_never_pushes(self) -> None:
+        found = promoted(machine(5400, condition="new"), row("card", 6000, condition="used"))
+        assert found["pc"].verdict == Verdict.GOOD
+
+    def test_a_bait_price_never_pushes(self) -> None:
+        # "$2,000 RTX 5090 gaming PC" is a scam shape, not a find.
+        assert promoted(machine(2000), row("card", 6000))["pc"].verdict == Verdict.GOOD
+
+    def test_a_machine_that_is_no_upgrade_never_pushes(self) -> None:
+        pc = replace(machine(5400), alertable=False)
+        assert promoted(pc, row("card", 6000))["pc"].verdict == Verdict.GOOD
+
+    def test_a_better_verdict_is_never_lowered(self) -> None:
+        pc = replace(machine(5400), verdict=Verdict.GRAIL)
+        assert promoted(pc, row("card", 6000))["pc"].verdict == Verdict.GRAIL

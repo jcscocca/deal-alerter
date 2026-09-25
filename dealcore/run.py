@@ -106,6 +106,11 @@ def run(domain: Domain, state: AlertState, options: RunOptions,
                 # Its raw key remains live: failed history is not an ended sale.
                 problems.append(f"{domain.key(listing)}: {type(exc).__name__}")
 
+        # judge() sees one listing at a time. A domain that weighs listings
+        # against each other gets the whole run once, before anything is sent.
+        promote = getattr(domain, "promote", None)
+        if promote is not None:
+            assessments = list(promote(assessments))
         assessments.sort(key=lambda item: (int(item.verdict), *item.rank), reverse=True)
         # No candidate in this run participates in another candidate's benchmark.
         if not options.dry_run and isinstance(domain.history, AccumulatedHistory):

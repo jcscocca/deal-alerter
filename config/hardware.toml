@@ -20,6 +20,11 @@ push_at = "EXCEPTIONAL"
 # days. Stops a week-long Slickdeals post from pushing you every 15 minutes.
 remind_after_days = 7
 
+# A prebuilt priced this far under the cheapest same-condition loose card of
+# its own GPU is pushed, even though a whole machine is otherwise capped below
+# push. Bait prices (under suspicious_price_ratio of that card) never qualify.
+prebuilt_push_margin_pct = 5.0
+
 [thresholds]
 # A price at or below the Nth percentile of everything we've recorded for that
 # part counts as the corresponding verdict. Percentiles are computed from this

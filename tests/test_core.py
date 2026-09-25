@@ -135,6 +135,22 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(retry.call_count, 1)
         self.assertEqual(set(loaded.records["test:a"]), {"email", "ntfy"})
 
+    def test_a_domain_can_promote_once_every_listing_is_judged(self):
+        domain = Domain([listing("a"), listing("b")])
+        domain.judge = lambda row, evidence: item(domain.key(row), row.price, Bands.SKIP)
+        seen = []
+
+        def promote(assessments):
+            seen.append(sorted(value.key for value in assessments))
+            return [replace(value, verdict=Bands.NOTICE) if value.key == "test:b" else value
+                    for value in assessments]
+
+        domain.promote = promote
+        push = Mock()
+        run(domain, self.state, self.options, (Channel("ntfy", "push", push),), now=NOW)
+        self.assertEqual(seen, [["test:a", "test:b"]])
+        self.assertEqual([call.args[0].buys[0].title for call in push.call_args_list], ["test:b"])
+
     def test_failed_source_does_not_erase_or_block_other_sources(self):
         self.state.record([item("dead:x")], "email", NOW)
         domain = Domain([listing()], complete=True)
