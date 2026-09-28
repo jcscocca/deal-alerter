@@ -100,7 +100,13 @@ class HardwarePlugin:
         if hunt is None:
             return None
         self.matched += 1
-        return Candidate(listing, result, hunt, listing.condition_hint or result.condition)
+        condition = listing.condition_hint or result.condition
+        # r/buildapcsales is a board of retail deals, so an unstated condition
+        # there means new. Observed 2026-09-22: "[gpu] rtx 5090 for $4299 at
+        # Walmart" was ranked against used cards instead.
+        if condition == "unknown" and listing.source == "reddit/buildapcsales":
+            condition = "new"
+        return Candidate(listing, result, hunt, condition)
 
     def read_history(self, candidate: Candidate):
         # Used and new are never mixed. A refurb A6000 and a sealed one are
@@ -131,6 +137,10 @@ class HardwarePlugin:
             item = replace(item, verdict=min(item.verdict, self.bands.GOOD))
         return Assessment(self.key(listing), item.unit_price, item.verdict, item,
             rank=(float(item.loggable), -item.dollars_per_gb), alertable=upgrade,
+            # A price you named is worth your phone, not just the digest. The
+            # native verdict lifts a hit to STRONG unless it looks like bait, so
+            # a hit left below STRONG is one it declined to trust.
+            target_override=item.target_hit and item.verdict >= self.bands.STRONG,
             loggable=item.loggable, axes=(("cheapness", item.reason),
                 ("value", f"{money(item.dollars_per_gb, whole_above=100)}/GB, "
                           f"{money(item.dollars_per_gb_bandwidth, whole_above=100)}/GB-TB/s"),
