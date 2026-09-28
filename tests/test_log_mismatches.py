@@ -115,6 +115,23 @@ class TestMobileModuleIsNotTheDesktopCard:
     def test_each_hole_alone_is_closed(self, title: str) -> None:
         assert match(title, price=4800.0).part is None
 
+    def test_xg_mobile_dock_is_dropped(self) -> None:
+        """Logged 2026-09-25 at $1,599.99 as a refurbished desktop RTX 4090
+        (eBay 278408211222). ASUS's XG Mobile is an external dock around a
+        laptop 4090 -- 16GB, not 24GB -- and the listing's own item specifics
+        say "Mobile RTX 4090". Its title names no laptop at all."""
+        result = match(
+            "ASUS ROG XG Mobile RTX 4090 - Graphics Card - Good Condition",
+            price=1599.99,
+        )
+        assert result.part is None
+
+    def test_a_rog_strix_desktop_4090_still_matches(self) -> None:
+        result = match(
+            "ASUS ROG Strix GeForce RTX 4090 OC 24GB GDDR6X Black", price=3198.99
+        )
+        assert result.part is not None and result.part.key == "rtx_4090"
+
     def test_a_desktop_5090_still_matches(self) -> None:
         result = match("MSI GeForce RTX 5090 32GB Gaming Trio OC", price=3500.0)
         assert result.part is not None and result.part.key == "rtx_5090"
