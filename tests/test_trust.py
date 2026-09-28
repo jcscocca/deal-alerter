@@ -155,6 +155,7 @@ class TestUntrustedSellerAtAnAlertingPrice:
         (folder / "hardware.toml").write_text(CONFIG.read_text())
         (folder / "watchlist.toml").write_text(
             '[[hunt]]\nname = "Mac Studio M3 Ultra 256GB"\nparts = ["mac_studio_m3_ultra_256"]\n'
+            "target = 6800.0\n"
         )
         return folder / "hardware.toml"
 

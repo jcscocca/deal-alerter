@@ -139,8 +139,10 @@ class HardwarePlugin:
             rank=(float(item.loggable), -item.dollars_per_gb), alertable=upgrade,
             # A price you named is worth your phone, not just the digest. The
             # native verdict lifts a hit to STRONG unless it looks like bait, so
-            # a hit left below STRONG is one it declined to trust.
-            target_override=item.target_hit and item.verdict >= self.bands.STRONG,
+            # a hit left below STRONG is one it declined to trust. A drop-down
+            # option's price may belong to another option, so it never counts.
+            target_override=(item.target_hit and item.verdict >= self.bands.STRONG
+                             and not item.multi_variant),
             loggable=item.loggable, axes=(("cheapness", item.reason),
                 ("value", f"{money(item.dollars_per_gb, whole_above=100)}/GB, "
                           f"{money(item.dollars_per_gb_bandwidth, whole_above=100)}/GB-TB/s"),
@@ -230,7 +232,8 @@ class HardwarePlugin:
     def promote(self, assessments: list[Assessment]) -> list[Assessment]:
         """Lift a prebuilt that undercuts its own loose card, like for like, to push.
 
-        judge() caps every machine at GOOD, below push_at, so a prebuilt priced
+        judge() caps every machine at GOOD, below push_at, unless it hits a
+        hunt's target, so a prebuilt priced
         under every loose card of its GPU surfaced only in the next day's "Also
         seen". Reported 2026-09-24: an RTX 5090 prebuilt deal was gone before
         anything said a word about it. Only a same-condition

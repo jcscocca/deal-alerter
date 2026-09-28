@@ -34,6 +34,7 @@ class NativeAssessment:
     dollars_per_gb_bandwidth: float = 40.1
     reason: str = "Capped for no upgrade; target subsequently promoted it"
     target_hit: bool = False
+    multi_variant: bool = False
     unlock: str = "No new model fits"
 
 
@@ -74,6 +75,13 @@ class HardwareAdapterTests(unittest.TestCase):
         plugin = self.plugin()
         plugin.verdict = NS(assess=Mock(return_value=NativeAssessment(
             vram_after=42, target_hit=True, verdict=Bands.GOOD)))
+        self.assertFalse(qualifies(plugin.judge(self.candidate(), NS()), Bands.EXCEPTIONAL))
+
+    def test_a_target_hit_on_a_drop_down_option_stays_off_the_phone(self):
+        # The price belongs to whichever option eBay chose to show.
+        plugin = self.plugin()
+        plugin.verdict = NS(assess=Mock(return_value=NativeAssessment(
+            vram_after=42, target_hit=True, multi_variant=True)))
         self.assertFalse(qualifies(plugin.judge(self.candidate(), NS()), Bands.EXCEPTIONAL))
 
     def test_a_target_hit_never_overrides_the_upgrade_cap(self):
