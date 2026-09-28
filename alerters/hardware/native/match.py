@@ -207,13 +207,27 @@ SYSTEM_PATTERNS = (
     r"\bdgx\s+station\b",
     r"\brender\s+node\b",
     r"\bmedia\s+server\b",
-    r"\bgpu\s+server\b",
     r"\bcompute\s+node\b",
     r"\brack\s*mount\b",
     r"\b\d+u\s+server\b",
 )
 SYSTEM_RE = re.compile("|".join(SYSTEM_PATTERNS), re.IGNORECASE)
 AI_WORKSTATION_RE = re.compile(r"\bai\s+work\s*station\b", re.IGNORECASE)
+# Checked apart from SYSTEM_PATTERNS so a bare card can name where it goes.
+# "NVIDIA RTX A6000 48GB GDDR6 Graphics Card GPU Server Workstation GPU PCIe
+# 4.0" (eBay 389904816813, $6,087.80, 2026-09-28) was pushed as a whole machine
+# undercutting the loose A6000. A card sells itself first and its use after; a
+# server leads with the server and counts its cards, so the card word only
+# excuses the phrase when it comes first on a single-card listing.
+GPU_SERVER_RE = re.compile(r"\bgpu\s+server\b", re.IGNORECASE)
+# Card counts written as words or trailing "x4", and server makers' names, mark
+# the machine even with the card word first. "Dual" can be a card's cooler
+# ("Dual Slot"); those simply stay systems, as they were before.
+SERVER_HINT_RE = re.compile(
+    r"\b(?:dual|triple|quad|two|three|four|six|eight)\b|\bx\d{1,2}\b"
+    r"|\bpoweredge\b|\bsupermicro\b|\bproliant\b|\bsys-",
+    re.IGNORECASE,
+)
 # ...unless the listing calls itself a card. Sellers of bare cards borrow the
 # builders' phrase too: "NVIDIA RTX 6000 ADA-Lovelace 48GB Professional Graphics
 # GPU Card AI Workstation" ($7,994) and "NVIDIA RTX PRO 6000 Blackwell 96GB
@@ -454,6 +468,17 @@ def is_system_listing(text: str, part: Part | None) -> bool:
         return False
     if SYSTEM_RE.search(text):
         return True
+    server = GPU_SERVER_RE.search(text)
+    if server:
+        card = CARD_WORD_RE.search(text)
+        if not (
+            card
+            and card.start() < server.start()
+            and detect_quantity(text) == 1
+            and not SERVER_HINT_RE.search(text)
+            and not STORAGE_RE.search(text)
+        ):
+            return True
     if AI_WORKSTATION_RE.search(text) and (
         STORAGE_RE.search(text) or not CARD_WORD_RE.search(text)
     ):
