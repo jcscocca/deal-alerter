@@ -16,11 +16,13 @@ on:
     # Hardware fast loop, push only, every 15 minutes around the clock. The
     # repository went public on 2026-09-25, so Actions minutes cost nothing.
     # eBay's Browse API allows 5,000 calls a day and a run makes one per search
-    # query (24), so 96 runs come to ~2,300. Reddit's anonymous RSS throttling
-    # was ~80% of a run, so this loop leaves it out and it gets its own below.
-    # GitHub drops many scheduled runs; see the README before trusting the 15.
+    # query (at most 24), so 96 runs come to ~2,300. Reddit's anonymous RSS
+    # throttling was ~80% of a run, so only r/buildapcsales rides this loop:
+    # its retail deals sell out within the hour, and one feed is one request.
+    # Observed 2026-09-22: "[gpu] rtx 5090 for $4299 at Walmart" was up for a
+    # single run. GitHub drops many scheduled runs; see the README.
     - cron: '*/15 * * * *'
-    # Reddit, hourly, push only.
+    # The swap boards, hourly, push only.
     - cron: '7 * * * *'
   workflow_dispatch:
     inputs:
@@ -104,12 +106,12 @@ jobs:
             case "$SCHEDULE" in
               '22 18 * * *') DOMAIN=steam; MODE=digest ;;
               '52 2 * * *') DOMAIN=hardware; MODE=digest ;;
-              '*/15 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=ebay,slickdeals,apple-refurb ;;
-              '7 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=reddit ;;
+              '*/15 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=ebay,slickdeals,reddit; REDDIT_SUBS=buildapcsales ;;
+              '7 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=reddit; REDDIT_SUBS=homelabsales,hardwareswap ;;
               *) echo "Unrecognised schedule: $SCHEDULE" >&2; exit 1 ;;
             esac
           fi
-          export HARDWARE_SOURCES
+          export HARDWARE_SOURCES REDDIT_SUBS
           flags=("--$MODE" --quiet-when-empty)
           if [ "$DRY" = true ]; then flags+=(--dry-run); fi
           python -m alerters "$DOMAIN" "${flags[@]}"

@@ -52,3 +52,16 @@ def test_a_misspelt_source_fails_loudly(monkeypatch) -> None:
 
 def test_naming_ebay_without_its_keys_still_sits_it_out(monkeypatch) -> None:
     assert names(load(monkeypatch, "ebay", ebay=False)) == []
+
+
+def test_reddit_subs_can_be_narrowed(monkeypatch) -> None:
+    # r/buildapcsales carries the retail deals that sell out within the hour, so
+    # it rides the 15-minute loop while the swap boards stay hourly.
+    monkeypatch.setenv("REDDIT_SUBS", "buildapcsales")
+    cfg = load(monkeypatch, "reddit")
+    assert build_sources(cfg)[0].subreddits == ("buildapcsales",)
+
+
+def test_reddit_subs_default_to_all_three(monkeypatch) -> None:
+    monkeypatch.delenv("REDDIT_SUBS", raising=False)
+    assert load(monkeypatch, None).reddit_subs == ("buildapcsales", "homelabsales", "hardwareswap")

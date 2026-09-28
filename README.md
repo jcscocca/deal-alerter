@@ -164,8 +164,8 @@ live as soon as its secrets exist:
 |---|---|---|---|
 | 18:22 daily | Steam | `ENABLE_STEAM` | `STEAM_ID`, `ITAD_API_KEY`, SMTP |
 | 02:52 daily | Hardware digest | `ENABLE_HARDWARE` | SMTP, and eBay keys unless you can do without eBay |
-| Every 15 minutes | Hardware push: eBay, Slickdeals, Apple refurb | `ENABLE_HARDWARE_FAST` | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
-| :07 past, hourly | Hardware push: Reddit | `ENABLE_HARDWARE_FAST` | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
+| Every 15 minutes | Hardware push: eBay, Slickdeals, r/buildapcsales | `ENABLE_HARDWARE_FAST` | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
+| :07 past, hourly | Hardware push: r/hardwareswap, r/homelabsales | `ENABLE_HARDWARE_FAST` | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
 
 ```bash
 gh variable set ENABLE_STEAM --body true
@@ -175,8 +175,9 @@ Steam runs just after Steam's 10:00 PT price flip. The repository is public, so
 Actions minutes are free and the push loop runs around the clock. Its limit is
 eBay's instead: 5,000 Browse calls a day, and a run makes one per search query.
 Reddit's anonymous feed is throttled hard enough to be most of a run, so it has
-its own hourly loop; `HARDWARE_SOURCES` (a comma-separated list, also a Run
-workflow input) is what splits them.
+its own loop: r/buildapcsales, whose retail deals sell out fast, every 15
+minutes, and the swap boards hourly. `HARDWARE_SOURCES` (a comma-separated
+list, also a Run workflow input) and `REDDIT_SUBS` are what split them.
 
 To try a run by hand: Actions, Check deals, Run workflow. It defaults to a dry
 run and keeps the HTML preview as a downloadable artifact.
