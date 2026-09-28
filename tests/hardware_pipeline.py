@@ -34,19 +34,19 @@ class StubSource:
         return FetchResult(list(self.listings))
 
 
-def plugin(state_root: Path) -> HardwarePlugin:
+def plugin(state_root: Path, config: Path = CONFIG) -> HardwarePlugin:
     """A plugin over the shipped configuration and whatever log is in state_root."""
-    return HardwarePlugin(CONFIG, state_root)
+    return HardwarePlugin(config, state_root)
 
 
-def evaluate(state_root: Path, listings: list[Listing], *, record: bool = True):
+def evaluate(state_root: Path, listings: list[Listing], *, record: bool = True, config: Path = CONFIG):
     """One run over these listings. Returns (assessments, matched count).
 
     `record=False` is a dry run. Each assessment is the native one carrying the
     run's final verdict, because that verdict -- after the adapter's no-upgrade
     cap -- is the one an alert floor is compared with.
     """
-    hardware = plugin(state_root)
+    hardware = plugin(state_root, config)
     hardware.sources = (StubSource(listings),)
     state = AlertState(hardware.state_dir / "alerts.json", hardware.normalise_key)
     options = replace(hardware.options, dry_run=not record,

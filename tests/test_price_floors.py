@@ -93,3 +93,28 @@ class TestFilterConstruction:
 
         src = EbaySource(("Whatever",), client_id="x", client_secret="y")
         assert src.price_floors == {}
+
+
+class TestPrebuiltSearches:
+    """A part's own query rarely surfaces a whole PC: "RTX 5090" returns 50
+    Best Match results, nearly all of them cards. A hunt can name extra
+    queries, and they are searched with the hunt's floor."""
+
+    def test_extra_queries_are_searched_with_the_hunts_floor(self, cfg: Config) -> None:
+        hunt = Hunt(name="5090", parts=(BY_KEY["rtx_5090"],), queries=("RTX 5090 gaming PC",))
+        config = Config(**{**cfg.__dict__, "hunts": (hunt,)})
+        assert config.search_queries == ("RTX 5090", "RTX 5090 gaming PC")
+        floors = config.query_price_floors
+        assert floors["RTX 5090 gaming PC"] == floors["RTX 5090"]
+
+
+def test_the_shipped_watchlist_hunts_no_unified_memory_machine() -> None:
+    # Decided 2026-09-28: an M5 Ultra 512GB is on order, and it outclasses every
+    # Mac, GB10 and Strix Halo box in both capacity and bandwidth.
+    from pathlib import Path
+
+    from alerters.hardware.native.config import load_watchlist
+
+    hunts = load_watchlist(Path(__file__).resolve().parent.parent / "config" / "watchlist.toml")
+    unified = {part.key for hunt in hunts for part in hunt.parts if part.kind.value == "unified"}
+    assert unified == set()

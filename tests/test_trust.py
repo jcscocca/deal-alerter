@@ -20,7 +20,7 @@ from alerters.hardware.native.sources.base import Listing
 from alerters.hardware.native.sources.ebay import _seller_risk
 from alerters.hardware.native.verdict import Verdict
 from alerters.hardware.plugin import Candidate, HardwarePlugin
-from tests.hardware_pipeline import evaluate, logged, plugin
+from tests.hardware_pipeline import CONFIG, evaluate, logged, plugin
 
 
 @pytest.fixture
@@ -146,7 +146,19 @@ class TestUntrustedSellerAtAnAlertingPrice:
 
     TITLE = "Apple Mac Studio 2025 M3 Ultra 28C/60C 256GB RAM 2TB SSD | A3389"
 
-    def test_the_mac_studio_does_not_reach_the_digest(self, state: Path) -> None:
+    @pytest.fixture
+    def config(self, tmp_path: Path) -> Path:
+        # The shipped watchlist stopped hunting Macs on 2026-09-28. The rule
+        # under test is about sellers, so the incident keeps its own hunt.
+        folder = tmp_path / "config"
+        folder.mkdir()
+        (folder / "hardware.toml").write_text(CONFIG.read_text())
+        (folder / "watchlist.toml").write_text(
+            '[[hunt]]\nname = "Mac Studio M3 Ultra 256GB"\nparts = ["mac_studio_m3_ultra_256"]\n'
+        )
+        return folder / "hardware.toml"
+
+    def test_the_mac_studio_does_not_reach_the_digest(self, state: Path, config: Path) -> None:
         items, _ = evaluate(
             state,
             [
@@ -158,6 +170,7 @@ class TestUntrustedSellerAtAnAlertingPrice:
                     seller_note="the seller has 0 feedback",
                 )
             ],
+            config=config,
         )
         assert items, "the listing must still be matched and shown"
         assert items[0].verdict <= Verdict.GOOD, "must not reach the digest floor"
@@ -165,12 +178,12 @@ class TestUntrustedSellerAtAnAlertingPrice:
         assert logged(state) == 0
 
     def test_an_ordinary_price_from_the_same_seller_only_drops_one_level(
-        self, state: Path
+        self, state: Path, config: Path
     ) -> None:
         """The cap is aimed at the profile, not at new sellers generally. A
         merely unremarkable price keeps the old one-level treatment."""
         clean, _ = evaluate(
-            state, [_listing(listing_id="a", title=self.TITLE, price=13000.0)]
+            state, [_listing(listing_id="a", title=self.TITLE, price=13000.0)], config=config
         )
         risky, _ = evaluate(
             state,
@@ -183,6 +196,7 @@ class TestUntrustedSellerAtAnAlertingPrice:
                     seller_note="the seller has 0 feedback",
                 )
             ],
+            config=config,
         )
         assert risky[0].verdict == Verdict(max(int(clean[0].verdict) - 1, 0))
         assert "Downgraded one level" in risky[0].reason
