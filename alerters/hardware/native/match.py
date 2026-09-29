@@ -291,6 +291,10 @@ MOBILE_PATTERNS = (
     r"\bmacbook\b",
     r"\bblade\s+1[45678]\b",  # Razer Blade
     r"\brog\s+(?:zephyrus|strix\s+scar|flow)\b",
+    # ASUS's external dock around a laptop GPU. "ASUS ROG XG Mobile RTX 4090 -
+    # Graphics Card - Good Condition" was logged as a refurbished desktop 4090
+    # at $1,599.99 on 2026-09-25; the chip inside is the 16GB mobile part.
+    r"\bxg\s+mobile\b",
     r"\bpredator\s+helios\b",
     r"\bnitro\s+\d\b",
     r"\bomen\s+1[4-8]\b",
