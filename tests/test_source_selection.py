@@ -1,7 +1,6 @@
 """HARDWARE_SOURCES picks which sources a run fetches.
 
-Reddit's anonymous RSS is throttled hard and was ~80% of a run, so the
-15-minute push loop runs without it and Reddit gets its own hourly loop.
+The fast loop uses the selected Reddit scope, defaulting to retail deals.
 """
 
 from __future__ import annotations
@@ -35,7 +34,7 @@ def test_unset_runs_every_source(monkeypatch) -> None:
     assert names(load(monkeypatch, None)) == ["reddit", "slickdeals", "apple-refurb", "ebay"]
 
 
-def test_the_fast_loop_leaves_reddit_out(monkeypatch) -> None:
+def test_a_source_filter_can_leave_reddit_out(monkeypatch) -> None:
     cfg = load(monkeypatch, "ebay, slickdeals,apple-refurb")
     assert names(cfg) == ["slickdeals", "apple-refurb", "ebay"]
 
@@ -55,13 +54,11 @@ def test_naming_ebay_without_its_keys_still_sits_it_out(monkeypatch) -> None:
 
 
 def test_reddit_subs_can_be_narrowed(monkeypatch) -> None:
-    # r/buildapcsales carries the retail deals that sell out within the hour, so
-    # it rides the 15-minute loop while the swap boards stay hourly.
-    monkeypatch.setenv("REDDIT_SUBS", "buildapcsales")
+    monkeypatch.setenv("REDDIT_SUBS", " customdeals, buildapcsales ")
     cfg = load(monkeypatch, "reddit")
-    assert build_sources(cfg)[0].subreddits == ("buildapcsales",)
+    assert build_sources(cfg)[0].subreddits == ("customdeals", "buildapcsales")
 
 
-def test_reddit_subs_default_to_all_three(monkeypatch) -> None:
+def test_reddit_subs_default_to_selected_retail_scope(monkeypatch) -> None:
     monkeypatch.delenv("REDDIT_SUBS", raising=False)
-    assert load(monkeypatch, None).reddit_subs == ("buildapcsales", "homelabsales", "hardwareswap")
+    assert load(monkeypatch, None).reddit_subs == ("buildapcsales",)

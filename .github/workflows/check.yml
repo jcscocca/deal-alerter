@@ -22,8 +22,6 @@ on:
     # Observed 2026-09-22: "[gpu] rtx 5090 for $4299 at Walmart" was up for a
     # single run. GitHub drops many scheduled runs; see the README.
     - cron: '*/15 * * * *'
-    # The swap boards, hourly, push only.
-    - cron: '7 * * * *'
   workflow_dispatch:
     inputs:
       domain:
@@ -62,8 +60,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event.schedule == '22 18 * * *' && vars.ENABLE_STEAM == 'true') ||
       (github.event.schedule == '52 2 * * *' && vars.ENABLE_HARDWARE == 'true') ||
-      ((github.event.schedule == '*/15 * * * *' || github.event.schedule == '7 * * * *') &&
-        vars.ENABLE_HARDWARE_FAST == 'true')
+      (github.event.schedule == '*/15 * * * *' && vars.ENABLE_HARDWARE_FAST == 'true')
     runs-on: ubuntu-latest
     env:
       STEAM_ID: ${{ secrets.STEAM_ID }}
@@ -106,12 +103,11 @@ jobs:
             case "$SCHEDULE" in
               '22 18 * * *') DOMAIN=steam; MODE=digest ;;
               '52 2 * * *') DOMAIN=hardware; MODE=digest ;;
-              '*/15 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=ebay,slickdeals,reddit; REDDIT_SUBS=buildapcsales ;;
-              '7 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=reddit; REDDIT_SUBS=homelabsales,hardwareswap ;;
+              '*/15 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=ebay,slickdeals,reddit ;;
               *) echo "Unrecognised schedule: $SCHEDULE" >&2; exit 1 ;;
             esac
           fi
-          export HARDWARE_SOURCES REDDIT_SUBS
+          export HARDWARE_SOURCES
           flags=("--$MODE" --quiet-when-empty)
           if [ "$DRY" = true ]; then flags+=(--dry-run); fi
           python -m alerters "$DOMAIN" "${flags[@]}"
