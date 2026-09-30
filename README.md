@@ -116,6 +116,25 @@ them against sold data now and then. Your machines live in `rig.py`.
 - **Not only NVIDIA.** AMD pro cards, the 7900 XTX, the Arc Pro B60, older Mac
   Studio Ultras and 64GB unified boxes are in the catalog as reference estimates.
 
+### Where listings come from
+
+eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales. Retailers
+reach it second-hand: Best Buy, Walmart, Newegg and Amazon deals arrive as
+r/buildapcsales and Slickdeals posts.
+
+Going to retailers directly was looked at and ruled out (2026-09-28). Don't
+reopen it without a new fact:
+
+- **Best Buy.** The developer API refuses sign-ups from free email and `.edu`
+  addresses, so there is no key to be had. Worth revisiting only with an
+  address on your own domain.
+- **Walmart.** The affiliate API needs approval against a business case and
+  RSA-signed requests; walmart.com itself sits behind bot protection that is not
+  worth fighting.
+
+Better retail coverage means reading the store out of those posts' titles, not
+adding a source.
+
 ## Running it
 
 Python 3.11 or newer.

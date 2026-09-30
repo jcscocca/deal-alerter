@@ -207,21 +207,45 @@ SYSTEM_PATTERNS = (
     r"\bdgx\s+station\b",
     r"\brender\s+node\b",
     r"\bmedia\s+server\b",
-    r"\bgpu\s+server\b",
     r"\bcompute\s+node\b",
     r"\brack\s*mount\b",
     r"\b\d+u\s+server\b",
 )
 SYSTEM_RE = re.compile("|".join(SYSTEM_PATTERNS), re.IGNORECASE)
 AI_WORKSTATION_RE = re.compile(r"\bai\s+work\s*station\b", re.IGNORECASE)
+# Checked apart from SYSTEM_PATTERNS so a bare card can name where it goes.
+# "NVIDIA RTX A6000 48GB GDDR6 Graphics Card GPU Server Workstation GPU PCIe
+# 4.0" (eBay 389904816813, $6,087.80, 2026-09-28) was pushed as a whole machine
+# undercutting the loose A6000. A card sells itself first and its use after; a
+# server leads with the server and counts its cards, so the card word only
+# excuses the phrase when it comes first on a single-card listing.
+GPU_SERVER_RE = re.compile(r"\bgpu\s+server\b", re.IGNORECASE)
+# Card counts written as words or trailing "x4", and server makers' names, mark
+# the machine even with the card word first. "Dual" can be a card's cooler
+# ("Dual Slot"); those simply stay systems, as they were before.
+SERVER_HINT_RE = re.compile(
+    r"\b(?:dual|triple|quad|two|three|four|six|eight)\b|\bx\d{1,2}\b"
+    r"|\bpoweredge\b|\bsupermicro\b|\bproliant\b|\bsys-",
+    re.IGNORECASE,
+)
 # ...unless the listing calls itself a card. Sellers of bare cards borrow the
 # builders' phrase too: "NVIDIA RTX 6000 ADA-Lovelace 48GB Professional Graphics
 # GPU Card AI Workstation" ($7,994) and "NVIDIA RTX PRO 6000 Blackwell 96GB
 # GDDR7 ECC AI Workstation GPU NEW" ($17,000) both reached the 2026-09-21 digest
 # as whole machines undercutting the loose card -- and were never logged. A
 # rig quoting RAM or storage stays a rig whatever it calls its GPU.
+#
+# A card can also say so by its memory. "NVIDIA RTX PRO 6000 Blackwell 96GB
+# GDDR7 ECC AI Workstation" ($3,999, eBay 188939006524, seen 2026-09-17) was the
+# third bare card wearing the phrase and the one the card word above does not
+# reach: it never writes GPU, card or graphics, so nothing contradicted the
+# phrase. It led the digest as a whole machine and was never logged -- the
+# cheapest RTX PRO 6000 asking price of that week left no row at all. GDDR and
+# HBM are memory only a card carries; a machine quotes DDR5 and an SSD, which
+# STORAGE_RE reads first.
 CARD_WORD_RE = re.compile(
-    r"\b(?:graphics|video|gpu)\s+card\b|\bgraphics\s+gpu\b|\bwork\s*station\s+gpu\b",
+    r"\b(?:graphics|video|gpu)\s+card\b|\bgraphics\s+gpu\b|\bwork\s*station\s+gpu\b"
+    r"|\b(?:gddr|hbm)\d",
     re.IGNORECASE,
 )
 
@@ -291,6 +315,10 @@ MOBILE_PATTERNS = (
     r"\bmacbook\b",
     r"\bblade\s+1[45678]\b",  # Razer Blade
     r"\brog\s+(?:zephyrus|strix\s+scar|flow)\b",
+    # ASUS's external dock around a laptop GPU. "ASUS ROG XG Mobile RTX 4090 -
+    # Graphics Card - Good Condition" was logged as a refurbished desktop 4090
+    # at $1,599.99 on 2026-09-25; the chip inside is the 16GB mobile part.
+    r"\bxg\s+mobile\b",
     r"\bpredator\s+helios\b",
     r"\bnitro\s+\d\b",
     r"\bomen\s+1[4-8]\b",
@@ -454,6 +482,17 @@ def is_system_listing(text: str, part: Part | None) -> bool:
         return False
     if SYSTEM_RE.search(text):
         return True
+    server = GPU_SERVER_RE.search(text)
+    if server:
+        card = CARD_WORD_RE.search(text)
+        if not (
+            card
+            and card.start() < server.start()
+            and detect_quantity(text) == 1
+            and not SERVER_HINT_RE.search(text)
+            and not STORAGE_RE.search(text)
+        ):
+            return True
     if AI_WORKSTATION_RE.search(text) and (
         STORAGE_RE.search(text) or not CARD_WORD_RE.search(text)
     ):

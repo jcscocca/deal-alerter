@@ -173,6 +173,49 @@ class TestAiWorkstations:
         assert result.is_system
 
 
+class TestGpuServerCards:
+    """The 2026-09-28 audit.
+
+    "NVIDIA RTX A6000 48GB GDDR6 Graphics Card GPU Server Workstation GPU PCIe
+    4.0" (eBay 389904816813, new, $6,087.80) is a bare card in eBay's Graphics
+    Cards category. "GPU Server" fired the enterprise-system pattern, so it
+    was read as a whole machine undercutting the loose A6000, lifted to
+    EXCEPTIONAL and pushed -- and never logged. A card word ahead of the
+    phrase, on a single-card listing with no RAM or storage, excuses it.
+    """
+
+    def test_a_card_describing_its_use_in_a_gpu_server_is_a_card(self) -> None:
+        result = match(
+            "NVIDIA RTX A6000 48GB GDDR6 Graphics Card GPU Server Workstation GPU PCIe 4.0",
+            price=6087.8,
+        )
+        assert result.part is not None and result.part.key == "rtx_a6000"
+        assert not result.is_system
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "Supermicro GPU Server 4U RTX A6000 Render Node 512GB",
+            "ASUS ESC8000A-E12 4U 8 GPU Server For NVIDIA A100 H100 80GB, AMD EPYC",
+            "GPU Server w/ 4x RTX A6000 48GB Graphics Card 512GB RAM 4TB NVMe",
+            "GPU Server RTX A6000 48GB",
+            # Card words that follow the server, or a card count, are the
+            # machine describing what it holds.
+            "GPU Server 4x NVIDIA RTX A6000 48GB Graphics Card",
+            "Supermicro 4029GP-TRT GPU Server 8x RTX A6000 Graphics Card",
+            "Dell PowerEdge R750xa GPU Server 2x NVIDIA A100 80GB GPU Card",
+            "GPU Server RTX A6000 Graphics Card 1TB",
+            "RTX A6000 48GB Graphics Card GPU Server 256GB RAM 2TB SSD",
+            "Dual RTX A6000 48GB Graphics Card GPU Server",
+            "RTX A6000 x4 Graphics Card GPU Server",
+            "NVIDIA A100 80GB GPU Card Dell PowerEdge R750xa GPU Server",
+            "Supermicro SYS-4029GP RTX A6000 Graphics Card GPU Server",
+        ],
+    )
+    def test_a_server_is_still_a_server(self, title: str) -> None:
+        assert match(title, price=10000.0).is_system, title
+
+
 class TestVendorPartNumbers:
     """A part number is not a second card.
 
