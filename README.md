@@ -118,9 +118,9 @@ them against sold data now and then. Your machines live in `rig.py`.
 
 ### Where listings come from
 
-eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales,
-r/homelabsales and r/hardwareswap. Retailers reach it second-hand: Best Buy,
-Walmart, Newegg and Amazon deals arrive as r/buildapcsales and Slickdeals posts.
+eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales. Retailers
+reach it second-hand: Best Buy, Walmart, Newegg and Amazon deals arrive as
+r/buildapcsales and Slickdeals posts.
 
 Going to retailers directly was looked at and ruled out (2026-09-28). Don't
 reopen it without a new fact:

@@ -1,4 +1,5 @@
-"""r/buildapcsales, r/homelabsales and r/hardwareswap.
+"""r/buildapcsales. The parsing below also handles r/homelabsales and r/hardwareswap,
+which were read until 2026-09-28.
 
 The best signal-to-noise of any source here: humans have already filtered for
 "this is a deal", titles are conventionally formatted as
@@ -69,7 +70,7 @@ INTERESTING_FLAIRS = {"gpu", "cpu", "ssd", "ram", "prebuilt", "laptop", "psu"}
 class RedditSource:
     def __init__(
         self,
-        subreddits: tuple[str, ...] = ("buildapcsales", "homelabsales", "hardwareswap"),
+        subreddits: tuple[str, ...] = ("buildapcsales",),
         *,
         client_id: str = "",
         client_secret: str = "",

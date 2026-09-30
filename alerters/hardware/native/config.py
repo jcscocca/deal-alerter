@@ -154,7 +154,7 @@ class Config:
 
     hunts: tuple[Hunt, ...] = ()
     thresholds: Thresholds = field(default_factory=Thresholds)
-    reddit_subs: tuple[str, ...] = ("buildapcsales", "homelabsales", "hardwareswap")
+    reddit_subs: tuple[str, ...] = ("buildapcsales",)
     prebuilt_push_margin_pct: float = 5.0
     # Empty means every source. Set per schedule by check.yml.
     sources: frozenset[str] = frozenset()
