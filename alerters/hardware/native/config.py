@@ -130,6 +130,9 @@ class Hunt:
     quantity_wanted: int = 1
     max_dollars_per_gb: float | None = None
     note: str = ""
+    # Searches beyond the parts' own names. "RTX 5090" returns 50 Best Match
+    # results, nearly all cards, so a whole PC to part out needs its own query.
+    queries: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -154,7 +157,7 @@ class Config:
 
     hunts: tuple[Hunt, ...] = ()
     thresholds: Thresholds = field(default_factory=Thresholds)
-    reddit_subs: tuple[str, ...] = ("buildapcsales", "homelabsales", "hardwareswap")
+    reddit_subs: tuple[str, ...] = ("buildapcsales",)
     prebuilt_push_margin_pct: float = 5.0
     # Empty means every source. Set per schedule by check.yml.
     sources: frozenset[str] = frozenset()
@@ -172,6 +175,8 @@ class Config:
         for hunt in self.hunts:
             for part in hunt.parts:
                 seen.setdefault(_query_for(part), None)
+            for query in hunt.queries:
+                seen.setdefault(query, None)
         return tuple(list(seen)[:24])
 
     @property
@@ -194,6 +199,10 @@ class Config:
                 query = _query_for(part)
                 floor = part.reference_price * self.thresholds.min_price_ratio
                 floors[query] = min(floors.get(query, floor), floor)
+            if hunt.queries:
+                floor = min(part.reference_price for part in hunt.parts) * self.thresholds.min_price_ratio
+                for query in hunt.queries:
+                    floors[query] = min(floors.get(query, floor), floor)
         return floors
 
     def all_watched_parts(self) -> dict[str, Hunt]:
@@ -213,6 +222,8 @@ class Config:
             ebay_client_secret=os.environ.get("EBAY_CLIENT_SECRET", "").strip(),
             reddit_client_id=os.environ.get("REDDIT_CLIENT_ID", "").strip(),
             reddit_client_secret=os.environ.get("REDDIT_CLIENT_SECRET", "").strip(),
+            **({"reddit_subs": tuple(sub.strip() for sub in os.environ["REDDIT_SUBS"].split(",") if sub.strip())}
+               if os.environ.get("REDDIT_SUBS", "").strip() else {}),
             sources=frozenset(name.strip() for name in os.environ.get("HARDWARE_SOURCES", "").split(",")
                               if name.strip()),
             country=general.get("country", "US"),
@@ -258,7 +269,8 @@ def load_watchlist(path: Path = ROOT / "watchlist.toml") -> tuple[Hunt, ...]:
             parts.append(part)
 
         if "class" in entry:
-            candidates = in_class(entry["class"])
+            kinds = entry["class"] if isinstance(entry["class"], list) else [entry["class"]]
+            candidates = [part for kind in kinds for part in in_class(kind)]
             floor = float(entry.get("min_vram_gb", 0))
             parts.extend(p for p in candidates if p.vram_gb >= floor)
 
@@ -284,6 +296,7 @@ def load_watchlist(path: Path = ROOT / "watchlist.toml") -> tuple[Hunt, ...]:
                     else None
                 ),
                 note=entry.get("note", ""),
+                queries=tuple(entry.get("queries", ())),
             )
         )
 

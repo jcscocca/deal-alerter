@@ -33,6 +33,8 @@ class NativeAssessment:
     dollars_per_gb: float = 37.5
     dollars_per_gb_bandwidth: float = 40.1
     reason: str = "Capped for no upgrade; target subsequently promoted it"
+    target_hit: bool = False
+    multi_variant: bool = False
     unlock: str = "No new model fits"
 
 
@@ -60,6 +62,47 @@ class HardwareAdapterTests(unittest.TestCase):
         self.assertFalse(qualifies(assessment, Bands.GOOD))
         plugin.verdict.assess.return_value = NativeAssessment(vram_after=42)
         self.assertTrue(qualifies(plugin.judge(self.candidate(), NS()), Bands.STRONG))
+
+    def test_a_trusted_target_hit_reaches_push(self):
+        # Observed 2026-09-22: "[gpu] rtx 5090 for $4299 at Walmart" was the
+        # cheapest 5090 in 30 days, and a target could only lift it to STRONG,
+        # below push.
+        plugin = self.plugin()
+        plugin.verdict = NS(assess=Mock(return_value=NativeAssessment(vram_after=42, target_hit=True)))
+        self.assertTrue(qualifies(plugin.judge(self.candidate(), NS()), Bands.EXCEPTIONAL))
+
+    def test_a_target_hit_held_back_as_bait_stays_off_the_phone(self):
+        plugin = self.plugin()
+        plugin.verdict = NS(assess=Mock(return_value=NativeAssessment(
+            vram_after=42, target_hit=True, verdict=Bands.GOOD)))
+        self.assertFalse(qualifies(plugin.judge(self.candidate(), NS()), Bands.EXCEPTIONAL))
+
+    def test_a_target_hit_on_a_drop_down_option_stays_off_the_phone(self):
+        # The price belongs to whichever option eBay chose to show.
+        plugin = self.plugin()
+        plugin.verdict = NS(assess=Mock(return_value=NativeAssessment(
+            vram_after=42, target_hit=True, multi_variant=True)))
+        self.assertFalse(qualifies(plugin.judge(self.candidate(), NS()), Bands.EXCEPTIONAL))
+
+    def test_a_target_hit_never_overrides_the_upgrade_cap(self):
+        plugin = self.plugin()
+        plugin.verdict = NS(assess=Mock(return_value=NativeAssessment(target_hit=True)))
+        self.assertFalse(qualifies(plugin.judge(self.candidate(), NS()), Bands.EXCEPTIONAL))
+
+    def test_a_buildapcsales_post_is_new_unless_it_says_otherwise(self):
+        plugin = self.plugin()
+        plugin.seen = plugin.matched = 0
+        plugin.cfg.max_listing_age_hours = 72
+        plugin.watched = {"rtx_5090": NS(target=5000, name="RTX 5090")}
+        cases = (("reddit/buildapcsales", "unknown", "new"),
+                 ("reddit/buildapcsales", "open_box", "open_box"),
+                 ("reddit/hardwareswap", "unknown", "unknown"))
+        for source, detected, expected in cases:
+            plugin.matcher = Mock(return_value=NS(junk=False, part=NS(key="rtx_5090"),
+                                                  unit_price=4299, condition=detected))
+            row = Listing("1wnci76", source, "[gpu] rtx 5090 for $4299 at Walmart",
+                          "https://example.test", datetime.now(timezone.utc), price=4299)
+            self.assertEqual(plugin.prepare(row).condition, expected, source)
 
     def test_condition_and_confidence_requirements_pass_through_unchanged(self):
         plugin = self.plugin()

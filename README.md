@@ -118,9 +118,9 @@ them against sold data now and then. Your machines live in `rig.py`.
 
 ### Where listings come from
 
-eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales,
-r/homelabsales and r/hardwareswap. Retailers reach it second-hand: Best Buy,
-Walmart, Newegg and Amazon deals arrive as r/buildapcsales and Slickdeals posts.
+eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales. Retailers
+reach it second-hand: Best Buy, Walmart, Newegg and Amazon deals arrive as
+r/buildapcsales and Slickdeals posts.
 
 Going to retailers directly was looked at and ruled out (2026-09-28). Don't
 reopen it without a new fact:
@@ -198,6 +198,9 @@ eBay's instead: 5,000 Browse calls a day, and a run makes one per search query
 stays with it, since each run reads a feed per query. Reddit is one feed, so it
 gets its own 5-minute loop; `HARDWARE_SOURCES` (a comma-separated list, also a
 Run workflow input) is what splits them.
+Reddit keeps the selected default scope, r/buildapcsales; the swap boards stay
+excluded. An explicit `REDDIT_SUBS` environment setting can select another scope
+without a scheduled workflow overriding it.
 
 To try a run by hand: Actions, Check deals, Run workflow. It defaults to a dry
 run and keeps the HTML preview as a downloadable artifact.

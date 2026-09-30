@@ -6,70 +6,61 @@
 #
 # Every hunt needs either `parts` (catalog keys, see
 # alerters/hardware/native/catalog.py) or a `class` filter. `target` is the price
-# at or below which you always get alerted regardless of what the history says
-# -- the equivalent of config/steam-targets.json.
+# at or below which you always get pushed regardless of what the history says
+# -- the equivalent of config/steam-targets.json. `queries` adds searches beyond
+# the parts' own names, which is how whole PCs to part out get found at all.
+#
+# Everything here is for the Z790 desktop. An M5 Ultra 512GB is on order
+# (2026-09-28) and outclasses every Mac, GB10 and Strix Halo box on both
+# capacity and bandwidth, so unified-memory machines are not hunted.
+#
+# Targets were set 2026-09-28 just under the 5th percentile of the last 30
+# days of asks, so a push means cheaper than ~95% of what was listed. A target
+# is compared with the whole price, so a prebuilt under a card's target is a
+# machine that costs less than the card alone.
 
 # ---------------------------------------------------------------------- tier 1
 # The recommendation: 96GB on one card, 300W, fits the Z790 tower untouched.
 [[hunt]]
 name = "RTX PRO 6000 Blackwell"
 parts = ["rtx_pro_6000_blackwell_maxq", "rtx_pro_6000_blackwell"]
-target = 6300.0
+target = 13000.0
+queries = ["RTX PRO 6000 workstation"]
 note = "Max-Q is the one that matters -- 300W fits the 1000 GT without a rebuild."
 
 # The cheap path to 48GB matched-Ampere in the machine you already own.
 [[hunt]]
 name = "RTX 3090 (pair up)"
 parts = ["rtx_3090", "rtx_3090_ti"]
-target = 700.0
+target = 1250.0
+queries = ["RTX 3090 gaming PC"]
 # Two of these replace the 3080 + 2080 entirely and NVLink together.
 quantity_wanted = 2
 
 [[hunt]]
 name = "RTX 5090"
 parts = ["rtx_5090"]
-target = 2200.0
+target = 5000.0
+queries = ["RTX 5090 gaming PC"]
 
 [[hunt]]
 name = "RTX 4090"
 parts = ["rtx_4090"]
-target = 900.0
+target = 2600.0
+queries = ["RTX 4090 gaming PC"]
 
 # ---------------------------------------------------------------------- tier 2
 # 48GB single-slot-ish pro cards. Blower coolers, no transient power spikes.
+# Split in two because one target cannot serve a $4,000 A6000 and a $7,000 Ada.
 [[hunt]]
-name = "48GB pro cards"
-parts = ["rtx_a6000", "rtx_6000_ada", "l40s", "rtx_pro_5000_blackwell"]
-target = 1900.0
-
-# ---------------------------------------------------------------------- tier 3
-# Unified memory. Capacity per dollar is unbeatable; bandwidth is not.
-[[hunt]]
-name = "Mac Studio Ultra (256/512GB)"
-parts = ["mac_studio_m3_ultra_256", "mac_studio_m3_ultra_512"]
-target = 6800.0
-note = "Apple refurb is the realistic source. Watch prefill speed, not just GB."
+name = "RTX A6000"
+parts = ["rtx_a6000"]
+target = 3600.0
 
 [[hunt]]
-name = "Mac Studio M4 Max 128GB"
-parts = ["mac_studio_m4_max_128"]
-target = 2450.0
-note = "Cheapest way into 128GB unified. 546 GB/s, so capacity over speed."
-
-# Portable inference. A mobile discrete GPU tops out near 24GB, so the only
-# laptops worth hunting are the ones where memory *is* GPU memory. Slower than
-# a desktop card -- 546 GB/s against 936 on a 3090 -- so this holds big models
-# at modest speed rather than competing with the reasoning node.
-[[hunt]]
-name = "MacBook Pro (128GB unified)"
-parts = ["macbook_pro_m4_max_128", "macbook_pro_m3_max_128"]
-target = 2500.0
-note = "Only 128GB configs. Anything less is a laptop, not an inference machine."
-
-[[hunt]]
-name = "Unified-memory mini boxes"
-parts = ["framework_desktop_128", "dgx_spark", "strix_halo_mini_128"]
-target = 1200.0
+name = "48GB Ada and Blackwell pro cards"
+parts = ["rtx_6000_ada", "l40s", "rtx_pro_5000_blackwell"]
+target = 6500.0
 
 # ------------------------------------------------------------- AMD and Intel
 # Cheaper capacity at real bandwidth, and a software stack that is the entire
@@ -89,33 +80,6 @@ parts = ["rx_7900_xtx", "arc_pro_b60"]
 target = 450.0
 note = "Below the catch-all's 32GB floor, so it needs naming to be seen at all."
 
-# ---------------------------------------------------------- more unified bins
-# The M3 Ultra hunt above covers this generation's top boxes. These are the
-# ones that were invisible: last generation at nearly the same bandwidth, and
-# the small end where capacity is cheap and speed is not.
-[[hunt]]
-name = "Mac Studio Ultra (previous generations)"
-parts = ["mac_studio_m2_ultra_192", "mac_studio_m2_ultra_128", "mac_studio_m1_ultra_128"]
-target = 2600.0
-note = "800 GB/s, within 3% of an M3 Ultra, at used prices. Verify the machine."
-
-[[hunt]]
-name = "Mac Studio M3 Ultra 384GB"
-parts = ["mac_studio_m3_ultra_384"]
-target = 8500.0
-
-[[hunt]]
-name = "Small unified boxes (64GB)"
-parts = ["mac_studio_m4_max_64", "mac_mini_m4_pro_64"]
-target = 1300.0
-note = "The mini is 273 GB/s. Capacity is the whole argument; speed is not."
-
-[[hunt]]
-name = "GB10 boxes"
-parts = ["dgx_spark", "asus_ascent_gx10"]
-target = 2400.0
-note = "Same superchip under two names. Cross-shop them; 273 GB/s either way."
-
 # ---------------------------------------------------------------------- tier 4
 # Datacenter. Mostly gray-market; verify the seller hard before buying.
 [[hunt]]
@@ -128,8 +92,9 @@ note = "A100 40GB PCIe under $4k is the interesting one. Needs blower airflow."
 # ------------------------------------------------------------------ open-ended
 # A catch-all so a card the catalog doesn't know about still gets seen. Judged
 # on $/GB-VRAM alone since there's no reference price to compare against.
+# Every class but unified: "any" would bring the Macs straight back.
 [[hunt]]
 name = "Anything with lots of VRAM, cheap"
-class = "any"
+class = ["consumer", "pro", "datacenter"]
 min_vram_gb = 32
 max_dollars_per_gb = 25.0
