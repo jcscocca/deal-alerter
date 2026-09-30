@@ -87,6 +87,51 @@ class TestWorkstationBuildIsNotABareCard:
         assert not match(title, price=14000.0).is_system
 
 
+class TestVramIsNotSystemMemory:
+    """The third "AI Workstation" card from the 2026-09-17 digest.
+
+    Three bare cards wore the builders' phrase that day. The card word added on
+    2026-09-21 rescued the two that say "GPU" or "Graphics Card"; this one --
+    "NVIDIA RTX PRO 6000 Blackwell 96GB GDDR7 ECC AI Workstation", $3,999,
+    eBay 188939006524 -- never names a card at all, so the phrase went
+    unopposed and it led the digest as a whole machine undercutting the loose
+    card. Nothing was logged and no receipt was written: the cheapest RTX PRO
+    6000 asking price of that week is absent from state entirely.
+
+    What contradicts the phrase is "96GB GDDR7". GDDR and HBM are memory only a
+    card carries; a machine quotes DDR5 and an SSD, which STORAGE_RE already
+    reads as the machine winning.
+    """
+
+    def test_a_card_quoting_only_its_vram_is_a_card(self) -> None:
+        result = match(
+            "NVIDIA RTX PRO 6000 Blackwell 96GB GDDR7 ECC AI Workstation",
+            price=3999.0,
+        )
+        assert result.part is not None
+        assert result.part.key == "rtx_pro_6000_blackwell"
+        assert not result.is_system, "a card, not a machine"
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "ULTRA 9 285K AI Workstation ASUS ROG Astral RTX 5090 128GB DDR5 4TB SSD",
+            "Intel ULTRA 9 285K AI Workstation PC - NVIDIA RTX 5090 64GB DDR5 4TB SSD WIFI 7!",
+            "Ryzen 7 9850X3D AI Workstation PC RTX 5090 128GB DDR5 2TB Gen4 WiFi CreatorPC",
+            "Intel Xeon w7-3565X 2x RTX PRO 6000 Blackwell AI/Machine Learning Workstation",
+            "HP Omen 45L Intel i9-14900KF, NVIDIA GeForce RTX 5090, 64GB RAM, 2TB SSD",
+            # A tower may quote its card's VRAM alongside its own memory. The
+            # DDR5 and the SSD still decide.
+            "ULTRA 9 285K AI Workstation ASUS ROG Astral RTX 5090 32GB GDDR7 128GB DDR5 4TB SSD",
+            # ...and one that quotes neither still has its CPU beside the
+            # build word.
+            "Ryzen 9 9950X AI Workstation RTX 5090 32GB GDDR7",
+        ],
+    )
+    def test_a_machine_is_still_a_machine(self, title: str) -> None:
+        assert match(title, price=4000.0).is_system, title
+
+
 class TestMobileModuleIsNotTheDesktopCard:
     def test_dell_pro_max_laptop_module_is_dropped(self) -> None:
         """$3,000 against the 48GB desktop card's $4,500 reference, and the
