@@ -251,3 +251,30 @@ class TestLockedAndPreProductionListingsAreNotTheProduct:
         result = match(title, price=4000)
         assert not result.junk
         assert result.part.key == part
+
+
+class TestAServerChassisIsNotTheCardItTakes:
+    def test_a_server_sold_for_named_gpus_is_junk(self) -> None:
+        """eBay 188936957585 ($5,549) and 318628291875 ($5,903), digest preview
+        2026-10-01: an empty chassis whose item specifics list the GPUs it
+        accepts, headlined as an H100 machine $37,651 under the loose card."""
+        result = match(
+            "ASUS ESC8000A-E12 4U 8 GPU Server For NVIDIA A100 H100 80GB , AMD EPYC 9004 CPU",
+            price=5549.01,
+        )
+        assert result.junk and result.part is None
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            # Live listings that name the card they hold, and a prebuilt whose
+            # "for" is about its use or its CPU platform.
+            "Supermicro 4U GPU Server for AMD EPYC 7003 with 4x NVIDIA A100 80GB installed",
+            "Gigabyte NVIDIA HPC/AI Server - G292-Z20 + 2x A100 40GB PCIE + 256gb RAM",
+            "Nvidia A100 40GB HBM2e PCI-e 4.0 x16 Ampere Server AI Accelerator Graphics Card",
+            "Intel Core Ultra 7 265K RTX PRO 6000 Blackwell 32GB DDR5 Workstation for Enscape",
+        ],
+    )
+    def test_a_listing_holding_the_card_still_matches(self, title: str) -> None:
+        result = match(title, price=17000.0)
+        assert not result.junk and result.part is not None
