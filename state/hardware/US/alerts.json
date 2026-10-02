@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-10-02T13:01:31+00:00",
+  "updated_at": "2026-10-02T18:23:11+00:00",
   "alerts": {
     "ebay:v1|128013345625": {
       "deliveries": {
@@ -649,6 +649,15 @@
           "price": 1694.5,
           "verdict": 3,
           "alerted_at": "2026-08-16T16:02:37+00:00"
+        }
+      }
+    },
+    "slickdeals:20088846": {
+      "deliveries": {
+        "ntfy": {
+          "price": 4267.99,
+          "verdict": 3,
+          "alerted_at": "2026-10-02T18:23:11+00:00"
         }
       }
     }
