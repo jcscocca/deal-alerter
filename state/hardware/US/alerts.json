@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-10-03T06:43:46+00:00",
+  "updated_at": "2026-10-03T08:35:02+00:00",
   "alerts": {
     "ebay:v1|128013345625": {
       "deliveries": {
@@ -636,6 +636,11 @@
     },
     "ebay:v1|800402829841": {
       "deliveries": {
+        "email": {
+          "price": 4920.99,
+          "verdict": 3,
+          "alerted_at": "2026-10-03T08:35:02+00:00"
+        },
         "ntfy": {
           "price": 4920.99,
           "verdict": 3,
@@ -654,6 +659,11 @@
     },
     "slickdeals:20088846": {
       "deliveries": {
+        "email": {
+          "price": 4267.99,
+          "verdict": 3,
+          "alerted_at": "2026-10-03T08:35:02+00:00"
+        },
         "ntfy": {
           "price": 4267.99,
           "verdict": 3,
