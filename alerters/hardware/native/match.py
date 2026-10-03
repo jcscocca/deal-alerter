@@ -338,6 +338,10 @@ ACCESSORY_PATTERNS = (
     r"\bcase\b(?!\s*(?:study|fan))",
     r"\bcpu\s+cooler\b",
     r"\baio\s+cooler\b",
+    # A chassis named for the cards it takes. "ASUS ESC8000A-E12 4U 8 GPU
+    # Server For NVIDIA A100 H100 80GB" (eBay 188936957585, $5,549) ships with
+    # no GPU, and led the 2026-10-01 digest as an H100 machine.
+    r"\bserver\s+for\s+(?:nvidia|rtx|tesla|a100|h100|h200|l40s?)\b",
 )
 ACCESSORY_RE = re.compile("|".join(ACCESSORY_PATTERNS), re.IGNORECASE)
 
