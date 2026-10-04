@@ -25,5 +25,5 @@ if result.returncode:
 (root / 'request-id.txt').unlink()
 print('Credentials imported into private Windows staging; values hidden.')
 '@
-& $PythonExe -c $importer
+$importer | & $PythonExe -
 if ($LASTEXITCODE -ne 0) { throw 'Credential import did not complete' }
