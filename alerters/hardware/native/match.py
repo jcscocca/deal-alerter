@@ -30,7 +30,7 @@ JUNK_PATTERNS = (
     r"\bas[- ]is\b",
     r"\bbroken\b",
     r"\bfaulty\b",
-    r"\bno\s+(?:gpu|card|display|video|output|power)\b",
+    r"\bno\s+(?:gpu|card|display|video|output|power)\b(?!\s+(?:drivers?|software|warranty)\b)",
     r"\bwater\s*block\b",
     r"\bwaterblock\b",
     r"\bback\s*plate\b",
@@ -77,7 +77,7 @@ JUNK_PATTERNS = (
     # selling point on real cards, and "with NVLink bridge included" is a card
     # plus a bridge, so mentions preceded by inclusion words don't count.
     r"(?<!with )(?<!includes )(?<!incl )(?<!and )(?<!\+ )(?<!w/ )"
-    r"\b(?:nvlink|sli)\s+bridge\b",
+    r"\b(?:nvlink|sli)\s+(?:hb\s+)?bridge\b",
     r"\breplacement\s+fans?\b",
     # Datacenter form factors and the parts that mount them. An SXM4 A100 is
     # not a cheap PCIe A100 -- it is a mezzanine module that cannot physically
@@ -105,19 +105,40 @@ MINING_PATTERNS = (
     (r"\bunder\s*volt", 1),
     (r"\brepaste[d]?\b", 1),
     (r"\bnew\s+thermal\s+pads?\b", 1),
-    (r"\bquantity\s*[:=]?\s*(?:[3-9]|\d{2,})\b", 2),
-    (r"\b(?:[3-9]|\d{2,})\s*(?:x|available|in\s+stock|units?)\b", 2),
-    (r"\btested\s+working\b", 1),
 )
 MINING_RES = tuple((re.compile(p, re.IGNORECASE), w) for p, w in MINING_PATTERNS)
 
 CONDITION_PATTERNS = (
+    ("parts", r"\bfor[- ]parts\b|\b(?:not|non)[- ]working\b"),
     ("refurbished", r"\brefurb(?:ished)?\b|\brenewed\b|\bcertified\s+pre"),
     ("open_box", r"\bopen[- ]box\b|\bopened\b"),
-    ("used", r"\bused\b|\bpre[- ]?owned\b|\bsecond\s*hand\b"),
+    ("used", r"\bused\b|\bpre[- ]?owned\b|\bsecond\s*hand\b|\b(?:pulled|removed)\s+from\b"),
     ("new", r"\bbrand\s+new\b|\bnew\s+sealed\b|\bsealed\b|\bnib\b|\bbnib\b"),
 )
 CONDITION_RES = tuple((name, re.compile(p, re.IGNORECASE)) for name, p in CONDITION_PATTERNS)
+
+# Explicit physical absence only: "no drivers installed" says nothing about
+# whether a card is included. Body evidence can veto a title's marketing names.
+GPU_ABSENT_RE = re.compile(
+    r"\b(?:gpus?|(?:graphics|video)\s+cards?|cards?)\s*[:=]\s*(?:none|no|0|not\s+included)\b"
+    # Seller configuration tables can flatten to "GPU\nNone", without a colon.
+    r"|\b(?:gpus?|(?:graphics|video)\s+cards?)\s+none\b"
+    r"|\b(?:gpus?|(?:graphics|video)[-\s]+cards?|cards?)[-\s]+(?:(?:are|is)[-\s]+)?not[-\s]+included\b"
+    r"|\b(?:no|without)\s+(?:(?:graphics|video)\s+cards?|gpus?)\b"
+    r"(?!\s+(?:drivers?|software|warranty)\b)",
+    re.IGNORECASE,
+)
+GPU_CONFIG_RE = re.compile(
+    r"\b(?:selected\s+)?(?:gpus?|graphics\s+cards?)\s*[:=]\s*([^\n;]+)", re.IGNORECASE
+)
+COMPATIBILITY_RE = re.compile(
+    r"\b(?:compatible\s+with|supports?|tested\s+(?:with|using|between)|"
+    r"(?:cards?\s+)?(?:shown|pictured)\s+(?:with|for))\b", re.IGNORECASE
+)
+PULL_ORIGIN_RE = re.compile(
+    r"\b(?:pulled|removed)\s+from\s+(?:an?\s+|my\s+)?(?:pre[- ]?built|desktop|gaming\s+pc|system)\b",
+    re.IGNORECASE,
+)
 
 # "$1,599.99" / "$749" / "1599.99 USD". Deliberately does not match bare numbers
 # -- "RTX 3090 24GB" would otherwise parse as a $24 card.
@@ -432,6 +453,13 @@ def _normalize(text: str) -> str:
     """
     text = text.lower()
     text = text.replace("_", " ").replace("/", " ")
+    # Sellers also omit every separator: "RTX3090Ti24GB" is still one card.
+    text = re.sub(
+        r"\b(rtx|gtx)\s*(\d{4})(?:\s*(ti|super))?(?:\s*(fe))?(?:\s*(\d{2,3})gb)?\b",
+        lambda m: " ".join(filter(None, (m[1], m[2], m[3], m[4], f"{m[5]}gb" if m[5] else ""))),
+        text,
+    )
+    text = re.sub(r"\b([ah]100)(?=(?:40|80)gb\b)", r"\1 ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return _MAXQ_RE.sub("maxq", text)
 
@@ -480,6 +508,7 @@ def is_system_listing(text: str, part: Part | None) -> bool:
     """
     if part is None or part.kind.value == "unified":
         return False
+    text = PULL_ORIGIN_RE.sub("", text)
     if SYSTEM_RE.search(text):
         return True
     server = GPU_SERVER_RE.search(text)
@@ -553,6 +582,12 @@ def names_multiple_models(text: str) -> bool:
     Distinct, so "RTX 3090 / 3090 Ti" is the one card it describes rather than
     two, and a title that repeats its own model number stays a single product.
     """
+    # Explicit CPU designations can share the GPU numbering shape: i7-4790
+    # and Xeon E5-2690 do not make a populated 3090 system a two-GPU bundle.
+    text = re.sub(
+        r"\b(?:i[3579][- ]?\d{4,5}[kfst]{0,2}|(?:xeon\s+)?e[357][- ]\d{4}(?:\s+v\d)?)\b",
+        " ", _normalize(text), flags=re.I,
+    )
     return len({found.group(0).lower() for found in MODEL_NUMBER_RE.finditer(text)}) > 1
 
 
@@ -723,6 +758,33 @@ def find_part(text: str) -> tuple[Part | None, str]:
     return None, ""
 
 
+def _included_title(text: str) -> str:
+    """Discard trailing GPU names used to describe compatibility or testing."""
+    evidence = COMPATIBILITY_RE.split(text, maxsplit=1)[0]
+    # A server's supported cards are not its installed configuration. Unlike
+    # an accessory blacklist, this still permits a populated GPU field below.
+    server_for = re.search(r"\bserver\s+for\s+(?:nvidia|rtx|a100|h100)\b", evidence, re.I)
+    return evidence[:server_for.start()] if server_for else evidence
+
+
+def _swap_item_body(body: str, part: Part) -> str | None:
+    """A unique priced GPU row can own its price and condition in a sale post.
+
+    Keep the existing whole-post fallback when no row can be identified. More
+    than one priced row naming this GPU is ambiguous, not a licence to pick one.
+    """
+    rows = body.splitlines()
+    priced = [i for i, row in enumerate(rows) if extract_price(row) is not None]
+    matching = [i for i in priced if part in find_all_parts(rows[i])]
+    if len(matching) > 1 or (not matching and len(priced) > 1):
+        return ""  # Multiple prices without a unique owner remain unknown.
+    if not matching:
+        return None
+    start = matching[0]
+    end = next((i for i in priced if i > start), len(rows))
+    return "\n".join(rows[start:end])
+
+
 def _capacity_agrees(haystack: str, part: Part) -> bool:
     """For configurable products, does a stated capacity match this SKU?
 
@@ -769,9 +831,9 @@ def match(
     """Parse one listing.
 
     `price` comes from the source when it has a structured field (eBay), and is
-    scraped from the title when it doesn't (Reddit, Slickdeals). `body` is
-    searched for condition and mining signals but never for the part itself --
-    a comment mentioning "I also have a 3090" must not retag the listing.
+    scraped from the title when it doesn't (Reddit, Slickdeals). `body` can
+    veto a missing GPU or identify an explicit server GPU field; casual
+    mentions of other cards must not retag the listing.
 
     `multi_variant` is the source saying this row is one option out of several
     priced behind a single listing, so the title belongs to the group and the
@@ -791,7 +853,42 @@ def match(
 
     # On have/want boards, match only against what's actually for sale.
     sale_text, is_swap = split_have_want(title)
-    part, matched_on = find_part(sale_text)
+    named_part, _ = find_part(sale_text)
+    evidence_title = _included_title(sale_text)
+    part, matched_on = find_part(evidence_title)
+    if is_swap and part is None:
+        # Separate advertised items have separate capacities: a 64GB memory
+        # kit after a comma must not contradict a 24GB GPU before it.
+        for item_title in re.split(r"[,;|]", evidence_title):
+            candidate, term = find_part(item_title)
+            if candidate and _swap_item_body(body, candidate):
+                part, matched_on = candidate, term
+                break
+    item_body = _swap_item_body(body, part) if is_swap and part else None
+    evidence_body = item_body if item_body is not None else body
+    absence_part = part or named_part
+    if absence_part and absence_part.kind.value != "unified" and GPU_ABSENT_RE.search(
+        f"{evidence_title}\n{evidence_body}"
+    ):
+        return MatchResult(None, None, "unknown", 0, junk=True)
+
+    # Only a server's explicit configuration field can supply a part from its
+    # description. Compatibility lists and cards used to test it cannot.
+    configured_gpu = ""
+    if is_system_listing(sale_text, named_part):
+        configs = [m.group(1) for m in GPU_CONFIG_RE.finditer(body)]
+        if configs:
+            if len(configs) != 1 or re.search(r"\b(?:optional|available|supported)\b", configs[0], re.I):
+                return MatchResult(None, None, "unknown", 0, junk=True)
+            configured_part, configured_on = find_part(_included_title(configs[0]))
+            if (
+                configured_part is None
+                or len(find_all_parts(configs[0])) != 1
+                or names_multiple_models(_normalize(configs[0]))
+                or (part is not None and part != configured_part)
+            ):
+                return MatchResult(None, None, "unknown", 0, junk=True)
+            part, matched_on, configured_gpu = configured_part, configured_on, configs[0]
 
     # A laptop 5090 and a desktop 5090 share a marketing name and nothing else.
     # A PSU that lists GPU compatibility is not a GPU. Neither is a near miss
@@ -820,7 +917,7 @@ def match(
     # part. Observed 2026-09-24, "MacBook Pro M3 Max 16.2-inch 36GB-128GB RAM"
     # quoted $2,199 for its 36GB option, with every larger size out of stock,
     # and read as an M3 Max 128GB at 39% under reference.
-    several_models = names_multiple_models(sale_text)
+    several_models = names_multiple_models(configured_gpu or evidence_title)
     if multi_variant and (
         several_models or is_system_listing(title, part) or names_memory_range(sale_text)
     ):
@@ -837,9 +934,11 @@ def match(
     # $1200") would otherwise leave a plausible-looking number attached to a
     # result that means the opposite of a sale.
     if resolved_price is None and is_swap and part is not None:
-        resolved_price = extract_price(body)
+        resolved_price = extract_price(evidence_body)
 
-    context = f"{title}\n{body}"
+    # A priced item row owns its condition. Another item's "BNIB" in the
+    # headline cannot turn a pulled/tested GPU into a new card.
+    context = evidence_body if item_body is not None else f"{title}\n{body}"
 
     is_system = is_system_listing(title, part)
     # A whole computer matched on a bare model number is almost certainly using
@@ -865,12 +964,14 @@ def match(
         condition=detect_condition(context),
         mining_score=mining_score(context),
         junk=False,
-        # Quantity comes from the title only. A body saying "I have 3 more" is
-        # a follow-on offer, not a discount on the thing being advertised.
-        quantity=detect_quantity(title),
+        # A machine's GPU count is not the number of machines purchased. Body
+        # stock counts likewise do not divide a card's advertised price.
+        quantity=1 if is_system else detect_quantity(evidence_title),
         is_system=is_system,
         # Catalog parts *or* bare model numbers: one price against several
         # named cards can't be attributed to any of them either way.
-        is_bundle=len(find_all_parts(sale_text)) > 1 or several_models,
+        is_bundle=(len(find_all_parts(configured_gpu or evidence_title)) > 1 or several_models
+                   or (item_body is not None and detect_quantity(_normalize(item_body)) > 1
+                       and not re.search(r"\beach\b|\bper\s+(?:card|gpu|unit)\b", item_body, re.I))),
         matched_on=matched_on,
     )

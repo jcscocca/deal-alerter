@@ -50,19 +50,21 @@ def score(price: float = PUSHED, part=SOLD, **kwargs):
 
 
 class TestStaleAnchor:
-    def test_asks_that_have_fallen_to_the_anchor_hold_it_below_push(self) -> None:
+    def test_asks_that_have_fallen_to_the_anchor_are_watch_only(self) -> None:
         item = score(stats=stats(recent_median=5999.0, recent_count=5))
-        assert item.verdict == Verdict.STRONG
+        assert item.verdict == Verdict.GOOD
+        assert not item.reference_trusted
         assert "out of date" in item.reason
 
-    def test_a_ranked_verdict_is_held_below_push_too(self) -> None:
+    def test_a_ranked_verdict_is_watch_only_too(self) -> None:
         """The cap has to survive the percentile path, which is where the real
         listing landed once its log covered enough days to rank."""
         ranked = stats(count=31, span_days=40.0, low=4699.0, p10=5100.0, p25=5949.0,
                        median=6300.0, recent_median=5999.0, recent_count=7)
         item = score(stats=ranked)
         assert item.confidence == "history"
-        assert item.verdict == Verdict.STRONG
+        assert item.verdict == Verdict.GOOD
+        assert not item.reference_trusted
 
     def test_a_market_still_asking_above_the_anchor_is_untouched(self) -> None:
         item = score(stats=stats(recent_median=SOLD.reference_price * 1.78, recent_count=11))
@@ -73,13 +75,14 @@ class TestStaleAnchor:
         assert item.verdict == Verdict.EXCEPTIONAL
 
     def test_an_estimate_still_says_it_is_an_estimate(self) -> None:
-        """Estimates were already held below push. They must not start
+        """Estimates are watch-only. They must not start
         reporting the stale-anchor reason instead of their own."""
         item = score(
             price=ESTIMATE.reference_price * 0.75,
             part=ESTIMATE,
             stats=stats(recent_median=ESTIMATE.reference_price * 0.98, recent_count=9),
         )
-        assert item.verdict == Verdict.STRONG
+        assert item.verdict == Verdict.GOOD
+        assert not item.reference_trusted
         assert "unverified estimate" in item.reason
         assert "out of date" not in item.reason
