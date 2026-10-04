@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-10-04T06:20:23+00:00",
+  "updated_at": "2026-10-04T08:51:01+00:00",
   "alerts": {
     "ebay:v1|128013345625": {
       "deliveries": {
@@ -659,6 +659,11 @@
     },
     "ebay:v1|960010926668": {
       "deliveries": {
+        "email": {
+          "price": 1199.99,
+          "verdict": 3,
+          "alerted_at": "2026-10-04T08:51:01+00:00"
+        },
         "ntfy": {
           "price": 1199.99,
           "verdict": 3,
