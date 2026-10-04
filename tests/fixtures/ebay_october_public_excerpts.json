@@ -1,0 +1,26 @@
+{
+  "provenance": "Seller-description text retrieved by HTTPS GET on 2026-10-04 at 15:42 UTC. These are public-page excerpts, NOT authenticated Browse API responses. shortDescription availability remains unverified because no production credentials are configured. Titles/prices are from the supplied audit and public item pages; price is incidental to these exclusion tests.",
+  "items": [
+    {
+      "itemId": "v1|960010926668|0",
+      "url": "https://itm.ebaydesc.com/itmdesc/960010926668",
+      "title": "NVIDIA GeForce RTX NVLink HB Bridge 4-Slot P3657 RTX 3090/3090Ti Tested",
+      "price": {"value": "1199.99", "currency": "USD"},
+      "seller_description_excerpt": "This bridge was installed between two matching NVIDIA GeForce RTX 3090 Ti cards and verified working immediately before this listing, using nvidia-smi:\nSupported cards: NVIDIA GeForce RTX 3090 and RTX 3090 Ti (30 Series)\nQuantity in this listing: 1 bridge\nWHAT IS INCLUDED\nOne (1) NVIDIA 4-slot NVLink HB bridge."
+    },
+    {
+      "itemId": "v1|188936957585|0",
+      "url": "https://itm.ebaydesc.com/itmdesc/188936957585",
+      "title": "ASUS ESC8000A-E12 4U 8 GPU Server For NVIDIA A100 H100 80GB , AMD EPYC 9004 CPU",
+      "price": {"value": "5549.01", "currency": "USD"},
+      "seller_description_excerpt": "HDD:\nNone\nHard drive bays:\nNone\nRadiator:\nYES\nCooling fan:\nYES\nProcessor:\nNone\nMemory\nNone\nGPU\nNone\nRAID Controller:\nNone"
+    },
+    {
+      "itemId": "v1|318628291875|0",
+      "url": "https://itm.ebaydesc.com/itmdesc/318628291875",
+      "title": "ASUS ESC8000A-E12 4U 8 GPU Server For NVIDIA A100 H100 80GB , AMD EPYC 9004 CPU",
+      "price": {"value": "5903.20", "currency": "USD"},
+      "seller_description_excerpt": "HDD:\nNone\nHard drive bays:\nNone\nRadiator:\nYES\nCooling fan:\nYES\nProcessor:\nNone\nMemory\nNone\nGPU\nNone\nRAID Controller:\nNone"
+    }
+  ]
+}

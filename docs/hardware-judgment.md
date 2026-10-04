@@ -40,5 +40,8 @@ price is a claim about a market at a moment. Asks sit above what a thing sells
 for, so when the last 30 days of asks have fallen to a part's sold average, the
 average is describing a market that has moved on -- a successor shipped,
 usually -- and every ratio against it reads a band too generous. Such a part is
-held below push, with the reason stated, until the number is refreshed.
+shown as **WATCH / UNVERIFIED**, capped at GOOD and excluded from buy
+recommendations and notifications until the number is refreshed. Unverified
+estimates use the same watch-only treatment. A target hit or a prebuilt price
+comparison cannot override it.
 `stale_anchor_ask_ratio` in `config/hardware.toml` sets the line.

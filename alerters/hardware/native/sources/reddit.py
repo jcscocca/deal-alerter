@@ -270,7 +270,11 @@ def _text(element: ET.Element, path: str) -> str:
 
 
 def _strip_html(raw: str) -> str:
-    return " ".join(re.sub(r"<[^>]+>", " ", html.unescape(raw)).split())
+    # Keep sale rows apart so one item's price/condition cannot leak into the
+    # next one when the matcher scopes a mixed hardwareswap post to its GPU.
+    text = re.sub(r"</?(?:p|br|li|tr|h[1-6])\b[^>]*>", "\n", html.unescape(raw), flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return "\n".join(" ".join(line.split()) for line in text.splitlines() if line.strip())
 
 
 def _parse_iso(raw: str) -> datetime | None:

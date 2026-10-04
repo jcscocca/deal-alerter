@@ -66,8 +66,8 @@ target = 6500.0
 # Cheaper capacity at real bandwidth, and a software stack that is the entire
 # reason it is cheaper: llama.cpp runs on all of these, vLLM and most
 # quantisation tooling do not. Worth watching, worth reading the note before
-# buying. Every reference price here is an estimate, so these are held below
-# the push threshold until somebody checks one against sold data.
+# buying. Every reference price here is an estimate, so these stay
+# WATCH / UNVERIFIED until somebody checks one against sold data.
 [[hunt]]
 name = "AMD pro cards (32-48GB)"
 parts = ["radeon_pro_w7900", "radeon_pro_w7800", "radeon_ai_pro_r9700"]

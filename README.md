@@ -73,8 +73,8 @@ Nothing like ITAD exists for hardware, so the tool logs what it sees to
 
 - **Until a part has 8 observations spanning 14 days,** it is judged against the
   catalog's reference price, labelled provisional, and capped at `EXCEPTIONAL`.
-  Where that reference is an estimate rather than a sold average the cap is
-  `STRONG`: it can reach the digest, never your phone.
+  An unverified or stale reference is shown as `WATCH / UNVERIFIED`, capped at
+  `GOOD`, and excluded from buy recommendations and notifications.
 - **Used, refurbished and new never pool.** Once a part has enough confirmed
   sales, those replace asking prices as what it is judged against.
 - **One listing gets one vote.** A listing seen every hour for a month is one
@@ -99,7 +99,8 @@ target = 700.0
 quantity_wanted = 2
 ```
 
-At or under `target` you are alerted whatever the history says. A part with no
+At or under `target` a trusted listing can alert, but inclusion, risk, and
+reference-quality vetoes still apply. A part with no
 hunt is matched and then never judged. Specs and reference prices live in
 `alerters/hardware/native/catalog.py`; used-market references decay, so retune
 them against sold data now and then. Your machines live in `rig.py`.
