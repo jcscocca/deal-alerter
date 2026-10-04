@@ -81,6 +81,14 @@ jobs:
               input=json.dumps({'request':os.environ['REQUEST_ID'], 'values':values}),
               text=True, capture_output=True, timeout=30)
           if result.returncode:
-              raise SystemExit('Native Windows credential writer failed; inspect staging locally')
+              # Only known fixed messages or exception class names reach logs.
+              allowed = ('Private staging request missing', 'Staging request does not match',
+                         'Staging credentials already exist; refusing overwrite')
+              detail = next((message for message in allowed if message in result.stderr), '')
+              if not detail:
+                  import re
+                  found = re.findall(r'^([A-Za-z]+Error):', result.stderr, re.MULTILINE)
+                  detail = found[-1] if found else 'unknown native writer error'
+              raise SystemExit('Native Windows credential writer failed: ' + detail)
           print('Credentials provisioned to private ThinkPad staging; values hidden.')
           PY
