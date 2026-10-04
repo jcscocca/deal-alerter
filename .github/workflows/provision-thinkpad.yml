@@ -1,0 +1,71 @@
+name: Provision ThinkPad monitor credentials
+
+# Explicit, owner-only provisioning to the already-connected personal runner.
+# No recurring trigger, checkout, artifact upload or secret-bearing output.
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: One-time request ID from the private ThinkPad staging directory
+        required: true
+        type: string
+
+permissions: {}
+concurrency:
+  group: thinkpad-monitor-provisioning
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: github.ref == 'refs/heads/main' && github.actor == github.repository_owner
+    runs-on: [self-hosted, Linux, X64, thinkpad]
+    timeout-minutes: 5
+    steps:
+      - name: Write credentials to the private local staging file
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+          EXPECTED_RUNNER: THINKPAD-wsl-deal-alerter
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          NTFY_SERVER: ${{ vars.NTFY_SERVER || 'https://ntfy.sh' }}
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          if os.environ['RUNNER_NAME'] != os.environ['EXPECTED_RUNNER']:
+              raise SystemExit('Unexpected runner; no credentials written')
+          root = Path('/mnt/c/Users/jacob/AppData/Local/DealAlerterProvision')
+          marker = root / 'request-id.txt'
+          if root.is_symlink() or marker.is_symlink() or not marker.is_file():
+              raise SystemExit('Private staging request missing')
+          if marker.read_text(encoding='utf-8-sig').strip() != os.environ['REQUEST_ID']:
+              raise SystemExit('Staging request does not match')
+          required = ('NTFY_TOPIC','EBAY_CLIENT_ID','EBAY_CLIENT_SECRET','SMTP_USER','SMTP_PASSWORD','MAIL_TO')
+          names = required + ('NTFY_TOKEN','NTFY_SERVER','MAIL_FROM','SMTP_HOST','SMTP_PORT','REDDIT_CLIENT_ID','REDDIT_CLIENT_SECRET')
+          values = {name: os.environ.get(name, '') for name in names}
+          if any(not values[name].strip() for name in required):
+              raise SystemExit('A required repository secret is missing')
+          if any('\n' in value or '\r' in value for value in values.values()):
+              raise SystemExit('Multiline settings require manual provisioning')
+          destination = root / 'secrets.env'
+          if destination.exists() or destination.is_symlink():
+              raise SystemExit('Staging credentials already exist; refusing overwrite')
+          # Directory NTFS ACL is set locally before this owner-authorized dispatch.
+          with destination.open('x', encoding='utf-8') as stream:
+              stream.write(''.join(f'{name}={value}\n' for name, value in values.items()))
+              stream.write('DESKTOP_NOTIFY=0\n')
+              stream.flush()
+              os.fsync(stream.fileno())
+          marker.unlink()
+          print('Credentials provisioned to private ThinkPad staging; values hidden.')
+          PY

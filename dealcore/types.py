@@ -82,6 +82,9 @@ class Assessment(Generic[B, D]):
     alertable: bool = True
     loggable: bool = False
     axes: tuple[tuple[str, str], ...] = ()
+    # Optional domain-owned revision for meaningful availability/sale changes.
+    # None retains the legacy price/verdict/reminder policy.
+    alert_revision: str | None = None
 
 
 @dataclass(frozen=True)

@@ -12,7 +12,7 @@ T = TypeVar("T")
 
 def load_dotenv(path: Path) -> None:
     if path.exists():
-        for raw in path.read_text(encoding="utf-8").splitlines():
+        for raw in path.read_text(encoding="utf-8-sig").splitlines():
             line = raw.strip()
             if line and not line.startswith("#") and "=" in line:
                 key, _, value = line.partition("=")
