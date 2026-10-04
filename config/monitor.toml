@@ -1,0 +1,44 @@
+# Fast local hardware monitor. Nothing starts until the Windows cutover is approved.
+[monitor]
+retailer_seconds = 120
+feed_seconds = 300
+discovery_seconds = 600
+legacy_seconds = 900
+heartbeat_seconds = 15
+stale_seconds = 600
+max_backoff_seconds = 3600
+max_products_per_retailer = 24
+workers = 6
+# Keep the existing hardware email digest under the same local writer.
+# The installed service reports missing SMTP credentials as degraded health.
+digest_utc = "02:52"
+
+[[seed]]
+kind = "hp"
+url = "https://www.hp.com/us-en/shop/pdp/omen-by-hp-45l-gaming-desktop-gt22-3090"
+
+[[seed]]
+kind = "newegg"
+url = "https://www.newegg.com/p/3D5-000Z-002C6?Item=9SIA1HJKEB7401"
+
+[[discovery]]
+kind = "discover-hp"
+url = "https://www.hp.com/us-en/shop/mdp/omen-45l-gaming-desktop"
+
+[[discovery]]
+kind = "discover-hp"
+url = "https://www.hp.com/us-en/shop/mdp/desktops/omen-max-45l-gaming-desktop"
+
+[[discovery]]
+kind = "discover-newegg"
+# Includes unavailable products so a later restock can be detected.
+url = "https://www.newegg.com/p/pl?N=100897483+601468634"
+
+[[discovery]]
+kind = "discover-newegg"
+url = "https://www.newegg.com/p/pl?d=ABS+RTX+5090+gaming+desktop"
+
+# Optional [[coupon]] entries require exact retailer + sku, code, instructions,
+# discount (dollars), required_accessories (dollars), eligibility_confirmed,
+# starts_at/ends_at (ISO with offset). The code must still appear on that page.
+# Membership/student/card offers are never presumed eligible.
