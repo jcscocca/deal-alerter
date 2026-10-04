@@ -763,7 +763,7 @@ def _included_title(text: str) -> str:
     evidence = COMPATIBILITY_RE.split(text, maxsplit=1)[0]
     # A server's supported cards are not its installed configuration. Unlike
     # an accessory blacklist, this still permits a populated GPU field below.
-    server_for = re.search(r"\bserver\s+for\s+(?:nvidia|rtx|a100|h100)\b", evidence, re.I)
+    server_for = re.search(r"\bserver\s+for\s+(?:nvidia|rtx|tesla|a100|h100|h200|l40s?)\b", evidence, re.I)
     return evidence[:server_for.start()] if server_for else evidence
 
 
