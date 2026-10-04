@@ -41,11 +41,17 @@ jobs:
         run: |
           python3 - <<'PY'
           import os
-          import json
-          import subprocess
-          import textwrap
+          from pathlib import Path
           if os.environ['RUNNER_NAME'] != os.environ['EXPECTED_RUNNER']:
               raise SystemExit('Unexpected runner; no credentials written')
+          root = Path('/home/jacob/.local/share/deal-alerter-provision')
+          marker = root / 'request-id.txt'
+          if root.is_symlink() or not root.is_dir() or root.stat().st_uid != os.getuid() or root.stat().st_mode & 0o077:
+              raise SystemExit('Private staging directory unavailable')
+          if marker.is_symlink() or not marker.is_file():
+              raise SystemExit('Private staging request missing')
+          if marker.read_text(encoding='utf-8').strip() != os.environ['REQUEST_ID']:
+              raise SystemExit('Staging request does not match')
           required = ('NTFY_TOPIC','EBAY_CLIENT_ID','EBAY_CLIENT_SECRET','SMTP_USER','SMTP_PASSWORD','MAIL_TO')
           names = required + ('NTFY_TOKEN','NTFY_SERVER','MAIL_FROM','SMTP_HOST','SMTP_PORT','REDDIT_CLIENT_ID','REDDIT_CLIENT_SECRET')
           values = {name: os.environ.get(name, '') for name in names}
@@ -53,42 +59,14 @@ jobs:
               raise SystemExit('A required repository secret is missing')
           if any('\n' in value or '\r' in value for value in values.values()):
               raise SystemExit('Multiline settings require manual provisioning')
-          # Native Windows file access is needed for this ACL-protected folder;
-          # WSL's drvfs view may omit it. Secrets travel only through stdin.
-          writer = r'''
-          import json, os, sys
-          from pathlib import Path
-          data = json.load(sys.stdin)
-          root = Path(r'C:\Users\jacob\AppData\Local\DealAlerterProvision')
-          marker = root / 'request-id.txt'
-          if root.is_symlink() or marker.is_symlink() or not marker.is_file():
-              raise SystemExit('Private staging request missing')
-          if marker.read_text(encoding='utf-8-sig').strip() != data['request']:
-              raise SystemExit('Staging request does not match')
           destination = root / 'secrets.env'
           if destination.exists() or destination.is_symlink():
               raise SystemExit('Staging credentials already exist; refusing overwrite')
-          with destination.open('x', encoding='utf-8') as stream:
-              stream.write(''.join(f'{name}={value}\n' for name, value in data['values'].items()))
+          with os.fdopen(os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w', encoding='utf-8') as stream:
+              stream.write(''.join(f'{name}={value}\n' for name, value in values.items()))
               stream.write('DESKTOP_NOTIFY=0\n')
               stream.flush()
               os.fsync(stream.fileno())
           marker.unlink()
-          '''
-          result = subprocess.run([
-              '/mnt/c/Users/jacob/AppData/Local/Programs/Python/Python311/python.exe',
-              '-c', textwrap.dedent(writer)],
-              input=json.dumps({'request':os.environ['REQUEST_ID'], 'values':values}),
-              text=True, capture_output=True, timeout=30)
-          if result.returncode:
-              # Only known fixed messages or exception class names reach logs.
-              allowed = ('Private staging request missing', 'Staging request does not match',
-                         'Staging credentials already exist; refusing overwrite')
-              detail = next((message for message in allowed if message in result.stderr), '')
-              if not detail:
-                  import re
-                  found = re.findall(r'^([A-Za-z]+Error):', result.stderr, re.MULTILINE)
-                  detail = found[-1] if found else 'unknown native writer error'
-              raise SystemExit('Native Windows credential writer failed: ' + detail)
           print('Credentials provisioned to private ThinkPad staging; values hidden.')
           PY
