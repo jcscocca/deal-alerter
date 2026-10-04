@@ -31,3 +31,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest -q
+      - name: Windows installer argument regression
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/windows/Test-InstallerArguments.ps1
