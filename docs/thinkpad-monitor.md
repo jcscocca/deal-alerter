@@ -145,8 +145,11 @@ separately approved external dead-man check. No paid infrastructure is involved.
    Alternatively, run `scripts/windows/Prepare-Credentials.ps1` locally, then
    manually dispatch `provision-thinkpad.yml` on main with its one-time request ID.
    This owner-only workflow uses the existing `THINKPAD-wsl-deal-alerter` runner
-   to write GitHub secrets into the ACL-protected local staging directory. It
-   never prints values or uploads an artifact. Pass that file to the elevated
+   to write GitHub secrets into a private WSL directory (0700, file 0600). Run
+   `Import-Credentials.ps1 -PythonExe <absolute-python-path>` to copy them through
+   a captured pipe into the private Windows staging directory and delete the
+   WSL copy. This avoids the runner service's inaccessible Windows profile view.
+   Neither step prints values or uploads an artifact. Pass the Windows file to the elevated
    installer as `-SecretsFile`; remove the staging copy after successful cutover.
    The installer grants the owner read access to health/state, while keeping
    the installed secrets file restricted to SYSTEM and administrators.
