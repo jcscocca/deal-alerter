@@ -18,10 +18,11 @@ on:
 
 jobs:
   test:
-    runs-on: [self-hosted, Linux, thinkpad]
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [[self-hosted, Linux, thinkpad], [self-hosted, Windows, thinkpad]]
         python-version: ['3.11', '3.14']
     defaults:
       run:
@@ -80,6 +81,10 @@ jobs:
                   print(key + "=" + os.environ.get("CI_JOB_TEMP", str(root / "tmp")), file=output)
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest -q
+      - name: Windows installer argument regression
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/windows/Test-InstallerArguments.ps1
       - name: Remove this job's Linux temporary directory
         if: always() && runner.os == 'Linux'
         shell: bash

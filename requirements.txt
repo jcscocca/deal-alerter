@@ -1,3 +1,6 @@
 # Runtime dependencies for both alerters. The test suite also needs pytest;
 # install requirements-dev.txt for that.
 requests
+beautifulsoup4>=4.12,<5
+# Windows does not ship the IANA time-zone database.
+tzdata

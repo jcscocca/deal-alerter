@@ -1,0 +1,290 @@
+{
+  "provenance": {
+    "url": "https://www.newegg.com/p/3D5-000Z-002C6?Item=9SIA1HJKEB7401",
+    "captured": "2026-10-04",
+    "kind": "Selected fields from live public HTML; prices are a parser fixture, not a current offer"
+  },
+  "ItemDetail": {
+    "Item": "9SIA1HJKEB7401",
+    "ParentItem": "3D5-000Z-002C6",
+    "Description": {
+      "Title": "Skytech Legacy Gaming PC Desktop, Ultra 9 285K 3.7 GHz(5.7 GHz Turbo), NVIDIA RTX 5090 32GB GDDR7, Z890 Motherboard,2TB Gen5 NVMe SSD, 64GB DDR5 6000 RGB, 1200W GOLD ATX 3.0, 420mm AIO, Wi-Fi, Win 11",
+      "IMDescription": "GD SKYTE|ST-LEGACY4-1599-B-AL R",
+      "BulletDescription": "Operating System: Windows 11 Home 64-bit\nCPU: Intel Core Ultra 9 U9 285K 3.7GHz (5.5GHz Turbo Boost) Processor\nGPU: NVIDIA GeForce RTX 5090 32GB GDDR7 (Brand may vary)\nMotherboard: Z890 Motherboard\nRAM: 64GB DDR5 6000 RGB Gaming Memory with Heat Spreader\nSSD: 2TB Gen5 NVMe M.2 SSD (Up to 30x Faster Than Traditional HDD)\nCPU Cooler: 420mm AIO Liquid CPU Cooler with ARGB Fans\nWiFi: 802.11 AC\nUSB Ports: USB 2.0, USB 3.0, USB 3.2 Gen1\nDisplay Outputs: 1 x HDMI, 1 x DisplayPort (Additional Ports May Vary)\nAudio: HD Audio & Microphone Support\nExtras: Free Gaming Keyboard & Mouse\nSoftware: No Bloatware\nWarranty: 1 Year Parts & Labor\nAssembly: Assembled in the U.S.A\nComponents brands may vary",
+      "LineDescription": "Skytech Legacy Gaming PC Desktop, Ultra 9 285K 3.7 GHz(5.7 GHz Turbo), NVIDIA RTX 5090 32GB GDDR7, Z890 Motherboard,2TB Gen5 NVMe SSD, 64GB DDR5 6000 RGB, 1200W GOLD ATX 3.0, 420mm AIO, Wi-Fi, Win 11",
+      "WebDescription": "Skytech Legacy Gaming PC Desktop, Ultra 9 285K 3.7 GHz(5.7 GHz Turbo), NVIDIA RTX 5090 32GB GDDR7, Z890 Motherboard,2TB Gen5 NVMe SSD, 64GB DDR5 6000 RGB, 1200W GOLD ATX 3.0, 420mm AIO, Wi-Fi, Win 11",
+      "LongDescription": null,
+      "UrlKeywords": "skytech-gaming-desktop-pcs-geforce-rtx-5090-intel-core-ultra-9-285k-64gb-ddr5-2tb-nvme-ssd-st-legacy4-1599-b-al-black",
+      "ShortTitle": "Skytech Legacy Gaming PC Desktop, Ultra 9 285K 3.7 GHz(5.7 GHz Turbo), NVIDIA RTX 5090 32GB GDDR7, Z890 Motherboard,2TB Gen5 NVMe SSD, 64GB DDR5 6000 RGB, 1200W GOLD ATX 3.0, 420mm AIO, Wi-Fi, Win 11",
+      "WHIDescription": null,
+      "ProductName": "Skytech Legacy Gaming PC Desktop, Ultra 9 285K 3.7 GHz(5.7 GHz Turbo), NVIDIA RTX 5090 32GB GDDR7, Z890 Motherboard,2TB Gen5 NVMe SSD, 64GB DDR5 6000 RGB, 1200W GOLD ATX 3.0, 420mm AIO, Wi-Fi, Win 11",
+      "ManualProductName": "Gaming Desktop PCs",
+      "SimplifiedWebDescription": null,
+      "SimplifiedLineDescription": null,
+      "SimplifiedBulletinDescription": null
+    },
+    "Feature": {
+      "IsAIT": false,
+      "IsRestricted": false,
+      "IsPremier": false,
+      "IsFirstFromAsia": false,
+      "IsInPMCC": false,
+      "IsHot": false,
+      "IsFreshDeal": false,
+      "HasManufacturerWarranty": true,
+      "ShipByNewegg": false,
+      "ShowOEMRetail": false,
+      "ShowOEM": false,
+      "USPSMark": false,
+      "ShopRunnerMark": "0",
+      "HasIntelligence": false,
+      "IsNew": true,
+      "IsRefurbished": false,
+      "IsOpenBoxed": false,
+      "ProductType": 1,
+      "IsPreLaunch": false,
+      "ABSMinimum": false,
+      "IsGiftCard": false,
+      "IsFlower": false,
+      "IsPCBuilderReserveItem": false,
+      "IsNegPlus": false,
+      "IsFinalSale": false,
+      "ChangeToOutOfStock": false,
+      "AutoNotifyBlockFlag": 0,
+      "InflatedPriceAlert": false,
+      "ShowAskAiAssistant": false,
+      "AllowRequestQuote": false
+    },
+    "Seller": {
+      "SellerId": "A1HJ",
+      "SellerName": "Skytech",
+      "SellerLogoURL": "Seller_A1HJ_89f49a2c-f572-4620-b5a6-d9509c4b1223.png",
+      "SellerRating": 5,
+      "SellerRatingOneDecimal": 4.6,
+      "SellerReviewCount": 471,
+      "SellerUrlKey": "Skytech",
+      "SellerModel": "VF",
+      "TopRated": true,
+      "LifetimeOrderCount": 0,
+      "SellerRatingLast12M": 5,
+      "SellerRatingOneDecimalLast12M": 4.7,
+      "SellerReviewCountLast12M": 107,
+      "Anchor": true,
+      "IsHotSeller": true,
+      "encodedSellerID": "0UHOPTYVE6MMH67E5"
+    },
+    "ItemManufactory": {
+      "BrandId": 28071,
+      "Code": 0,
+      "Manufactory": "Skytech",
+      "CountryOfMfr": "USA",
+      "ManfactoryLogo": 1,
+      "ManufactoryWeb": "https://skytechgaming.com/",
+      "Hyperlink": null,
+      "CustomerServicePhone": null,
+      "IsM2C": true,
+      "IsTopTierBrand": false,
+      "ManufacturerCodes": "28071"
+    },
+    "ViewDescription": "<b>CPU Type:</b> Intel Core Ultra 9<br/><b>GPU/VGA Type:</b> GeForce RTX 5090<br/><b>CPU Name:</b> Intel Core Ultra 9 285K<br/><b>Memory Capacity:</b> 64GB DDR5<br/><b>SSD:</b> 2TB NVMe<br/><b>Operating System:</b> Windows 11 Home<br/><b>Power Supply:</b> 1200W<br/><b>Type:</b> Gaming & Entertainment<br/>",
+    "Model": "ST-LEGACY4-1599-B-AL",
+    "UnitCost": 7599.99,
+    "InstantRebateAmount": 0,
+    "FinalPrice": 7599.99,
+    "Instock": true,
+    "ShippingCharge": 0,
+    "ItemTagFlags": {
+      "NeweggPick": 5
+    },
+    "PromotionInfo": {
+      "PromotionText": null,
+      "DisplayPromotionText": "",
+      "PromotionLink": null,
+      "PromotionLinkOpenType": null,
+      "PCode": "",
+      "PCodeType": 0,
+      "PCodeValue": 0,
+      "PromotionCaseType": null
+    },
+    "PcodeDiscount": 0,
+    "PriceHideMark": "0",
+    "CountryCode": "USA"
+  },
+  "PropertyCollection": {
+    "PropertyGroups": [
+      {
+        "GroupCode": 1,
+        "GroupDescription": "Options",
+        "Style": "Swatch",
+        "HasPriceAdditionInfo": false,
+        "SelectedProperty": {
+          "Value": 10001,
+          "Description": "Antec P1 Performance Black / U9 285K / 5090 / 64G / 2T",
+          "DisplayInfo": "Antec P1 Performance Black / U9 285K / 5090 / 64G / 2T",
+          "ItemImageName": null
+        },
+        "Properties": [
+          {
+            "Value": 10000,
+            "Description": "Antec P1 Performance Black / 9950X3D / 5090 / 64G / 4T",
+            "DisplayInfo": "Antec P1 Performance Black / 9950X3D / 5090 / 64G / 4T",
+            "ItemImageName": null
+          },
+          {
+            "Value": 10006,
+            "Description": "King 95 Montech White / 9800X3D / 5080 / 32G / 1T",
+            "DisplayInfo": "King 95 Montech White / 9800X3D / 5080 / 32G / 1T",
+            "ItemImageName": null
+          },
+          {
+            "Value": 10001,
+            "Description": "Antec P1 Performance Black / U9 285K / 5090 / 64G / 2T",
+            "DisplayInfo": "Antec P1 Performance Black / U9 285K / 5090 / 64G / 2T",
+            "ItemImageName": null
+          },
+          {
+            "Value": 10010,
+            "Description": "Montech TG3 Curved Black / 9800X3D / 5080 / 32G / 2T",
+            "DisplayInfo": "Montech TG3 Curved Black / 9800X3D / 5080 / 32G / 2T",
+            "ItemImageName": null
+          },
+          {
+            "Value": 10011,
+            "Description": "Montech TG3 Curved Black / 9800X3D / 5080 / 64G / 4T",
+            "DisplayInfo": "Montech TG3 Curved Black / 9800X3D / 5080 / 64G / 4T",
+            "ItemImageName": null
+          },
+          {
+            "Value": 10013,
+            "Description": "Montech TG3 Curved Black / 9800X3D / 5090 / 64G / 4T",
+            "DisplayInfo": "Montech TG3 Curved Black / 9800X3D / 5090 / 64G / 4T",
+            "ItemImageName": null
+          },
+          {
+            "Value": 10012,
+            "Description": "Montech TG3 Curved Black / 9800X3D / 5090 / 32G / 2T",
+            "DisplayInfo": "Montech TG3 Curved Black / 9800X3D / 5090 / 32G / 2T",
+            "ItemImageName": null
+          },
+          {
+            "Value": 10014,
+            "Description": "Montech TG3 Curved Black / 9950X3D / 5090 / 64G / 4T",
+            "DisplayInfo": "Montech TG3 Curved Black / 9950X3D / 5090 / 64G / 4T",
+            "ItemImageName": null
+          }
+        ],
+        "ShowItemImage": false
+      },
+      {
+        "GroupCode": 2,
+        "GroupDescription": "GPU",
+        "Style": "Swatch",
+        "HasPriceAdditionInfo": false,
+        "SelectedProperty": {
+          "Value": 20001,
+          "Description": "5090",
+          "DisplayInfo": "5090",
+          "ItemImageName": null
+        },
+        "Properties": [
+          {
+            "Value": 20000,
+            "Description": "5080",
+            "DisplayInfo": "5080",
+            "ItemImageName": null
+          },
+          {
+            "Value": 20001,
+            "Description": "5090",
+            "DisplayInfo": "5090",
+            "ItemImageName": null
+          }
+        ],
+        "ShowItemImage": false
+      },
+      {
+        "GroupCode": 3,
+        "GroupDescription": "CPU",
+        "Style": "Swatch",
+        "HasPriceAdditionInfo": false,
+        "SelectedProperty": {
+          "Value": 30003,
+          "Description": "U9 285K",
+          "DisplayInfo": "U9 285K",
+          "ItemImageName": null
+        },
+        "Properties": [
+          {
+            "Value": 30001,
+            "Description": "9800X3D",
+            "DisplayInfo": "9800X3D",
+            "ItemImageName": null
+          },
+          {
+            "Value": 30002,
+            "Description": "9950X3D",
+            "DisplayInfo": "9950X3D",
+            "ItemImageName": null
+          },
+          {
+            "Value": 30003,
+            "Description": "U9 285K",
+            "DisplayInfo": "U9 285K",
+            "ItemImageName": null
+          }
+        ],
+        "ShowItemImage": false
+      }
+    ],
+    "AvailableFullPaths": [
+      {
+        "ItemNumber": "3D5-000Z-003B3",
+        "UrlKeywords": "skytech-gaming-desktop-pcs-geforce-rtx-5090-amd-ryzen-9-9950x3d-64gb-ddr5-4tb-nvme-ssd-st-legacy4-2500-b-al-black",
+        "Path": "10000,20001,30002",
+        "IsActivated": false
+      },
+      {
+        "ItemNumber": "3D5-000Z-003R9",
+        "UrlKeywords": "skytech-gaming-desktop-pcs-geforce-rtx-5080-amd-ryzen-7-9800x3d-32gb-ddr5-1tb-nvme-ssd-st-king95-2785-w-al-white",
+        "Path": "10006,20000,30001",
+        "IsActivated": false
+      },
+      {
+        "ItemNumber": "3D5-000Z-002C6",
+        "UrlKeywords": "skytech-gaming-desktop-pcs-geforce-rtx-5090-intel-core-ultra-9-285k-64gb-ddr5-2tb-nvme-ssd-st-legacy4-1599-b-al-black",
+        "Path": "10001,20001,30003",
+        "IsActivated": false
+      },
+      {
+        "ItemNumber": "3D5-000Z-00452",
+        "UrlKeywords": "skytech-gaming-desktop-pcs-geforce-rtx-5080-amd-ryzen-7-9800x3d-32gb-ddr5-2tb-nvme-ssd-st-blaze5-3221-b-al-black",
+        "Path": "10010,20000,30001",
+        "IsActivated": true
+      },
+      {
+        "ItemNumber": "3D5-000Z-00449",
+        "UrlKeywords": "skytech-gaming-desktop-pcs-geforce-rtx-5080-amd-ryzen-7-9800x3d-64gb-ddr5-4tb-nvme-ssd-st-blaze5-3230-b-al-black",
+        "Path": "10011,20000,30001",
+        "IsActivated": false
+      },
+      {
+        "ItemNumber": "3D5-000Z-00453",
+        "UrlKeywords": "skytech-gaming-desktop-pcs-geforce-rtx-5090-amd-ryzen-7-9800x3d-64gb-ddr5-4tb-nvme-ssd-st-blaze5-3303-b-al-black",
+        "Path": "10013,20001,30001",
+        "IsActivated": false
+      },
+      {
+        "ItemNumber": "3D5-000Z-00454",
+        "UrlKeywords": "skytech-gaming-desktop-pcs-geforce-rtx-5090-amd-ryzen-7-9800x3d-32gb-ddr5-2tb-nvme-ssd-st-blaze5-3304-b-al-black",
+        "Path": "10012,20001,30001",
+        "IsActivated": false
+      },
+      {
+        "ItemNumber": "3D5-000Z-00455",
+        "UrlKeywords": "skytech-gaming-desktop-pcs-geforce-rtx-5090-amd-ryzen-9-9950x3d-64gb-ddr5-4tb-nvme-ssd-st-blaze5-3305-b-al-black",
+        "Path": "10014,20001,30002",
+        "IsActivated": false
+      }
+    ]
+  }
+}

@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import argparse
 import sys
+import os
+import json
+from contextlib import ExitStack
 from dataclasses import replace
 from pathlib import Path
 
@@ -10,6 +13,7 @@ from dealcore.config import load_dotenv
 from dealcore.notify import channels
 from dealcore.run import run
 from dealcore.state import AlertState
+from dealcore.locking import WriterLock
 from .hardware.manual import CONDITIONS as MANUAL_CONDITIONS
 from .hardware.plugin import HardwarePlugin
 from .steam.plugin import SteamPlugin
@@ -57,7 +61,14 @@ def main(argv: list[str] | None = None) -> int:
     mode = "fast" if args.fast else "digest" if args.digest else factory.default_mode
     load_dotenv(ROOT / ".env")
     plugin = None
+    locks = ExitStack()
     try:
+        if args.domain == "hardware" and (not dry or args.add is not None):
+            owner_file = Path(os.environ.get("DEAL_ALERTER_OWNER_FILE",
+                              str(Path(os.environ.get("PROGRAMDATA", ROOT / ".local")) / "DealAlerter/owner.json")))
+            if owner_file.exists() and json.loads(owner_file.read_text(encoding="utf-8-sig")).get("hardware_writer") == "thinkpad":
+                raise ValueError("Hardware state belongs to the ThinkPad monitor; use --dry-run or its managed cutover procedure")
+            locks.enter_context(WriterLock(args.state_dir / "hardware/.writer.lock"))
         # Requirements follow the selected mode. A preview must not demand SMTP,
         # and a broken email credential must not prevent a push-only run.
         delivery = channels(email=mode != "fast", push=mode != "digest", dry_run=dry)
@@ -98,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         if plugin is not None:
             plugin.close()
+        locks.close()
 
 
 if __name__ == "__main__":

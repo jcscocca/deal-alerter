@@ -123,8 +123,13 @@ eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales. Retailers
 reach it second-hand: Best Buy, Walmart, Newegg and Amazon deals arrive as
 r/buildapcsales and Slickdeals posts.
 
-Going to retailers directly was looked at and ruled out (2026-09-28). Don't
-reopen it without a new fact:
+The optional [ThinkPad monitor](docs/thinkpad-monitor.md) adds direct HP OMEN
+and Newegg ABS/Skytech product checks, with exact configuration validation,
+separate PC history and stock/sale events. See its dry-run coverage report before
+cutover: dynamic HP configurations and blocked feeds cannot be treated as
+confirmed offers. It preserves the $5,000 RTX 5090 target.
+
+Other direct retailers were investigated on 2026-09-28:
 
 - **Best Buy.** The developer API refuses sign-ups from free email and `.edu`
   addresses, so there is no key to be had. Worth revisiting only with an
@@ -133,8 +138,7 @@ reopen it without a new fact:
   RSA-signed requests; walmart.com itself sits behind bot protection that is not
   worth fighting.
 
-Better retail coverage means reading the store out of those posts' titles, not
-adding a source.
+Community sources remain useful for discovery and advance sale notices.
 
 ## Running it
 
@@ -175,6 +179,11 @@ an email with nothing in it. Steam runs in digest mode only.
 Tunables are in `config/steam.toml` and `config/hardware.toml`.
 
 ## Scheduling
+
+For fast local hardware checks, prepare the Windows startup and watchdog tasks
+using [the ThinkPad cutover procedure](docs/thinkpad-monitor.md). Preparation and
+dry runs do not activate anything. Cutover closes both GitHub hardware gates,
+drains existing runs and transfers current hardware state; Steam stays on Actions.
 
 `.github/workflows/check.yml` runs on GitHub Actions and commits state back to
 the repository. Each schedule has its own repository variable, so each can go
