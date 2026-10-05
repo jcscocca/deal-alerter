@@ -86,6 +86,38 @@ class TestWorkstationBuildIsNotABareCard:
     def test_a_bare_card_is_not_condemned_by_its_own_name(self, title: str) -> None:
         assert not match(title, price=14000.0).is_system
 
+    @pytest.mark.parametrize(
+        "title,price",
+        [
+            # eBay 404932819870, logged 2026-10-02 as a bare RTX 4090 at $4,000.
+            # The seller's "58003XD" typo hides the CPU from CPU_RE.
+            ("Ryzen 58003XD PC NVIDIA RTX 4090 - 64GB DDR4 RGB! 3600Mhz RAM+2TB SSD+WiFi 6",
+             4000.0),
+            # eBay 820195368426, logged 2026-10-02 as a bare RTX 4090 at $3,499.99.
+            ("Fractal Custom PC 3.0GHz 64GB RAM 2TB SSD Nvidia GeForce RTX 4090", 3499.99),
+            # eBay 298728188892, logged 2026-10-05 as a bare RTX 5090 at $6,093.45.
+            ("Intel Ultra 9 Assembled Computer 8GB RAM 240GB Gaming W11 Pro RTX5090 32GB PC",
+             6093.45),
+        ],
+    )
+    def test_a_pc_quoting_its_ram_is_a_system(self, title: str, price: float) -> None:
+        assert match(title, price=price).is_system, "a machine, not a card"
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            # Live log titles: VRAM written as "RAM", and "PCI" beside it.
+            "ZOTAC Trinity GeForce RTX 3090 24GB RAM Graphics Card Tested",
+            "Dell Alienware Nvidia GeForce RTX 4090 24GB Graphics Card GPU PC Used",
+            # Not yet seen: both at once, still a card by its own word.
+            "MSI GeForce RTX 4090 Gaming X Trio 24GB RAM Graphics Card for PC",
+            "DELL Alienware GeForce RTX 3090 24GB RAM - Graphics Card - Very Good Condition",
+            "ASRock Intel Arc Pro B60 Creator PCI 24576MB 90-GA60ZZ-00UBNF Graphics Card",
+        ],
+    )
+    def test_a_card_quoting_ram_or_pc_is_still_a_card(self, title: str) -> None:
+        assert not match(title, price=1500.0).is_system
+
 
 class TestVramIsNotSystemMemory:
     """The third "AI Workstation" card from the 2026-09-17 digest.
