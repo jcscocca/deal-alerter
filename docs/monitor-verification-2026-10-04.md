@@ -1,9 +1,42 @@
 # Monitor review — October 4, 2026
 
-This report records the pre-activation verification. The user subsequently
-approved reduced-coverage activation and one test push after credential
-provisioning. HP and anonymous community access remain unverified or blocked;
-their limitations are not waived by that approval.
+The approved reduced-coverage monitor became operational at **8:21 PM PDT on
+October 4, 2026**. HP and anonymous community access remain unverified or blocked.
+The earlier dry-run findings are retained below as historical verification.
+
+## Activation follow-up
+
+- Refreshed from main again before installation, including the isolated ThinkPad
+  runner migration and the latest hardware state at `710c7ae`. The local runtime
+  keeps that cutover commit and the original hardware-state ZIP for recovery.
+- Both hidden tasks are registered as SYSTEM / ServiceAccount. Hardware reached
+  Running, established a fresh heartbeat, and began writing separate prebuilt
+  observations. The watchdog completed successfully and subsequently recorded
+  the known coverage warnings and their ntfy delivery receipts.
+- ntfy accepted the **one approved test push at 8:21:34 PM PDT**. Its local
+  `test-push-receipt.json` prevents a repeat. Phone display was not independently
+  inspected.
+- `HARDWARE_WRITER=thinkpad`, `ENABLE_HARDWARE=false`, and
+  `ENABLE_HARDWARE_FAST=false`. `ENABLE_STEAM=true` and its `22 18 * * *` cron are
+  unchanged. Existing GitHub check runs were drained before local ownership.
+- Live SYSTEM checks succeeded for Newegg products/discovery, eBay and Apple.
+  Confirmed selected Skytech desktop RTX 5090 configurations entered
+  `prebuilt-prices.jsonl`; prices observed during acceptance were above target.
+  HP continues to time out/back off, and Reddit/Slickdeals anonymous feeds remain
+  policy-blocked. There are no local Reddit API credentials.
+- Startup exposed an installer ACL bug: recursively removing inheritance left
+  leaf files with empty DACLs (Task Scheduler result `0x80070005`). The corrected
+  helper protects the runtime root, enables inheritance on nonsecret children,
+  and separately restricts secrets to SYSTEM/Administrators. A real Windows
+  regression test reproduces the empty file DACL and verifies the repair.
+- The refreshed local suite passed **928 tests and 58 subtests**; Windows
+  installer argument and runtime-permission regressions also passed. Boot
+  triggers, hidden `pythonw.exe`, battery settings and restart policies are
+  configured. A physical reboot or network-disconnection test was not performed.
+
+Live evidence resides in `C:\ProgramData\DealAlerter\health.json`,
+`watchdog.json`, `test-push-receipt.json`, and `state/hardware/US/`.
+The original preparation/installation attempts below predate this activation.
 
 ## Checkout and preserved behavior
 
