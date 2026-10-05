@@ -1,16 +1,17 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$PythonExe)
+param([Parameter(Mandatory)][string]$PythonExe, [string]$StagingDirectory = '')
 $ErrorActionPreference = 'Stop'
+if (-not $StagingDirectory) { $StagingDirectory = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path '.local\credentials' }
 # Capture credentials entirely inside Python; never send them to PowerShell output.
 $importer = @'
 from pathlib import Path
-import subprocess
+import subprocess, sys
 source = '/home/jacob/.local/share/deal-alerter-provision/secrets.env'
 reader = "from pathlib import Path; import sys; sys.stdout.buffer.write(Path(sys.argv[1]).read_bytes())"
 result = subprocess.run(['wsl.exe','-d','Ubuntu','--','python3','-c',reader,source], capture_output=True, timeout=30)
 if result.returncode:
     raise SystemExit('WSL credential staging is unavailable')
-root = Path(r'C:\Users\jacob\AppData\Local\DealAlerterProvision')
+root = Path(sys.argv[1])
 if root.is_symlink() or not (root / 'request-id.txt').is_file():
     raise SystemExit('Prepare the private Windows staging directory first')
 with (root / 'secrets.env').open('xb') as stream:
@@ -25,5 +26,5 @@ if result.returncode:
 (root / 'request-id.txt').unlink()
 print('Credentials imported into private Windows staging; values hidden.')
 '@
-$importer | & $PythonExe -
+$importer | & $PythonExe - ([IO.Path]::GetFullPath($StagingDirectory))
 if ($LASTEXITCODE -ne 0) { throw 'Credential import did not complete' }

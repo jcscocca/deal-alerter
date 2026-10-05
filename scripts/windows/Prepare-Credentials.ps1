@@ -1,10 +1,9 @@
 [CmdletBinding()]
-param()
+param([string]$StagingDirectory = '')
 $ErrorActionPreference = 'Stop'
-$staging = Join-Path $env:LOCALAPPDATA 'DealAlerterProvision'
-if ($staging -ne 'C:\Users\jacob\AppData\Local\DealAlerterProvision') {
-    throw 'The provisioning workflow is bound to the reviewed ThinkPad account path.'
-}
+if (-not $StagingDirectory) { $StagingDirectory = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path '.local\credentials' }
+# AppData may have a different view in packaged apps, UAC and runner services.
+$staging = [IO.Path]::GetFullPath($StagingDirectory)
 if (Test-Path -LiteralPath (Join-Path $staging 'secrets.env')) {
     throw 'Staged credentials already exist; refusing to replace them.'
 }
