@@ -85,15 +85,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Virtual environment creation failed' }
 $python = Join-Path $runtime 'venv\Scripts\python.exe'
 & $python -m pip install -r (Join-Path $app 'requirements.txt') -r (Join-Path $app 'alerters\hardware\native\requirements.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
-# SYSTEM and administrators only. Service secrets/state do not enter Git.
-& icacls.exe $runtime /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' /T /Q | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'Runtime ACL failed' }
-# The owner may inspect app/state/health without elevation; secrets stay private.
-$ownerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-& icacls.exe $runtime /grant:r "*$($ownerSid):(OI)(CI)RX" /T /Q | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'Read-only owner ACL failed' }
-& icacls.exe $secretPath /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' /remove:g "*$ownerSid" /Q | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'Secret file ACL failed' }
+& (Join-Path $PSScriptRoot 'Set-MonitorRuntimePermissions.ps1') -RuntimeDirectory $runtime
 @{ hardware_writer='thinkpad'; approved=$true; checkout=$app; state_root=$state; cutover_commit=(& git -C $release.checkout rev-parse origin/main) } |
     ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $runtime 'owner.json')
 foreach ($name in 'Hardware','Watchdog') {

@@ -85,6 +85,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: ./scripts/windows/Test-InstallerArguments.ps1
+      - name: Windows runtime permissions regression
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/windows/Test-RuntimePermissions.ps1
       - name: Remove this job's Linux temporary directory
         if: always() && runner.os == 'Linux'
         shell: bash
