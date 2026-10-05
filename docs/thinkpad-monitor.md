@@ -147,8 +147,9 @@ separately approved external dead-man check. No paid infrastructure is involved.
    This owner-only workflow uses the existing `THINKPAD-wsl-deal-alerter` runner
    to write GitHub secrets into a private WSL directory (0700, file 0600). Run
    `Import-Credentials.ps1 -PythonExe <absolute-python-path>` to copy them through
-   a captured pipe into the private Windows staging directory and delete the
-   WSL copy. This avoids the runner service's inaccessible Windows profile view.
+   a captured pipe into the ACL-protected `.local/credentials` directory and delete the
+   WSL copy. Keeping staging outside AppData avoids different filesystem views
+   between packaged applications, runner services and elevated sessions.
    Neither step prints values or uploads an artifact. Pass the Windows file to the elevated
    installer as `-SecretsFile`; remove the staging copy after successful cutover.
    The installer grants the owner read access to health/state, while keeping
