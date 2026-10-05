@@ -106,6 +106,29 @@ class HardwareAdapterTests(unittest.TestCase):
                           "https://example.test", datetime.now(timezone.utc), price=4299)
             self.assertEqual(plugin.prepare(row).condition, expected, source)
 
+    def test_a_slickdeals_post_is_new_unless_it_says_otherwise(self):
+        # Slickdeals thread 20088846 (2026-10-02): a Staples Advantage TUF 5090
+        # at $4,267.99 was pushed and logged in the used bucket.
+        plugin = self.plugin()
+        plugin.seen = plugin.matched = 0
+        plugin.cfg.max_listing_age_hours = 72
+        plugin.watched = {"rtx_5090": NS(target=5000, name="RTX 5090")}
+        title = ("ASUS GeForce RTX 5090 PCI Express 5 32GB GDDR7 Gaming Graphics Card, "
+                 "2437 MHz Core, 28000 MHz, Multicolored (TUF-RTX5090-32G-G) $4267.99")
+        for detected, expected in (("unknown", "new"), ("refurbished", "refurbished")):
+            plugin.matcher = Mock(return_value=NS(junk=False, part=NS(key="rtx_5090"),
+                                                  unit_price=4267.99, condition=detected))
+            row = Listing("20088846", "slickdeals", title, "https://example.test",
+                          datetime.now(timezone.utc), price=4267.99)
+            self.assertEqual(plugin.prepare(row).condition, expected, detected)
+
+    def test_a_woot_reconditioned_card_is_refurbished(self):
+        # Slickdeals 19883949 (2026-08-16), logged as used. Once unlabelled
+        # Slickdeals posts read as new, this one must not.
+        from alerters.hardware.native.match import detect_condition
+        self.assertEqual(detect_condition("$4399.99 | MSI GeForce RTX 5090 32G SUPRIM LIQUID SOC "
+                                          "(Factory Reconditioned) at Woot!"), "refurbished")
+
     def test_condition_and_confidence_requirements_pass_through_unchanged(self):
         plugin = self.plugin()
         sold, pooled = NS(trustworthy=False), NS(trustworthy=False)

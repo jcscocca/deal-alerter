@@ -104,8 +104,10 @@ class HardwarePlugin:
         condition = "parts" if result.condition == "parts" else listing.condition_hint or result.condition
         # r/buildapcsales is a board of retail deals, so an unstated condition
         # there means new. Observed 2026-09-22: "[gpu] rtx 5090 for $4299 at
-        # Walmart" was ranked against used cards instead.
-        if condition == "unknown" and listing.source == "reddit/buildapcsales":
+        # Walmart" was ranked against used cards instead. Slickdeals is the same
+        # kind of board: thread 20088846, a Staples TUF 5090 at $4,267.99 on
+        # 2026-10-02, was pushed and logged as used.
+        if condition == "unknown" and listing.source in ("reddit/buildapcsales", "slickdeals"):
             condition = "new"
         return Candidate(listing, result, hunt, condition)
 

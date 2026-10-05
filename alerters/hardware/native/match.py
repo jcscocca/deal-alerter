@@ -110,7 +110,9 @@ MINING_RES = tuple((re.compile(p, re.IGNORECASE), w) for p, w in MINING_PATTERNS
 
 CONDITION_PATTERNS = (
     ("parts", r"\bfor[- ]parts\b|\b(?:not|non)[- ]working\b"),
-    ("refurbished", r"\brefurb(?:ished)?\b|\brenewed\b|\bcertified\s+pre"),
+    # "Factory Reconditioned" is how Woot writes it, and Woot refurbs reach
+    # Slickdeals, where an unlabelled post now reads as new.
+    ("refurbished", r"\brefurb(?:ished)?\b|\breconditioned\b|\brenewed\b|\bcertified\s+pre"),
     ("open_box", r"\bopen[- ]box\b|\bopened\b"),
     ("used", r"\bused\b|\bpre[- ]?owned\b|\bsecond\s*hand\b|\b(?:pulled|removed)\s+from\b"),
     ("new", r"\bbrand\s+new\b|\bnew\s+sealed\b|\bsealed\b|\bnib\b|\bbnib\b"),
