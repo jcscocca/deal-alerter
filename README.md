@@ -180,20 +180,29 @@ Tunables are in `config/steam.toml` and `config/hardware.toml`.
 
 ## Scheduling
 
+**External-trigger proposal, currently superseded.** Hardware monitoring moved
+to the ThinkPad on October 4, 2026. `HARDWARE_WRITER=thinkpad` blocks GitHub
+hardware runs, and both GitHub hardware switches are disabled. The external
+dispatch jobs described below are an inactive alternative; do not enable them
+while the local monitor owns hardware state. See
+[ThinkPad monitoring](docs/thinkpad-monitor.md) for the active setup.
+
 For fast local hardware checks, prepare the Windows startup and watchdog tasks
 using [the ThinkPad cutover procedure](docs/thinkpad-monitor.md). Preparation and
 dry runs do not activate anything. Cutover closes both GitHub hardware gates,
 drains existing runs and transfers current hardware state; Steam stays on Actions.
 
 `.github/workflows/check.yml` runs on GitHub Actions and commits state back to
-the repository. Each schedule has its own repository variable, so each can go
-live as soon as its secrets exist:
+the repository. The dailies are GitHub schedules, each with its own repository
+variable so it can go live as soon as its secrets exist. The push loop is
+dispatched from outside GitHub (below):
 
 | Schedule (UTC) | Runs | Switch | Needs |
 |---|---|---|---|
 | 18:22 daily | Steam | `ENABLE_STEAM` | `STEAM_ID`, `ITAD_API_KEY`, SMTP |
 | 02:52 daily | Hardware digest | `ENABLE_HARDWARE` | SMTP, and eBay keys unless you can do without eBay |
-| Every 15 minutes | Hardware push: eBay, Slickdeals, r/buildapcsales | `ENABLE_HARDWARE_FAST` | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
+| :00, :15, :30, :45 | Hardware push: eBay, Slickdeals, Apple refurb | External scheduler | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
+| Every 5 minutes, from :01 | Hardware push: r/buildapcsales | External scheduler | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
 
 ```bash
 gh variable set ENABLE_STEAM --body true
@@ -201,11 +210,14 @@ gh variable set ENABLE_STEAM --body true
 
 Steam runs just after Steam's 10:00 PT price flip. The repository is public, so
 Actions minutes are free and the push loop runs around the clock. Its limit is
-eBay's instead: 5,000 Browse calls a day, and a run makes one per search query.
-The fast loop includes Reddit with the selected default scope, r/buildapcsales.
-The swap boards are excluded. `HARDWARE_SOURCES` (a comma-separated list, also
-a Run workflow input) selects sources; an explicit `REDDIT_SUBS` environment
-setting can select a different scope without a scheduled workflow overriding it.
+eBay's instead: 5,000 Browse calls a day, and a run makes one per search query
+(24), so eBay cannot go below every 10 minutes and stays at 15. Slickdeals
+stays with it, since each run reads a feed per query. Reddit is one feed, so it
+gets its own 5-minute loop; `HARDWARE_SOURCES` (a comma-separated list, also a
+Run workflow input) is what splits them.
+Reddit keeps the selected default scope, r/buildapcsales; the swap boards stay
+excluded. An explicit `REDDIT_SUBS` environment setting can select another scope
+without a scheduled workflow overriding it.
 
 To try a run by hand: Actions, Check deals, Run workflow. It defaults to a dry
 run and keeps the HTML preview as a downloadable artifact.
@@ -220,7 +232,27 @@ Steam arrived three. Under an earlier 15-minute schedule GitHub created about
 eight runs a day out of ninety-six. So the push loop is not hourly in practice,
 the schedule above is a ceiling rather than a forecast, and
 anything that has to reach you within the hour needs a trigger from outside
-GitHub.
+GitHub. Measured again 2026-09-26 to 28: 10-15 scheduled runs a day out of ~122.
+
+### The external trigger
+
+Two jobs on a free scheduler such as cron-job.org, each a `POST` to
+`https://api.github.com/repos/jcscocca/deal-alerter/actions/workflows/check.yml/dispatches`
+with headers `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`
+and `X-GitHub-Api-Version: 2022-11-28`:
+
+| Minutes | Body |
+|---|---|
+| `0,15,30,45` | `{"ref":"main","inputs":{"domain":"hardware","mode":"fast","dry_run":"false","sources":"ebay,slickdeals,apple-refurb"}}` |
+| `1-56/5` | `{"ref":"main","inputs":{"domain":"hardware","mode":"fast","dry_run":"false","sources":"reddit"}}` |
+
+A success is `204 No Content`. The token is a fine-grained personal access
+token for this repository only, with Actions: Read and write and nothing else.
+It lives in the scheduler, never in this repository. Pausing the jobs pauses the
+push loop; there is no repository switch for it.
+
+Keep the minutes off 22 and 52 (0 and 1 mod 5 are): a dispatch arriving while a
+daily is pending cancels the daily.
 
 **Keep one writer.** Don't make real, non-dry local runs while the schedules are
 on: two writers committing the price log and alert receipts will conflict, and
