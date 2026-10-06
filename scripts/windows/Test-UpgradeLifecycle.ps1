@@ -64,7 +64,7 @@ try {
     function Start-Sleep($Seconds) {}
     $tasks=@{'DealAlerter-Hardware'=@{enabled=$true};'DealAlerter-Watchdog'=@{enabled=$true}}
     $health=Start-EnabledMonitorTasks $tasks $testRoot $holderId
-    if ($health.pid -eq $holderId -or ($script:events -join '|') -ne 'enable DealAlerter-Hardware|enable DealAlerter-Watchdog|start DealAlerter-Hardware|start DealAlerter-Watchdog') { throw 'Restart must establish a new hardware heartbeat before starting the watchdog.' }
+    if ($health.pid -eq $holderId -or ($script:events -join '|') -ne 'enable DealAlerter-Hardware|start DealAlerter-Hardware|enable DealAlerter-Watchdog|start DealAlerter-Watchdog') { throw 'Restart must establish a new hardware heartbeat before enabling or starting the watchdog.' }
     @{pid=$holderId;heartbeat=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds();dry_run=$false} | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $testRoot 'health.json')
     $script:events=@()
     function Start-ScheduledTask($TaskName) { $script:events+=('start '+$TaskName) }

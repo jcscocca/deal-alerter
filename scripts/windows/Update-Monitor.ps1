@@ -40,26 +40,30 @@ function Wait-MonitorStopped($TaskNames,[int]$PreviousPid,[string]$Python,[strin
     throw 'Hardware writer/tasks did not stop and release the lock; application was not replaced.'
 }
 function Start-EnabledMonitorTasks($Tasks,[string]$Runtime,[int]$PreviousPid) {
-    foreach ($name in @('DealAlerter-Hardware','DealAlerter-Watchdog')) {
-        if ($Tasks[$name].enabled) { Enable-ScheduledTask -TaskName $name | Out-Null }
-    }
     $health = $null
-    if ($Tasks['DealAlerter-Hardware'].enabled) {
-        $healthy=$false
-        for ($attempt=0; $attempt -lt 30; $attempt++) {
-            $task = Get-ScheduledTask -TaskName 'DealAlerter-Hardware'
-            if ($task.State -notin @('Running','Queued')) { Start-ScheduledTask -TaskName 'DealAlerter-Hardware' }
-            Start-Sleep -Seconds 2
-            $health = Get-Content -Raw -LiteralPath (Join-Path $Runtime 'health.json') | ConvertFrom-Json
-            if ($health.pid -ne $PreviousPid -and [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()-$health.heartbeat -lt 60 -and -not $health.dry_run) {
-                $healthy=$true; break
+    try {
+        if ($Tasks['DealAlerter-Hardware'].enabled) {
+            Enable-ScheduledTask -TaskName 'DealAlerter-Hardware' | Out-Null
+            $healthy=$false
+            for ($attempt=0; $attempt -lt 30; $attempt++) {
+                $task = Get-ScheduledTask -TaskName 'DealAlerter-Hardware'
+                if ($task.State -notin @('Running','Queued')) { Start-ScheduledTask -TaskName 'DealAlerter-Hardware' }
+                Start-Sleep -Seconds 2
+                $health = Get-Content -Raw -LiteralPath (Join-Path $Runtime 'health.json') | ConvertFrom-Json
+                if ($health.pid -ne $PreviousPid -and [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()-$health.heartbeat -lt 60 -and -not $health.dry_run) {
+                    $healthy=$true; break
+                }
             }
+            if (-not $healthy) { throw 'Enabled hardware task has no new process with a fresh heartbeat.' }
         }
-        # Keep the watchdog enabled even if startup failed, so its next trigger
-        # can recover monitoring independently of this maintenance process.
-        if ($Tasks['DealAlerter-Watchdog'].enabled) { Start-ScheduledTask -TaskName 'DealAlerter-Watchdog' }
-        if (-not $healthy) { throw 'Enabled hardware task has no new process with a fresh heartbeat.' }
-    } elseif ($Tasks['DealAlerter-Watchdog'].enabled) { Start-ScheduledTask -TaskName 'DealAlerter-Watchdog' }
+    } finally {
+        # Enabling early can itself fire a missed minute trigger. Keep watchdog
+        # disabled through startup; restore it on both successful and failed starts.
+        if ($Tasks['DealAlerter-Watchdog'].enabled) {
+            Enable-ScheduledTask -TaskName 'DealAlerter-Watchdog' | Out-Null
+            Start-ScheduledTask -TaskName 'DealAlerter-Watchdog'
+        }
+    }
     return $health
 }
 if (-not $ValidateOnly -and -not $ApproveUpgrade) { throw 'Apply requires -ApproveUpgrade.' }
