@@ -238,6 +238,19 @@ def render_page(url, channel, robots):
                     failure.append(BrowserFailure("rate", max(300, retry_after(response.headers.get("retry-after")))))
             context.route("**/*", route_request)
             context.route_web_socket("**/*", lambda websocket: websocket.close())
+            # Playwright routes may only see the first request in a redirect
+            # chain. Pause responses before Chromium can follow Location, and
+            # reject all redirects (including assets) instead of checking late.
+            session = context.new_cdp_session(page)
+            def response_paused(event):
+                request_id = event["requestId"]
+                if event.get("responseStatusCode") in (301, 302, 303, 307, 308):
+                    failure.append(BrowserFailure("policy", 3600))
+                    session.send("Fetch.failRequest", {"requestId": request_id, "errorReason": "BlockedByClient"})
+                else:
+                    session.send("Fetch.continueResponse", {"requestId": request_id})
+            session.on("Fetch.requestPaused", response_paused)
+            session.send("Fetch.enable", {"patterns": [{"urlPattern": "*", "requestStage": "Response"}]})
             context.on("response", response_received)
             context.on("page", lambda popup: popup.close() if popup != page else None)
             page.on("dialog", lambda dialog: dialog.dismiss())

@@ -43,7 +43,8 @@ and accessory rejection, scoped discovery, robots and request restrictions,
 shared cooldown, other-source isolation, sanitized worker errors/environment,
 timeout cleanup, real process termination and opt-in monitor routing. A real
 headless Edge test hydrates the saved fixture through intercepted requests;
-it exercises browser startup, navigation, delayed rendering and teardown without
+it exercises browser startup, navigation, delayed rendering, redirect rejection,
+server denials/rate limits and teardown without
 contacting HP. That test proves the implementation can render, not HP access.
 
 The next acceptance gate is successful repeated **fresh headless** live probes,

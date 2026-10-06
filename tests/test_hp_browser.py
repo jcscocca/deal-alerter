@@ -240,7 +240,7 @@ def test_browser_launch_failure_is_reported_without_cleanup_error(monkeypatch):
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Local Windows Edge renderer acceptance")
-@pytest.mark.parametrize("status", [200, 403, 429])
+@pytest.mark.parametrize("status", [200, 302, 403, 429])
 def test_real_edge_hydration_and_denials_without_network(monkeypatch, status):
     playwright = pytest.importorskip("playwright.sync_api")
     edge = Path(os.environ.get("ProgramFiles(x86)", "")) / "Microsoft/Edge/Application/msedge.exe"
@@ -257,9 +257,9 @@ def test_real_edge_hydration_and_denials_without_network(monkeypatch, status):
         def route(pattern, handler):
             def intercept(real_route):
                 navigated.append(real_route.request.url)
-                assert real_route.request.url == URL
+                assert real_route.request.url in (URL, "http://127.0.0.1:1/blocked")
                 handler(SimpleNamespace(request=real_route.request, abort=real_route.abort,
-                        continue_=lambda: real_route.fulfill(status=status, headers={"Retry-After": "7200"}, content_type="text/html", body=delayed)))
+                        continue_=lambda: real_route.fulfill(status=status, headers={"Retry-After": "7200", "Location": "http://127.0.0.1:1/blocked"}, content_type="text/html", body=delayed)))
             original_route(pattern, intercept)
         context.route = route
         return context
@@ -270,6 +270,7 @@ def test_real_edge_hydration_and_denials_without_network(monkeypatch, status):
     else:
         with pytest.raises(BrowserFailure) as exc:
             render_page(URL, "msedge", Robots("User-agent: *\nAllow: /"))
-        assert exc.value.code == ("denied" if status == 403 else "rate")
-        assert exc.value.retry == (3600 if status == 403 else 7200)
+        assert exc.value.code == {302: "policy", 403: "denied", 429: "rate"}[status]
+        assert exc.value.retry == (7200 if status == 429 else 3600)
+    # Redirect responses are stopped before Chromium requests their destination.
     assert navigated == [URL]

@@ -89,7 +89,8 @@ installed. Chromium requires a separate Playwright browser installation.
 Each fetch launches a fresh, sandboxed headless browser with no personal profile,
 cookies or storage state. Only first-party HP HTTPS GET resources permitted by
 robots are allowed; API/cart/login paths, third-party requests, service workers,
-downloads and popups are blocked. If those restrictions prevent hydration, the
+downloads, WebSockets and popups are blocked. Redirect responses are stopped
+before Chromium follows them, including redirects of assets. If those restrictions prevent hydration, the
 reader reports unavailable evidence. It does not relax them to obtain a price.
 Navigation/challenge/rate-limit failures keep the shared host backoff. The
 subprocess receives an allowlisted environment without monitor credentials or
