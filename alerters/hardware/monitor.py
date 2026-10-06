@@ -39,6 +39,8 @@ from .retail_http import Deferred, PublicClient, public_url
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUNTIME = Path(os.environ.get("PROGRAMDATA", ROOT / ".local")) / "DealAlerter"
 LOG = logging.getLogger("hardware-monitor")
+HEALTH_CHANGE_SECONDS = 30 * 60
+HEALTH_REMINDER_SECONDS = 24 * 3600
 
 
 def read_json(path, default):
@@ -79,6 +81,16 @@ def health_problems(status: dict, now: float, stale: int = 600) -> list[str]:
             problems.append(f"{key}: {job['error']}")
     problems.extend(status.get("problems", []))
     return problems
+
+
+def health_problem_key(problem: str, status: dict) -> str:
+    if problem == "Monitor heartbeat is stale":
+        return "monitor:heartbeat"
+    prefix = problem.partition(":")[0]
+    if prefix in status.get("jobs", {}):
+        # Backoff, missing success and stale checks describe the same job outage.
+        return "job:" + prefix
+    return "coverage:" + problem
 
 
 class Monitor:
@@ -310,7 +322,9 @@ class Monitor:
 
 def watchdog(runtime: Path, *, dry_run: bool):
     status = read_json(runtime / "health.json", {})
-    issues = health_problems(status, time.time())
+    now = time.time()
+    issues = health_problems(status, now)
+    prior_health = read_json(runtime / "watchdog.json", {})
     result = {"checked_at": datetime.now(timezone.utc).isoformat(), "problems": issues}
     atomic_write(runtime / "watchdog.json", json.dumps(result, indent=2) + "\n")
     if dry_run:
@@ -325,20 +339,49 @@ def watchdog(runtime: Path, *, dry_run: bool):
         for action in ("/End", "/Run"):
             subprocess.run(["schtasks.exe", action, "/TN", "DealAlerter-Hardware"], capture_output=True,
                            timeout=20, creationflags=flags, check=action == "/Run")
-    previous = read_json(runtime / "watchdog-receipt.json", {})
+    receipt_path = runtime / "watchdog-receipt.json"
+    previous = read_json(receipt_path, {})
+    original = json.dumps(previous, sort_keys=True)
+    keys = sorted({health_problem_key(problem, status) for problem in issues})
+    # Migrate delivered legacy fingerprints without sending the same warning
+    # again just because the receipt format changed.
+    prior_issues = prior_health.get("problems", [])
+    prior_fingerprint = hashlib.sha256(json.dumps(sorted(prior_issues)).encode()).hexdigest()
+    for name, record in list(previous.items()):
+        if name in ("fingerprint", "sent_at", "version"):
+            continue
+        if isinstance(record, str):
+            reported = [health_problem_key(problem, status) for problem in prior_issues] if record == prior_fingerprint else []
+            record = {"problem_keys": reported, "sent_at": previous.get("sent_at", 0)}
+        if isinstance(record, dict):
+            # Remember recovery even while other coverage warnings remain. A
+            # later lost heartbeat must be able to alert immediately again.
+            record["problem_keys"] = sorted(set(record.get("problem_keys", [])) & set(keys))
+            previous[name] = record
+    # Persist recovery before attempting delivery: an offline second transport
+    # must not prevent the successful transport from recognizing a new outage.
+    if previous and json.dumps(previous, sort_keys=True) != original:
+        atomic_write(receipt_path, json.dumps(previous) + "\n")
     fingerprint = hashlib.sha256(json.dumps(sorted(issues)).encode()).hexdigest()
     if issues:
-        report = Report("Hardware monitor needs attention", "Monitoring health", "", "",
-                        (Card("ThinkPad hardware monitor", "", "", "MONITOR STALE / DEGRADED", "Checks need attention",
-                              "; ".join(issues), priority=4),))
+        stale = "monitor:heartbeat" in keys
+        report = Report("Hardware monitor heartbeat is stale" if stale else "Hardware monitor coverage needs attention",
+                        "Monitoring health", "", "",
+                        (Card("ThinkPad hardware monitor", "", "", "MONITOR STALE" if stale else "COVERAGE DEGRADED",
+                              "Heartbeat needs attention" if stale else "Monitor running; some checks need attention",
+                              "; ".join(issues), priority=4 if stale else 2),))
         for channel in channels(email=False, push=True, dry_run=False):
-            if previous.get(channel.name) != fingerprint:
+            record = previous.get(channel.name, {})
+            new = set(keys) - set(record.get("problem_keys", []))
+            elapsed = now - record.get("sent_at", 0)
+            changed_due = bool(new) and elapsed >= HEALTH_CHANGE_SECONDS
+            if (not record or "monitor:heartbeat" in new or changed_due or elapsed >= HEALTH_REMINDER_SECONDS):
                 channel.send(report)
-                previous[channel.name] = fingerprint
-                previous.update(fingerprint=fingerprint, sent_at=time.time())
-                atomic_write(runtime / "watchdog-receipt.json", json.dumps(previous) + "\n")
-    elif not issues and previous:
-        atomic_write(runtime / "watchdog-receipt.json", "{}\n")
+                previous[channel.name] = {"problem_keys": keys, "sent_at": now}
+                previous.update(version=2, fingerprint=fingerprint, sent_at=now)
+                atomic_write(receipt_path, json.dumps(previous) + "\n")
+    # Delivery times survive recovery; coverage flapping cannot reset the limit.
+    # The diagnostics above still update on every watchdog check.
     return bool(issues)
 
 
