@@ -180,7 +180,7 @@ Tunables are in `config/steam.toml` and `config/hardware.toml`.
 
 ## Scheduling
 
-**External-trigger proposal, currently superseded.** Hardware monitoring moved
+Hardware monitoring moved
 to the ThinkPad on October 4, 2026. `HARDWARE_WRITER=thinkpad` blocks GitHub
 hardware runs, and both GitHub hardware switches are disabled. The external
 dispatch jobs described below are an inactive alternative; do not enable them
@@ -193,9 +193,9 @@ dry runs do not activate anything. Cutover closes both GitHub hardware gates,
 drains existing runs and transfers current hardware state; Steam stays on Actions.
 
 `.github/workflows/check.yml` runs on GitHub Actions and commits state back to
-the repository. The dailies are GitHub schedules, each with its own repository
-variable so it can go live as soon as its secrets exist. The push loop is
-dispatched from outside GitHub (below):
+the repository. Steam's daily check remains on GitHub. Its optional hardware
+digest and external dispatch support remain available for a future change of
+writer; they are inactive while the ThinkPad owns hardware state:
 
 | Schedule (UTC) | Runs | Switch | Needs |
 |---|---|---|---|
@@ -208,8 +208,8 @@ dispatched from outside GitHub (below):
 gh variable set ENABLE_STEAM --body true
 ```
 
-Steam runs just after Steam's 10:00 PT price flip. The repository is public, so
-Actions minutes are free and the push loop runs around the clock. Its limit is
+Steam runs just after Steam's 10:00 PT price flip. The external-dispatch
+alternative below would run around the clock. Its limit is
 eBay's instead: 5,000 Browse calls a day, and a run makes one per search query
 (24), so eBay cannot go below every 10 minutes and stays at 15. Slickdeals
 stays with it, since each run reads a feed per query. Reddit is one feed, so it
@@ -234,9 +234,10 @@ the schedule above is a ceiling rather than a forecast, and
 anything that has to reach you within the hour needs a trigger from outside
 GitHub. Measured again 2026-09-26 to 28: 10-15 scheduled runs a day out of ~122.
 
-### The external trigger
+### Optional external dispatch after transferring hardware ownership
 
-Two jobs on a free scheduler such as cron-job.org, each a `POST` to
+If a reviewed rollback transfers hardware ownership away from the ThinkPad,
+two jobs on an external scheduler can each `POST` to
 `https://api.github.com/repos/jcscocca/deal-alerter/actions/workflows/check.yml/dispatches`
 with headers `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`
 and `X-GitHub-Api-Version: 2022-11-28`:
@@ -248,8 +249,9 @@ and `X-GitHub-Api-Version: 2022-11-28`:
 
 A success is `204 No Content`. The token is a fine-grained personal access
 token for this repository only, with Actions: Read and write and nothing else.
-It lives in the scheduler, never in this repository. Pausing the jobs pauses the
-push loop; there is no repository switch for it.
+It belongs in the scheduler, never in this repository. Pausing those jobs would
+pause that alternative push loop. `HARDWARE_WRITER=thinkpad` still blocks real
+hardware dispatches while the local runtime owns state.
 
 Keep the minutes off 22 and 52 (0 and 1 mod 5 are): a dispatch arriving while a
 daily is pending cancels the daily.
@@ -262,8 +264,9 @@ count, and GitHub emails before it disables anything.
 
 ## State and failure
 
-Everything durable is committed JSON under `state/`, split by domain and
-country so one market's price never becomes another's baseline:
+Steam's live state is committed JSON under `state/`. After the ThinkPad cutover,
+live hardware state is under `C:\ProgramData\DealAlerter\state`; the Git hardware
+files are a recovery copy. Each domain/country keeps separate baselines:
 
 ```
 state/steam/US/alerts.json       alert receipts

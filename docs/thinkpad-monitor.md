@@ -195,6 +195,25 @@ the reviewed application snapshot and dependencies, then restart and inspect
 health. Do not rerun the initial cutover installer over an existing owner; it
 intentionally refuses to seed stale GitHub hardware state over local history.
 
+For a release with unchanged dependencies, use the reviewed maintenance helper:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Prepare-Monitor.ps1 -OutputDirectory .local/upgrade
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Update-Monitor.ps1 -PreparedDirectory .local/upgrade -ValidateOnly
+# Run the apply command in an elevated Windows session after validation:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Update-Monitor.ps1 -PreparedDirectory .local/upgrade -ApproveUpgrade
+```
+
+The helper verifies a clean merged package, the installed owner and closed
+GitHub hardware gates before disabling the watchdog and hardware tasks. It
+backs up application/state/owner/task definitions without copying secrets,
+verifies the writer lock is released, installs hashed files, applies the
+audited history repair and approved titleless-row quarantine, then restarts
+the tasks and requires a fresh heartbeat. It keeps live receipts and records
+`installed_commit` in the owner manifest. On failure it restores the old
+application and enabled tasks while retaining all history and delivery receipts.
+It refuses dependency changes rather than modifying the active environment.
+
 If installation fails after closing GitHub gates, hardware monitoring stays
 paused. Diagnose from the installer output and saved prior switches; do not
 automatically start both writers to recover. Steam continues independently.

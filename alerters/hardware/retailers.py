@@ -122,6 +122,13 @@ def parse_newegg(body: str, url: str, now: datetime) -> Offer | None:
                  else "new" if feature.get("IsNew") else "unknown")
     seller_data = item.get("Seller") or {}
     seller = seller_data.get("SellerName") or "Unknown seller"
+    # Direct Newegg inventory can leave the structured seller blank. Require
+    # its primary product's explicit "Sold by Newegg" label; shipping by
+    # Newegg or a recommendation elsewhere cannot establish who sells it.
+    if seller == "Unknown seller" and seller_data.get("SellerId") in ("0", "", None):
+        labels = BeautifulSoup(body, "html.parser").select(".product-seller-box .product-seller-sold-by")
+        if len(labels) == 1 and re.fullmatch(r"sold\s+by\s+newegg", labels[0].get_text(" ", strip=True), re.I):
+            seller = "Newegg"
     # Do not trust a marketplace seller merely because the product is on Newegg.
     trusted = ((seller == "Skytech" and seller_data.get("SellerId") == "A1HJ")
                or (seller == "Newegg" and seller_data.get("SellerId") in ("0", "", None)))

@@ -15,3 +15,10 @@ After the ThinkPad cutover, live hardware state is maintained under
 For the exact historical corrections paired with PRs #22, #32 and #33, use
 `scripts/repair_hardware_history.py` (dry run by default). See the
 [PR review and live repair procedure](../docs/pr-readiness-2026-10-05.md).
+
+`prices-unaudited.jsonl` preserves legacy observations without listing titles.
+They are excluded from active price comparisons because their product identity
+cannot be verified. The repair tool's `--quarantine-unlabelled` option archives
+them before replacing active history; it keeps all original metadata and an
+exact pre-repair backup. The older title-verified SKU corrections are also
+included in that tool. See [maintenance follow-up](../docs/review-follow-up-2026-10-05.md).
