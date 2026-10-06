@@ -40,6 +40,14 @@ Retailers use conditional requests where supported. HTTP 429/503 Retry-After
 every six hours; unverifiable policies fail closed. No cart, login, payment or
 private retailer API calls are made. Cadence is a target, not a delivery SLA.
 
+Slickdeals discovery uses the public Computers category sorted newest first.
+Its explicit posting timestamps and expired flags are checked before assessing
+rows. Only the first page is read; it cannot establish exhaustive search coverage
+or delisting. The coverage limit remains visible in health and watchdog reports.
+Slickdeals search RSS and anonymous Reddit RSS remain blocked by their robots
+policies. New Reddit API credentials are unavailable to this user, as recorded
+in the repository's Reddit source notes; that gap remains reported.
+
 ## Offer evidence and notifications
 
 Newegg confirmation uses its public `window.__initialState__.ItemDetail` and
@@ -213,6 +221,41 @@ the tasks and requires a fresh heartbeat. It keeps live receipts and records
 `installed_commit` in the owner manifest. On failure it restores the old
 application and enabled tasks while retaining all history and delivery receipts.
 It refuses dependency changes rather than modifying the active environment.
+
+## Approved physical recovery acceptance
+
+After applying the merged release, run the installed helper in an elevated
+session. It validates existing SYSTEM boot tasks, battery/wake settings, ownership
+and a fresh heartbeat before scheduling a disruptive check:
+
+```powershell
+& C:\ProgramData\DealAlerter\app\scripts\windows\Test-MonitorRecovery.ps1 -ValidateOnly
+# Only after the user has saved work and approved reboot/network interruption:
+& C:\ProgramData\DealAlerter\app\scripts\windows\Test-MonitorRecovery.ps1 -ApproveReboot
+```
+
+Windows schedules a reboot in two minutes; `shutdown /a` cancels that countdown.
+Save all open work before approval. Leave the computer signed out for the first
+two minutes after restart so the check can establish startup before interactive
+logon. A one-time hidden SYSTEM task starts 90 seconds after boot, verifies the
+new monitor process, waits for a healthy retailer job to become due, and disables
+the original active physical adapters for 60 seconds. It re-enables them in a
+`finally` block; an independent one-time SYSTEM task also requests restoration
+after 90 seconds if the verifier is interrupted.
+
+The verifier waits up to ten minutes for that same retailer to succeed again,
+requires the monitor heartbeat and PID to survive the outage, and checks that
+prior delivery receipts have not disappeared or moved backwards. Existing
+regressions establish duplicate suppression; receipt retention alone cannot
+prove what a remote notification recipient received. No test notification is
+sent. Power-plan settings are inspected, not changed.
+
+`C:\ProgramData\DealAlerter\acceptance\recovery-result.json` records complete,
+partial or failed evidence. A logon before monitor startup leaves no-login
+acceptance explicitly partial. The acceptance tasks remove themselves when
+finished; a restore task is retained if the adapters are not up. This acceptance
+does not claim to restore blocked HP/Reddit access or provide external dead-host
+coverage.
 
 If installation fails after closing GitHub gates, hardware monitoring stays
 paused. Diagnose from the installer output and saved prior switches; do not
