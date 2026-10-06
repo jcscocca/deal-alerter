@@ -7,11 +7,10 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from urllib.parse import urlencode
 
 from dealcore.types import Listing
 from .native.sources.reddit import ATOM_NS, _parse_iso, _strip_html
-from .native.sources.slickdeals import _parse_rfc822, EXPIRED_RE
+from .community import SLICKDEALS_COMPUTERS, SLICKDEALS_COVERAGE, parse_slickdeals_computers
 from .retail_http import Deferred, PublicClient, retry_after
 from .retailers import discover_hp, discover_newegg, parse_hp, parse_newegg, reviewed_coupon
 
@@ -25,6 +24,11 @@ class Batch:
 
 
 def fetch_feed(kind: str, client: PublicClient, now: datetime) -> Batch:
+    if kind == "slickdeals":
+        return Batch(listings=parse_slickdeals_computers(client.get(SLICKDEALS_COMPUTERS), now),
+                     notes=[SLICKDEALS_COVERAGE])
+    if kind != "reddit":
+        raise ValueError("Unknown community source")
     if kind == "reddit":
         if os.environ.get("REDDIT_CLIENT_ID") and os.environ.get("REDDIT_CLIENT_SECRET"):
             from .native.sources.reddit import RedditSource
@@ -47,9 +51,6 @@ def fetch_feed(kind: str, client: PublicClient, now: datetime) -> Batch:
             finally:
                 source.session.close()
         raw = client.get("https://www.reddit.com/r/buildapcsales/new.rss?limit=100")
-    else:
-        query = urlencode({"q": "RTX 5090", "searcharea": "deals", "searchin": "first", "rss": 1})
-        raw = client.get("https://slickdeals.net/newsearch.php?" + query)
     try:
         root = ET.fromstring(raw)
     except ET.ParseError:
@@ -67,15 +68,6 @@ def fetch_feed(kind: str, client: PublicClient, now: datetime) -> Batch:
                 out.append(Listing(value("id").rsplit("_", 1)[-1], "reddit/buildapcsales",
                                    html.unescape(value("title")), link.get("href", "") if link is not None else "",
                                    posted, body=_strip_html(value("content"))))
-    else:
-        if root.tag != "rss":
-            raise Deferred("Slickdeals feed schema changed", 900)
-        for entry in root.findall(".//item"):
-            posted = _parse_rfc822(entry.findtext("pubDate", ""))
-            link, title = entry.findtext("link", ""), entry.findtext("title", "")
-            if posted and link and title:
-                out.append(Listing(entry.findtext("guid", link).replace("thread-", ""), "slickdeals",
-                                   html.unescape(title), link, posted, body=_strip_html(entry.findtext("description", ""))))
     out = [row for row in out if 0 <= (now - row.posted_at).total_seconds() <= 72 * 3600]
     # Feed notices are unverified; the fast loop never treats absence as delisting.
     return Batch(listings=out)

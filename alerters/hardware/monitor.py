@@ -30,6 +30,7 @@ from dealcore.run import run
 from dealcore.state import AlertState, atomic_write
 from dealcore.types import Card, FetchResult, Report
 from .monitor_sources import Batch, fetch_job
+from .community import SLICKDEALS_COVERAGE
 from .prebuilt import OfferState
 from .prebuilt_plugin import MonitorHardwarePlugin, community_offer, offer_listing
 from .retailers import canonical_product
@@ -95,7 +96,7 @@ class Monitor:
         self.jobs = {}
         self.pending, self.cache, self.benchmarks = {}, {}, []
         self.started = time.time()
-        self.problems = []
+        self.problems = [SLICKDEALS_COVERAGE]
         self.results = []
         self.last_digest = ""
         self.stopping = False
