@@ -9,3 +9,9 @@ becoming another market's alert baseline.
 The hardware SQLite database lives in a private temporary directory for one run.
 It is rebuilt from committed JSONL, including for read-only previews and statistics.
 Only a real run exports observations back here.
+
+After the ThinkPad cutover, live hardware state is maintained under
+`C:\ProgramData\DealAlerter\state`, independently of this Git recovery copy.
+For the exact historical corrections paired with PRs #22, #32 and #33, use
+`scripts/repair_hardware_history.py` (dry run by default). See the
+[PR review and live repair procedure](../docs/pr-readiness-2026-10-05.md).
