@@ -35,7 +35,11 @@ Actual reboot/network results are written to the installed runtime's
 `acceptance/recovery-result.json`; preparation and fixture tests cannot
 establish that those physical checks have happened.
 
-Local validation passed 999 tests and 58 subtests. Both installer regressions
+The new category URL also gives its job a new identity, so the old disallowed
+RSS path's six-hour delay cannot postpone the new route. Shared server/host
+cooldowns remain intact across the change.
+
+Local validation passed 1,000 tests and 58 subtests. Both installer regressions
 passed. Windows Task Scheduler validated both acceptance task definitions
 without registering them or changing networking. CI now repeats that task
 validation on Windows.

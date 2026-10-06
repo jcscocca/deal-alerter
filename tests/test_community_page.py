@@ -5,6 +5,7 @@ import pytest
 
 from alerters.hardware.community import parse_slickdeals_computers, SLICKDEALS_COMPUTERS
 from alerters.hardware.monitor_sources import fetch_feed
+from alerters.hardware.monitor import Monitor, job_id
 from alerters.hardware.retail_http import Deferred, Robots
 
 NOW = datetime(2026, 10, 6, 3, 40, tzinfo=timezone.utc)
@@ -67,3 +68,24 @@ def test_fetch_uses_allowed_category_and_reports_coverage_limit():
     robots = Robots("User-agent: *\nDisallow: /newsearch.php?*rss=*\nDisallow: /*page=*")
     assert robots.allows(SLICKDEALS_COMPUTERS)
     assert not robots.allows("https://slickdeals.net/newsearch.php?q=5090&rss=1")
+
+
+def test_category_route_is_not_delayed_by_retired_rss_path_backoff(tmp_path, monkeypatch):
+    import json
+    import time
+    from pathlib import Path
+    monkeypatch.setattr("alerters.hardware.monitor.channels", lambda **_: ())
+    until = time.time() + 21600
+    (tmp_path / "schedule.json").write_text(json.dumps({
+        "jobs": {job_id("slickdeals"): {"kind": "slickdeals", "next": until, "failures": 5,
+                                       "error": "Path disallowed by robots.txt"}},
+        "host_backoff": {"slickdeals.net": until + 60},
+    }))
+    root = Path(__file__).resolve().parents[1]
+    mon = Monitor(root / "config/monitor.toml", tmp_path / "state", tmp_path, dry_run=False)
+    job = mon.jobs[job_id("slickdeals", SLICKDEALS_COMPUTERS)]
+    assert job["next"] == 0 and job["failures"] == 0
+    assert job["url"] == SLICKDEALS_COMPUTERS
+    assert job_id("slickdeals") not in mon.jobs
+    # Changing a path does not erase a shared server/host cooldown.
+    assert mon.client.host("slickdeals.net")["blocked_until"] == until + 60

@@ -30,7 +30,7 @@ from dealcore.run import run
 from dealcore.state import AlertState, atomic_write
 from dealcore.types import Card, FetchResult, Report
 from .monitor_sources import Batch, fetch_job
-from .community import SLICKDEALS_COVERAGE
+from .community import SLICKDEALS_COMPUTERS, SLICKDEALS_COVERAGE
 from .prebuilt import OfferState
 from .prebuilt_plugin import MonitorHardwarePlugin, community_offer, offer_listing
 from .retailers import canonical_product
@@ -107,7 +107,7 @@ class Monitor:
             public_url(discovery["url"])
             self.add_job(discovery["kind"], self.cfg["discovery_seconds"], discovery["url"])
         for name in ("reddit", "slickdeals"):
-            self.add_job(name, self.cfg["feed_seconds"])
+            self.add_job(name, self.cfg["feed_seconds"], SLICKDEALS_COMPUTERS if name == "slickdeals" else "")
         for name, interval in (("ebay", self.cfg["legacy_seconds"]), ("apple-refurb", 3600)):
             if name == "ebay" and not (os.environ.get("EBAY_CLIENT_ID") and os.environ.get("EBAY_CLIENT_SECRET")):
                 self.problems.append("eBay disabled: local credentials missing")
