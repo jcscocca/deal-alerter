@@ -100,14 +100,21 @@ class TestWorkstationBuildIsNotABareCard:
     @pytest.mark.parametrize(
         "title",
         [
-            # Live log titles: a card named for the server it goes in, and a
-            # card whose seller writes VRAM as "RAM". Neither has both.
+            # Live titles, plus cards that use both server and RAM language.
             "Nvidia A100 40GB HBM2e PCI-e 4.0 x16 Ampere Server AI Accelerator Graphics Card",
             "Lenovo Quadro RTX A6000 48GB RAM - Graphics Card - Very Good Condition",
+            "Nvidia A100 40GB RAM Server AI Accelerator Graphics Card",
+            "Lenovo Quadro RTX A6000 48GB RAM Server Graphics Card",
         ],
     )
     def test_a_server_card_is_still_a_card(self, title: str) -> None:
         assert not match(title, price=5000.0).is_system
+
+    def test_server_ram_is_not_excused_by_the_cards_memory_type(self) -> None:
+        assert match(
+            "Gigabyte Server 2x A100 40GB HBM2e Graphics Card + 256GB RAM",
+            price=17500.0,
+        ).is_system
 
 
 class TestVramIsNotSystemMemory:
