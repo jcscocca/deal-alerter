@@ -153,6 +153,35 @@ def test_live_newegg_fixture_confirms_exact_selected_config():
     assert pc.total(NOW) == 7599.99
 
 
+def test_direct_newegg_abs_inventory_uses_the_primary_sold_by_label():
+    data = json.loads((ROOT / "tests/fixtures/newegg_selected_abs.json").read_text(encoding="utf-8"))
+    body = page(data) + data["primary_seller_html"]
+    url = "https://www.newegg.com/p/83-360-990C?Item=83-360-990C"
+    pc = parse_newegg(body, url, NOW)
+    assert pc.seller == "Newegg" and pc.confirmed
+    assert pc.condition == "refurbished" and pc.stock == "out_of_stock"
+    assert pc.total(NOW) == 4999.99
+    assert pc.specs["GPU/VGA Type"] == "GeForce RTX 5090"
+
+
+@pytest.mark.parametrize("label", ["Shipped by Newegg", "Sold by Other Seller", "",
+                                  "Sold by Newegg Marketplace"])
+def test_newegg_fulfilment_or_ambiguous_seller_does_not_establish_trust(label):
+    data = fixture()
+    data["ItemDetail"]["Seller"] = {"SellerId": "", "SellerName": None}
+    body = page(data) + f'<div class="product-seller-box"><div class="product-seller-sold-by">{label}</div></div>'
+    assert not parse_newegg(body, URL, NOW).confirmed
+
+
+def test_seller_label_cannot_override_marketplace_id_or_conflicting_primary_labels():
+    data = fixture()
+    data["ItemDetail"]["Seller"] = {"SellerId": "OTHER", "SellerName": None}
+    label = '<div class="product-seller-box"><div class="product-seller-sold-by">Sold by Newegg</div></div>'
+    assert not parse_newegg(page(data) + label, URL, NOW).confirmed
+    data["ItemDetail"]["Seller"]["SellerId"] = ""
+    assert not parse_newegg(page(data) + label + label, URL, NOW).confirmed
+
+
 def test_wrong_selected_gpu_rejected_even_when_page_mentions_5090():
     data = fixture()
     data["PropertyCollection"]["PropertyGroups"][1]["SelectedProperty"]["Description"] = "5080"
@@ -236,6 +265,29 @@ def test_conditional_304_reuses_only_confirmed_cached_representation(monkeypatch
         return SimpleNamespace(status_code=304,headers={})
     monkeypatch.setattr("requests.get", get)
     assert client.get(URL) == client.get(URL) == "PRODUCT"
+
+
+def test_network_disconnect_recovers_after_backoff_without_losing_cached_policy(monkeypatch):
+    import requests
+    clock = [1000.0]
+    client = PublicClient(clock=lambda:clock[0], sleeper=lambda n:clock.__setitem__(0,clock[0]+n))
+    calls = []
+    def get(url, **kwargs):
+        calls.append(url)
+        if url.endswith("robots.txt"):
+            return SimpleNamespace(status_code=200,text="User-agent: *\nAllow: /",headers={},content=b"")
+        if len(calls) == 2:
+            raise requests.Timeout("simulated network loss")
+        return SimpleNamespace(status_code=200,text="RECOVERED",headers={},content=b"RECOVERED")
+    monkeypatch.setattr(requests,"get",get)
+    with pytest.raises(Deferred, match="Network request failed") as error:
+        client.get(URL)
+    with pytest.raises(Deferred, match="backing off"):
+        client.get(URL)
+    assert len(calls) == 2
+    clock[0] += error.value.seconds + 1
+    assert client.get(URL) == "RECOVERED"
+    assert len(calls) == 3
 
 
 @pytest.mark.parametrize("url", ["https://127.0.0.1/p/a","http://www.newegg.com/p/a","https://user:password@www.hp.com/us-en/shop/pdp/x","https://www.newegg.com.evil.test/p/x"])

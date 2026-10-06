@@ -16,7 +16,7 @@ $files = & git -C $Checkout ls-files --cached --others --exclude-standard
 if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate the checkout' }
 $hashes = @{}
 foreach ($relative in $files) {
-    if ($relative -notmatch '^(alerters/|dealcore/|config/|scripts/windows/|requirements.*\.txt$)') { continue }
+    if ($relative -notmatch '^(alerters/|dealcore/|config/|scripts/windows/|scripts/repair_hardware_history\.py$|requirements.*\.txt$)') { continue }
     $source = Join-Path $Checkout $relative
     $destination = Join-Path $packageApp $relative
     New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null
