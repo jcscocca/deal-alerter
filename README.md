@@ -129,6 +129,12 @@ separate PC history and stock/sale events. See its dry-run coverage report befor
 cutover: dynamic HP configurations and blocked feeds cannot be treated as
 confirmed offers. It preserves the $5,000 RTX 5090 target.
 
+The [desktop upgrade watch](docs/desktop-upgrade-watch.md) extends that monitor
+to RTX 5080 prebuilts and a 96GB/128GB RAM goal. It distinguishes documented
+layout from unverified mixed-kit compatibility, reusing the owned Corsair 64GB
+kit where possible. Rules live in `config/desktop-profile.toml`; checkout changes
+need deployment through the existing release procedure before they become live.
+
 Other direct retailers were investigated on 2026-09-28:
 
 - **Best Buy.** The developer API refuses sign-ups from free email and `.edu`

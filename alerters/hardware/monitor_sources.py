@@ -130,6 +130,6 @@ def fetch_job(job: dict, client: PublicClient, coupons: list[dict]) -> Batch:
         parser = parse_hp_rendered
     offer = parser(body, job["url"], now)
     if not offer:
-        return Batch(notes=["Selected product does not contain a qualifying desktop RTX 5090"])
+        return Batch(notes=["Selected product does not contain a qualifying desktop RTX 5080/5090"])
     offer = reviewed_coupon(offer, body, coupons, now)
     return Batch(offers=[offer])

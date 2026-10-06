@@ -7,7 +7,7 @@ legacy_seconds = 900
 heartbeat_seconds = 15
 stale_seconds = 600
 max_backoff_seconds = 3600
-max_products_per_retailer = 24
+max_products_per_retailer = 48
 workers = 6
 # Keep the existing hardware email digest under the same local writer.
 # The installed service reports missing SMTP credentials as degraded health.
@@ -25,8 +25,16 @@ kind = "hp"
 url = "https://www.hp.com/us-en/shop/pdp/omen-by-hp-45l-gaming-desktop-gt22-3090"
 
 [[seed]]
+kind = "hp"
+url = "https://www.hp.com/us-en/shop/pdp/omen-35l-gaming-desktop-gt16-1085m-pc"
+
+[[seed]]
 kind = "newegg"
 url = "https://www.newegg.com/p/3D5-000Z-002C6?Item=9SIA1HJKEB7401"
+
+[[seed]]
+kind = "newegg"
+url = "https://www.newegg.com/p/3D5-000Z-003H2?Item=9SIA1HJKP24777"
 
 [[discovery]]
 kind = "discover-hp"
@@ -44,6 +52,15 @@ url = "https://www.newegg.com/p/pl?N=100897483+601468634"
 [[discovery]]
 kind = "discover-newegg"
 url = "https://www.newegg.com/p/pl?d=ABS+RTX+5090+gaming+desktop"
+
+[[discovery]]
+kind = "discover-newegg"
+url = "https://www.newegg.com/p/pl?N=100897483+601468633&Order=1"
+
+[[discovery]]
+kind = "discover-newegg"
+# Dedicated 64GB search prevents cheaper 32GB PCs from crowding out this route.
+url = "https://www.newegg.com/p/pl?N=100897483+601468633+601399480&Order=1"
 
 # Optional [[coupon]] entries require exact retailer + sku, code, instructions,
 # discount (dollars), required_accessories (dollars), eligibility_confirmed,

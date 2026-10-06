@@ -9,8 +9,9 @@ from dealcore.types import Assessment, Card, Listing
 from .native.history import PriceStats
 from .native.verdict import Assessment as NativeAssessment
 from .plugin import HardwarePlugin
-from .prebuilt import Offer, OfferState, PrebuiltHistory, announced_start, dollars, exact_desktop, pacific_time, priority
+from .prebuilt import Offer, OfferState, PrebuiltHistory, announced_start, dollars, exact_desktop, pacific_time
 from .retailers import canonical_product
+from .desktop_profile import DEFAULT_PROFILE, DesktopProfile
 
 
 def community_offer(listing: Listing) -> Offer | None:
@@ -18,8 +19,6 @@ def community_offer(listing: Listing) -> Offer | None:
     if not exact_desktop(listing.title):
         return None
     text = listing.title + " " + listing.body
-    if not re.search(r"5090", text):
-        return None
     start = announced_start(text, listing.posted_at)
     upcoming = bool(start or re.search(r"upcoming|starts?\b|begins?\b|tomorrow|announcement|goes live", text, re.I))
     quoted = re.search(r"\$\s*([\d,]+(?:\.\d{2})?)", listing.title)
@@ -56,12 +55,14 @@ class PrebuiltCandidate:
 
 
 class MonitorHardwarePlugin(HardwarePlugin):
-    def __init__(self, *args, now=None, **kwargs):
+    def __init__(self, *args, now=None, desktop_profile=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.desktop_profile = DesktopProfile(desktop_profile or DEFAULT_PROFILE)
         self.now = now or datetime.now(timezone.utc)
         self.pc_history = PrebuiltHistory(self.state_dir)
         self.offers = OfferState(self.state_dir)
         self.pc_details = {}
+        self.memory_fits = {}
 
     def prepare(self, listing):
         if offer := listing.extra.get("prebuilt_offer"):
@@ -79,31 +80,39 @@ class MonitorHardwarePlugin(HardwarePlugin):
         if not isinstance(candidate, PrebuiltCandidate):
             return super().judge(candidate, stats)
         offer = candidate.offer
+        if offer.gpu not in ("5080", "5090"):
+            raise ValueError("Selected desktop GPU is ambiguous or unsupported")
         revision, event = self.offers.observe(offer, self.now)
         total, status = offer.total(self.now), offer.sale_status(self.now)
-        target = self.watched["rtx_5090"].target
+        gpu = offer.gpu
+        hunt = self.watched.get("rtx_" + gpu)
+        fit = self.desktop_profile.assess_memory(offer)
+        target = self.desktop_profile.ceiling(gpu, hunt.target if hunt else None, fit)
+        self.memory_fits[offer.key] = fit
+        memory_ok = fit.eligible and self.desktop_profile.memory["allow_unverified"]
         trusted = (offer.confirmed and total is not None and total > 0 and status == "live"
                    and offer.condition in ("new", "refurbished", "open_box", "used"))
-        target_hit = trusted and target is not None and total <= target
-        upcoming = (status == "upcoming" or status == "unverified" and offer.announcement)
+        target_hit = trusted and memory_ok and target is not None and total <= target
+        upcoming = memory_ok and (status == "upcoming" or status == "unverified" and offer.announcement)
         advertised = offer.claimed_price if offer.announcement else total
         if target is not None and advertised is not None and advertised > target:
             upcoming = False
         verdict = self.bands.STRONG if target_hit or upcoming else self.bands.GOOD
-        part = next(p for p in self.catalog.PARTS if p.key == "rtx_5090")
+        part = next(p for p in self.catalog.PARTS if p.key == "rtx_" + gpu)
         # Complete-PC prices never use a loose-GPU percentile or catalog anchor.
         # Target qualification and the existing same-condition 5% promotion remain.
         detail = NativeAssessment(candidate.listing.listing_id, candidate.listing.source, part,
                                   offer.title, offer.url, total or 0, 1, offer.condition,
                                   candidate.listing.posted_at, verdict, event.upper(), stats,
-                                  (total or 0) / 32, is_system=True, target_price=target,
+                                  (total or 0) / part.usable_vram_gb, is_system=True, target_price=target,
                                   target_hit=target_hit, loggable=False, reference_trusted=trusted,
-                                  promotion_ceiling=self.bands.GRAIL if trusted else self.bands.GOOD)
+                                  promotion_ceiling=self.bands.GRAIL if trusted and memory_ok else self.bands.GOOD)
         self.pc_details[offer.key] = (offer, event, stats)
-        return Assessment(offer.key, total or 0, verdict, detail, rank=(-(total or 0),),
-                          target_override=bool(target_hit or upcoming), alertable=bool(trusted or upcoming),
+        return Assessment(offer.key, total or 0, verdict, detail,
+                          rank=(int((fit.potential_gb or 0) >= self.desktop_profile.memory["preferred_gb"]), int(fit.status == "POSSIBLE REUSE"), -(total or 0)),
+                          target_override=bool(target_hit or upcoming), alertable=bool(memory_ok and (trusted or upcoming)),
                           loggable=trusted, axes=(("cheapness", stats), ("value", "Complete PC total before tax"),
-                                                 ("capability", "Desktop RTX 5090 32GB")),
+                                                 ("capability", f"Desktop RTX {gpu}; {fit.summary}")),
                           alert_revision=revision)
 
     def append(self, pairs):
@@ -135,12 +144,23 @@ class MonitorHardwarePlugin(HardwarePlugin):
         total = offer.total(self.now)
         confirmed = offer.confirmed and not offer.announcement and offer.sale_status(self.now) == "live"
         badge = f"{event.upper()} · {'CONFIRMED OFFER' if confirmed else 'UNVERIFIED ANNOUNCEMENT'}"
+        fit = self.memory_fits[offer.key]
+        badge += " · RAM: " + fit.status
         facts = [offer.title, f"Seller: {offer.seller}; condition: {offer.condition}; stock: {offer.stock}"]
         facts.extend(f"{key}: {value}" for key, value in offer.specs.items() if value)
         cost = lambda amount: f"${amount:,.2f}" if amount is not None else "unknown"
         facts += [f"PC: {cost(offer.base_price)}; shipping: {cost(offer.shipping)}; required accessories: {cost(offer.required_accessories)}",
                   "Before tax. Cashback shown separately and excluded from the total.", "Cashback: " + offer.cashback]
         warnings = []
+        facts += ["RAM goal: 128GB preferred / 96GB acceptable", fit.summary,
+                  "Owned RAM: " + self.desktop_profile.memory["owned_kit"], *fit.evidence]
+        warnings.append("Adding your existing 2x32GB kit is not a guaranteed RAM upgrade. Mixed kits may need lower speeds or fail stability testing.")
+        if offer.gpu == "5080":
+            band = self.desktop_profile.price_band(fit)
+            lane = f"Factory {fit.installed_gb}GB" if fit.installed_gb else "Factory RAM unknown"
+            facts.append(f"{lane}: watch through ${band['ceiling']:,.0f}; strong-price target ${band['target']:,.0f}. Provisional alert settings, not a purchase recommendation.")
+            if total is not None and total > band["target"]:
+                facts.append("Within the watch range; above this RAM tier's strong-price target.")
         if offer.coupon:
             facts.append("Coupon: " + offer.coupon.instructions)
             facts.append(f"Coupon discount: {cost(offer.coupon.discount)}; additional required accessories: {cost(offer.coupon.required_accessories)}")
@@ -159,9 +179,9 @@ class MonitorHardwarePlugin(HardwarePlugin):
             warnings.append(offer.evidence)
         if signal:
             warnings.append(signal)
-        return Card("RTX 5090 prebuilt", offer.url, cost(total) if total is not None else "Total unverified",
+        return Card(f"RTX {offer.gpu} prebuilt", offer.url, cost(total) if total is not None else "Total unverified",
                     badge, f"{cost(total)} before tax" if total is not None else "Advance/community notice; recheck required",
-                    history, tuple(facts), tuple(warnings), priority=priority(total) if confirmed else 3)
+                    history, tuple(facts), tuple(warnings), priority=self.desktop_profile.priority(offer.gpu, total, fit) if confirmed else 3)
 
     def persist(self):
         super().persist()

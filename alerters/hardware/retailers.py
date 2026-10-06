@@ -13,8 +13,10 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
 
-from .prebuilt import Coupon, Offer, dollars, exact_desktop, GPU, NOT_DESKTOP
+from .prebuilt import Coupon, Offer, dollars, exact_desktop, gpu_model
 from .retail_http import Deferred, public_url
+
+DESKTOP_BRANDS = {"abs", "skytech", "cyberpowerpc", "ibuypower", "msi", "gigabyte", "stormcraft", "hp"}
 
 
 def initial_state(body: str) -> dict:
@@ -52,7 +54,7 @@ def discover_newegg(body: str) -> list[str]:
         item = row.get("ItemCell") or {}
         title = (item.get("Description") or {}).get("Title", "")
         brand = (item.get("ItemManufactory") or {}).get("Manufactory", "").lower()
-        if brand in ("abs", "skytech") and exact_desktop(title) and item.get("Item"):
+        if brand in DESKTOP_BRANDS and exact_desktop(title) and item.get("Item"):
             links.append(f"https://www.newegg.com/p/{item.get('ParentItem') or item['Item']}?Item={item['Item']}")
     return list(dict.fromkeys(links))
 
@@ -99,7 +101,7 @@ def parse_newegg(body: str, url: str, now: datetime) -> Offer | None:
         raise Deferred("Newegg offer is not confirmed as US pricing", 300)
     title = html.unescape(desc.get("Title") or "")
     brand = (item.get("ItemManufactory") or {}).get("Manufactory", "").lower()
-    if brand not in ("abs", "skytech") or not exact_desktop(title):
+    if brand not in DESKTOP_BRANDS or not exact_desktop(title):
         return None
     specs = {}
     for line in re.split(r"<br\s*/?>", item.get("ViewDescription") or "", flags=re.I):
@@ -111,11 +113,13 @@ def parse_newegg(body: str, url: str, now: datetime) -> Offer | None:
         selected = (group.get("SelectedProperty") or {}).get("Description")
         if selected:
             specs["Selected " + group.get("GroupDescription", "option")] = selected
-        if group.get("GroupDescription", "").lower() == "gpu" and selected and not re.fullmatch(r"(?:GeForce\s+RTX\s+)?5090", selected, re.I):
-            raise Deferred("Selected GPU conflicts with the 5090 product title", 300)
+        if group.get("GroupDescription", "").lower() == "gpu" and selected:
+            selected_model = re.fullmatch(r"(?:GeForce\s+RTX\s+)?(5080|5090)", selected, re.I)
+            if not selected_model or selected_model[1] != gpu_model(title):
+                raise Deferred("Selected GPU conflicts with the product title", 300)
     gpu = specs.get("GPU/VGA Type", "")
-    if not GPU.search(gpu) or NOT_DESKTOP.search(gpu):
-        raise Deferred("Desktop RTX 5090 not confirmed in selected specifications", 300)
+    if gpu_model(gpu) != gpu_model(title):
+        raise Deferred("Desktop RTX GPU not confirmed in selected specifications", 300)
     specs["Model"] = item.get("Model") or item["Item"]
     specs["Included components"] = _text(desc.get("BulletDescription"))
     condition = ("open_box" if feature.get("IsOpenBoxed") else "refurbished" if feature.get("IsRefurbished")
@@ -213,14 +217,16 @@ def parse_hp(body: str, url: str, now: datetime) -> Offer | None:
     # Schema describing a configurable base SKU does not prove a selected upgrade.
     configurable = "/custom/" in url or bool(re.search(r"AV(?:[_#-]|$)|\b(?:customizable|configure|up to)\b", sku + " " + title, re.I))
     description = _text(product.get("description"))
-    if not exact_desktop(title):
-        raise Deferred("HP selected desktop RTX 5090 not proven; base/family price ignored", 300)
+    primary = " ".join((title, description, *[v for k, v in specs.items() if "graphics" in k.lower()]))
+    if not exact_desktop(primary):
+        raise Deferred("HP selected desktop RTX GPU not proven; base/family price ignored", 300)
     if configurable:
         raise Deferred("HP configurable SKU requires a fixed selected-configuration offer", 900)
     specs["Configuration"] = title
     specs["Details"] = description
+    specs["Selected GPU"] = gpu_model(primary)
     for key, value in specs.items():
-        if "graphics" in key.lower() and (not GPU.search(value) or NOT_DESKTOP.search(value)):
+        if "graphics" in key.lower() and gpu_model(value) != gpu_model(primary):
             raise Deferred("HP selected graphics conflict with title", 300)
     offers = product.get("offers")
     offers = offers if isinstance(offers, list) else [offers]
