@@ -13,6 +13,13 @@ workers = 6
 # The installed service reports missing SMTP credentials as degraded health.
 digest_utc = "02:52"
 
+[hp_browser]
+# Experimental: interactive access works, fresh headless access is unverified.
+# Install requirements-browser.txt and pass the documented unattended probe
+# before opting in. The shipped/live configuration keeps the current transport.
+enabled = false
+channel = "msedge"
+
 [[seed]]
 kind = "hp"
 url = "https://www.hp.com/us-en/shop/pdp/omen-by-hp-45l-gaming-desktop-gt22-3090"

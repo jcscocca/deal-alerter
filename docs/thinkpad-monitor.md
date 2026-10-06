@@ -64,6 +64,56 @@ closed. **Dynamic HP custom builds are not yet confirmed by this adapter**;
 they need a public fixed selected-configuration representation before they can
 produce confirmed offers. Broad OMEN marketing text is insufficient.
 
+### Experimental HP browser reader
+
+`[hp_browser]` in `config/monitor.toml` selects an optional browser transport.
+It ships **disabled**: HP worked in an interactive browser on October 6, 2026,
+but fresh headless Edge and Chrome returned an HTTP/2 protocol error. An HTTP/1
+diagnostic also timed out. This feature does not yet restore unattended HP
+coverage; issue #36 stays open. See [the development evidence](hp-browser-2026-10-06.md).
+
+Developers can install `requirements-browser.txt` and run a notification-free
+probe using the already installed Edge browser:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-browser.txt
+.\.venv\Scripts\python.exe -m alerters.hardware.hp_browser --probe https://www.hp.com/us-en/shop/pdp/omen-max-45l-gaming-dt-gt23-0990m-pc-ck4n6aa-aba --channel msedge
+```
+
+The probe prints JSON and exits 0 only for verified evidence; unavailable access
+exits 1. It neither loads monitor secrets nor writes history/receipts nor sends
+notifications. `msedge`, `chrome` and `chromium` are explicit supported channels;
+the reader never switches channels after a denial. Edge/Chrome must already be
+installed. Chromium requires a separate Playwright browser installation.
+
+Each fetch launches a fresh, sandboxed headless browser with no personal profile,
+cookies or storage state. Only first-party HP HTTPS GET resources permitted by
+robots are allowed; API/cart/login paths, third-party requests, service workers,
+downloads and popups are blocked. If those restrictions prevent hydration, the
+reader reports unavailable evidence. It does not relax them to obtain a price.
+Navigation/challenge/rate-limit failures keep the shared host backoff. The
+subprocess receives an allowlisted environment without monitor credentials or
+Python/Node injection variables, and has a 75-second parent deadline with
+process-tree cleanup. Other source workers and the heartbeat continue normally.
+
+The primary purchase area's displayed price, exact SKU and stock button must
+agree with its Product/Offer schema. An out-of-stock offer is a successful check,
+but missing/zero prices, financing amounts, accessory recommendations, mismatched
+stock and configurable products cannot confirm an offer. Browser category
+discovery is restricted to OMEN RTX 5090 product links in the page content; an
+empty/unrecognized category stays unverified. Browser product polling has a
+five-minute minimum interval. Configured custom/selector URLs remain a visible
+coverage gap rather than falling back to another transport.
+
+Before enabling this in the service, verify repeated fresh-session probes for
+both fixed SKUs and category pages, then repeat under the actual SYSTEM task
+identity with the protected runtime's Python and the same browser version.
+Install the optional dependency in that runtime during reviewed maintenance;
+do not treat an installation in a developer/user venv as service readiness.
+Only then set `hp_browser.enabled = true` in a prepared release and verify live
+job success, unchanged receipts and process cleanup. No interactive cookies,
+debugging ports, stealth settings or challenge bypass are part of this reader.
+
 Announcements and community offers are separate unverified notices. A post
 without a price can still notify. Explicit ISO dates or dates/relative days
 with explicit PT/PST/PDT/ET/EST/EDT/UTC are converted to Pacific time, including
