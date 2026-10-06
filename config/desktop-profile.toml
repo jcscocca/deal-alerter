@@ -1,0 +1,35 @@
+# Watch factory 32GB and 64GB PCs to combine with the owned 2x32GB kit.
+# Prices are PC totals before tax. Mixing compatibility remains unverified.
+[memory]
+owned_kit = "Corsair Vengeance RGB CMH64GX5M2B6000C40W"
+owned_gb = 64
+owned_modules = 2
+owned_rated_mt_s = 6000
+minimum_gb = 96
+preferred_gb = 128
+required_slots = 4
+# User preference: surface promising deals while clearly flagging unknowns.
+allow_unverified = true
+
+# Provisional notification settings, not user-approved spending limits or
+# predicted sale prices. Calibrated to manually checked listings on 2026-10-06:
+# HP 32GB $2799.99; PowerSpec 64GB $3799.99 (pickup); Skytech 64GB $3999.99.
+# Unknown RAM uses the 64GB watch ceiling at normal priority, clearly flagged.
+[price.rtx_5080_32]
+ceiling = 3000.0
+target = 2800.0
+urgent = 2500.0
+
+[price.rtx_5080_64]
+ceiling = 4000.0
+target = 3600.0
+urgent = 3300.0
+# The existing RTX 5090 ceiling continues to come from watchlist.toml.
+
+[[reviewed_configuration]]
+retailer = "hp"
+sku = "C33HVAA#ABA"
+source = "https://www.hp.com/us-en/shop/pdp/omen-35l-gaming-desktop-gt16-1085m-pc"
+checked_on = "2026-10-06"
+# This documents physical layout; it does NOT validate mixing the two RAM kits.
+specs = { RAM = "32GB DDR5 (2 x 16GB)", "Memory Slots (Total)" = "4", "Maximum Memory Supported" = "128GB" }

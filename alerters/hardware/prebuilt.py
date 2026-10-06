@@ -13,12 +13,19 @@ from zoneinfo import ZoneInfo
 from dealcore.state import atomic_write, parse_time
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
-GPU = re.compile(r"\b(?:geforce\s+)?rtx\s*[™®]?\s*5090\b", re.I)
-NOT_DESKTOP = re.compile(r"laptop|notebook|mobile|\b5090\s*d\b|\b(?:no|without|optional)\s+(?:gpu|graphics|rtx)|up to.{0,30}5090", re.I)
+GPU = re.compile(r"\b(?:geforce\s+)?rtx\s*[™®]?\s*(5080|5090)\b", re.I)
+NOT_DESKTOP = re.compile(r"laptop|notebook|mobile|\b5090\s*d\b|\b(?:no|without|optional)\s+(?:gpu|graphics|rtx)|up to.{0,30}(?:5080|5090)", re.I)
+
+
+def gpu_model(text: str) -> str | None:
+    if re.search(r"\b(?:5080|5090)\s*(?:[/|]|or)\s*(?:RTX\s*)?(?:5080|5090)\b", text, re.I):
+        return None
+    models = set(GPU.findall(text))
+    return models.pop() if len(models) == 1 and not NOT_DESKTOP.search(text) else None
 
 
 def exact_desktop(text: str) -> bool:
-    return bool(GPU.search(text) and not NOT_DESKTOP.search(text)
+    return bool(gpu_model(text)
                 and re.search(r"desktop|gaming\s+(?:pc|computer)|\bprebuilt\b|\bOMEN\s+(?:MAX\s+)?\d+L\b", text, re.I))
 
 
@@ -81,6 +88,12 @@ class Offer:
     required_accessories: float | None = 0
     notice_type: str = "live-deal"
     claimed_price: float | None = None
+
+    @property
+    def gpu(self) -> str | None:
+        return gpu_model(" ".join((self.title, self.specs.get("GPU/VGA Type", ""),
+                                   self.specs.get("Details", ""),
+                                   "RTX " + self.specs.get("Selected GPU", ""))))
 
     @property
     def key(self) -> str:
