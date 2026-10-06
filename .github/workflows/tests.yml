@@ -93,6 +93,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: ./scripts/windows/Test-RecoveryTasks.ps1
+      - name: Windows upgrade lock and task lifecycle regression
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/windows/Test-UpgradeLifecycle.ps1
       - name: Remove this job's Linux temporary directory
         if: always() && runner.os == 'Linux'
         shell: bash

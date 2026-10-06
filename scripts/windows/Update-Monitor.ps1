@@ -5,6 +5,63 @@ param(
     [switch]$ValidateOnly
 )
 $ErrorActionPreference = 'Stop'
+function Invoke-WriterLockProbe([string]$Python,[string]$PackageApp,[string]$LockPath) {
+    # Expected contention must not emit stderr: Windows PowerShell 5.1 promotes
+    # native stderr to NativeCommandError under ErrorActionPreference=Stop.
+    $code = @'
+import sys
+from pathlib import Path
+try:
+    sys.path.insert(0,sys.argv[1])
+    from dealcore.locking import WriterLock
+    with WriterLock(Path(sys.argv[2])):
+        pass
+except ValueError as exc:
+    if str(exc) == 'Another hardware state writer is running':
+        sys.exit(75)
+    print(type(exc).__name__)
+    sys.exit(2)
+except Exception as exc:
+    print(type(exc).__name__)
+    sys.exit(2)
+'@
+    $diagnostic = & $Python -c $code $PackageApp $LockPath
+    return @{exit_code=$LASTEXITCODE;diagnostic=($diagnostic -join ' ')}
+}
+function Wait-MonitorStopped($TaskNames,[int]$PreviousPid,[string]$Python,[string]$PackageApp,[string]$LockPath,[int]$Attempts=30,[int]$RetrySeconds=2) {
+    for ($attempt=0; $attempt -lt $Attempts; $attempt++) {
+        $probe = Invoke-WriterLockProbe $Python $PackageApp $LockPath
+        if ($probe.exit_code -notin @(0,75)) { throw "Writer lock probe failed: $($probe.diagnostic) (exit $($probe.exit_code))." }
+        $active = @(Get-ScheduledTask -TaskName $TaskNames | Where-Object { $_.State -in @('Running','Queued') })
+        $oldProcess = Get-Process -Id $PreviousPid -ErrorAction SilentlyContinue
+        if ($probe.exit_code -eq 0 -and -not $active -and -not $oldProcess) { return }
+        Start-Sleep -Seconds $RetrySeconds
+    }
+    throw 'Hardware writer/tasks did not stop and release the lock; application was not replaced.'
+}
+function Start-EnabledMonitorTasks($Tasks,[string]$Runtime,[int]$PreviousPid) {
+    foreach ($name in @('DealAlerter-Hardware','DealAlerter-Watchdog')) {
+        if ($Tasks[$name].enabled) { Enable-ScheduledTask -TaskName $name | Out-Null }
+    }
+    $health = $null
+    if ($Tasks['DealAlerter-Hardware'].enabled) {
+        $healthy=$false
+        for ($attempt=0; $attempt -lt 30; $attempt++) {
+            $task = Get-ScheduledTask -TaskName 'DealAlerter-Hardware'
+            if ($task.State -notin @('Running','Queued')) { Start-ScheduledTask -TaskName 'DealAlerter-Hardware' }
+            Start-Sleep -Seconds 2
+            $health = Get-Content -Raw -LiteralPath (Join-Path $Runtime 'health.json') | ConvertFrom-Json
+            if ($health.pid -ne $PreviousPid -and [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()-$health.heartbeat -lt 60 -and -not $health.dry_run) {
+                $healthy=$true; break
+            }
+        }
+        # Keep the watchdog enabled even if startup failed, so its next trigger
+        # can recover monitoring independently of this maintenance process.
+        if ($Tasks['DealAlerter-Watchdog'].enabled) { Start-ScheduledTask -TaskName 'DealAlerter-Watchdog' }
+        if (-not $healthy) { throw 'Enabled hardware task has no new process with a fresh heartbeat.' }
+    } elseif ($Tasks['DealAlerter-Watchdog'].enabled) { Start-ScheduledTask -TaskName 'DealAlerter-Watchdog' }
+    return $health
+}
 if (-not $ValidateOnly -and -not $ApproveUpgrade) { throw 'Apply requires -ApproveUpgrade.' }
 $PreparedDirectory = (Get-Item -LiteralPath $PreparedDirectory).FullName
 $release = Get-Content -Raw -LiteralPath (Join-Path $PreparedDirectory 'release.json') | ConvertFrom-Json
@@ -67,14 +124,7 @@ try {
         Disable-ScheduledTask -TaskName $name | Out-Null
         Stop-ScheduledTask -TaskName $name
     }
-    $lockCode = 'import sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from dealcore.locking import WriterLock; lock=WriterLock(Path(sys.argv[2])); lock.__enter__(); lock.__exit__()'
-    $released = $false
-    for ($attempt=0; $attempt -lt 15; $attempt++) {
-        & $python -c $lockCode $packageApp (Join-Path $state 'hardware\.writer.lock') 2>$null
-        if ($LASTEXITCODE -eq 0) { $released=$true; break }
-        Start-Sleep -Seconds 2
-    }
-    if (-not $released) { throw 'Hardware writer did not release its lock; application was not replaced.' }
+    Wait-MonitorStopped @('DealAlerter-Hardware','DealAlerter-Watchdog') $before.pid $python $packageApp (Join-Path $state 'hardware\.writer.lock')
     New-Item -ItemType Directory -Path $backup | Out-Null
     Copy-Item -LiteralPath $app -Destination (Join-Path $backup 'app') -Recurse
     Copy-Item -LiteralPath $state -Destination (Join-Path $backup 'state') -Recurse
@@ -98,37 +148,35 @@ try {
     $ownerTemporary = Join-Path $runtime ('.owner-' + [Guid]::NewGuid().ToString('N') + '.json')
     $owner | ConvertTo-Json | Set-Content -Encoding UTF8 $ownerTemporary
     Move-Item -LiteralPath $ownerTemporary -Destination $ownerPath -Force
-    foreach ($name in @('DealAlerter-Hardware','DealAlerter-Watchdog')) {
-        if ($tasks[$name].enabled) { Enable-ScheduledTask -TaskName $name | Out-Null; Start-ScheduledTask -TaskName $name }
-    }
-    if ($tasks['DealAlerter-Hardware'].enabled) {
-        $healthy=$false
-        for ($attempt=0; $attempt -lt 30; $attempt++) {
-            Start-Sleep -Seconds 2
-            $health = Get-Content -Raw -LiteralPath (Join-Path $runtime 'health.json') | ConvertFrom-Json
-            if ($health.pid -ne $before.pid -and [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()-$health.heartbeat -lt 60 -and -not $health.dry_run) {
-                $healthy=$true; break
-            }
-        }
-        if (-not $healthy) { throw 'Updated hardware task has no fresh heartbeat.' }
-    }
+    $health = Start-EnabledMonitorTasks $tasks $runtime $before.pid
     $result = @{status='complete';commit=$upstream;backup=$backup;pid=$health.pid}
     $result | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $PreparedDirectory 'upgrade-result.json')
     Write-Output 'Monitor updated and restarted; live history repaired, receipts retained and secrets untouched.'
 } catch {
+    $failure = $_.Exception.Message
+    $recovery = 'failed'
+    $recoveryError = ''
+    $failedWriter = (Get-Content -Raw -LiteralPath (Join-Path $runtime 'health.json') | ConvertFrom-Json).pid
     foreach ($name in @('DealAlerter-Watchdog','DealAlerter-Hardware')) {
         Disable-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue | Out-Null
         Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
     }
-    if ($copied) {
-        Copy-Item -Path (Join-Path $backup 'app\*') -Destination $app -Recurse -Force
-        Copy-Item -LiteralPath (Join-Path $backup 'owner.json') -Destination $ownerPath -Force
+    try {
+        Wait-MonitorStopped @('DealAlerter-Hardware','DealAlerter-Watchdog') $failedWriter $python $packageApp (Join-Path $state 'hardware\.writer.lock')
+        if ($copied) {
+            Copy-Item -Path (Join-Path $backup 'app\*') -Destination $app -Recurse -Force
+            Copy-Item -LiteralPath (Join-Path $backup 'owner.json') -Destination $ownerPath -Force
+        }
+        # Never roll back history/receipts after a task may have sent a real alert.
+        $health = Start-EnabledMonitorTasks $tasks $runtime $failedWriter
+        $recovery = 'complete'
+    } catch {
+        $recoveryError = $_.Exception.Message
+        foreach ($name in @('DealAlerter-Hardware','DealAlerter-Watchdog')) {
+            if ($tasks[$name].enabled) { Enable-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue | Out-Null }
+        }
     }
-    # Never roll back history/receipts after a task may have sent a real alert.
-    foreach ($name in @('DealAlerter-Hardware','DealAlerter-Watchdog')) {
-        if ($tasks[$name].enabled) { Enable-ScheduledTask -TaskName $name | Out-Null; Start-ScheduledTask -TaskName $name }
-    }
-    @{status='failed';reason=$_.Exception.Message;backup=$backup} | ConvertTo-Json |
+    @{status='failed';reason=$failure;backup=$backup;recovery_status=$recovery;recovery_error=$recoveryError} | ConvertTo-Json |
         Set-Content -Encoding UTF8 (Join-Path $PreparedDirectory 'upgrade-result.json')
-    throw
+    throw "Upgrade failed: $failure Recovery: $recovery $recoveryError"
 }

@@ -222,6 +222,14 @@ the tasks and requires a fresh heartbeat. It keeps live receipts and records
 application and enabled tasks while retaining all history and delivery receipts.
 It refuses dependency changes rather than modifying the active environment.
 
+The lock probe returns a quiet retry status for ordinary contention, including
+under Windows PowerShell 5.1. It separately rejects unexpected I/O/import errors.
+Maintenance waits for the prior PID and scheduled task instances to exit as
+well as for the writer lock to become available before copying application
+files. Success and rollback both start hardware first and require its new
+heartbeat before starting the watchdog. Failed upgrades record a separate
+`recovery_status` so a failed restart cannot masquerade as a completed rollback.
+
 ## Approved physical recovery acceptance
 
 After applying the merged release, run the installed helper in an elevated
