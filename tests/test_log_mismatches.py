@@ -103,6 +103,17 @@ class TestWorkstationBuildIsNotABareCard:
     def test_a_pc_quoting_its_ram_is_a_system(self, title: str, price: float) -> None:
         assert match(title, price=price).is_system, "a machine, not a card"
 
+    def test_a_server_quoting_its_ram_is_a_system(self) -> None:
+        """eBay 389929023162, logged 2026-09-30 as two bare A100 40GBs at
+        $8,750 each: the $17,500 was a whole Gigabyte server. It names no CPU,
+        so neither CPU pairing caught it, and "server" alone is not a system
+        word."""
+        result = match(
+            "Gigabyte NVIDIA HPC/AI Server - G292-Z20 + 2x A100 40GB PCIE + 256gb RAM",
+            price=17500.0,
+        )
+        assert result.is_system, "a machine, not a card"
+
     @pytest.mark.parametrize(
         "title",
         [
@@ -117,6 +128,25 @@ class TestWorkstationBuildIsNotABareCard:
     )
     def test_a_card_quoting_ram_or_pc_is_still_a_card(self, title: str) -> None:
         assert not match(title, price=1500.0).is_system
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            # Live titles, plus cards that use both server and RAM language.
+            "Nvidia A100 40GB HBM2e PCI-e 4.0 x16 Ampere Server AI Accelerator Graphics Card",
+            "Lenovo Quadro RTX A6000 48GB RAM - Graphics Card - Very Good Condition",
+            "Nvidia A100 40GB RAM Server AI Accelerator Graphics Card",
+            "Lenovo Quadro RTX A6000 48GB RAM Server Graphics Card",
+        ],
+    )
+    def test_a_server_card_is_still_a_card(self, title: str) -> None:
+        assert not match(title, price=5000.0).is_system
+
+    def test_server_ram_is_not_excused_by_the_cards_memory_type(self) -> None:
+        assert match(
+            "Gigabyte Server 2x A100 40GB HBM2e Graphics Card + 256GB RAM",
+            price=17500.0,
+        ).is_system
 
 
 class TestVramIsNotSystemMemory:
