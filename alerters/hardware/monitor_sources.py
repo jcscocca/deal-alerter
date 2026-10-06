@@ -120,8 +120,14 @@ def fetch_job(job: dict, client: PublicClient, coupons: list[dict]) -> Batch:
     if kind == "discover-newegg":
         return Batch(discovered=discover_newegg(body))
     if kind == "discover-hp":
+        if getattr(client, "hp_reader", None) is not None:
+            from .hp_browser import discover_hp_rendered
+            return Batch(discovered=discover_hp_rendered(body))
         return Batch(discovered=discover_hp(body))
     parser = parse_hp if kind == "hp" else parse_newegg
+    if kind == "hp" and getattr(client, "hp_reader", None) is not None:
+        from .hp_browser import parse_hp_rendered
+        parser = parse_hp_rendered
     offer = parser(body, job["url"], now)
     if not offer:
         return Batch(notes=["Selected product does not contain a qualifying desktop RTX 5080/5090"])
