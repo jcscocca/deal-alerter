@@ -7,7 +7,7 @@ restart, schedule change or notification was performed during this review.
 | PR | Decision | Remaining work |
 | --- | --- | --- |
 | [#22](https://github.com/jcscocca/deal-alerter/pull/22) | Merge server detection fix | Updated against main; added protection for cards that call VRAM RAM, with regressions for both cards and complete servers. |
-| [#32](https://github.com/jcscocca/deal-alerter/pull/32) | Merge PC detection fix | Install in the live monitor after merge. |
+| [#32](https://github.com/jcscocca/deal-alerter/pull/32) | Merge after #22 | Includes #22 and resolves the overlapping test insertion. Install in the live monitor after merge. |
 | [#33](https://github.com/jcscocca/deal-alerter/pull/33) | Merge Slickdeals condition fix | Install in the live monitor after merge. |
 | [#21](https://github.com/jcscocca/deal-alerter/pull/21) | Close as superseded | Conflict resolved and pushed, retaining self-hosted runner isolation and the hardware ownership guard. External dispatch remains an inactive proposal. |
 
@@ -64,6 +64,28 @@ because it replaces the application used to send alerts and interrupts polling.
 - Git hardware history is a cutover-era recovery copy. Live observations now
   belong to `C:\ProgramData\DealAlerter\state`; merging a Git-only cleanup does
   not repair the active monitor's history.
+
+## Older history backlog
+
+A title-only replay of the complete history against the combined parser also
+flags **16 observations beyond this PR cleanup**. They reflect earlier parsing
+changes already present on main, rather than new regressions from the open PRs:
+
+| Evidence | Rows | Listing IDs |
+| --- | --- | --- |
+| ASUS Ascent GX10 stored as DGX Spark | 2 | 147512947333, 198028854618 |
+| RTX 3090 Ti stored as RTX 3090 | 1 | 188788253355 |
+| Mobile/laptop hardware stored as desktop GPUs | 4 | 117361479588 (two prices), 127929388460, 227469245646 |
+| Whole Xeon workstation stored as a bare PRO 6000 | 1 | 236742551157 |
+| Max-Q PRO 6000 stored as the workstation edition | 8 | 127612384846 (two prices), 227410975366, 227433753697, 336742858136, 389764313744, 800270279893, 128022061160 |
+
+These candidates exist in both Git and live history and deserve a separate
+reviewed migration. The cleanup is deliberately restricted to the six exact
+audited listings associated with the current PRs. Another **564 observations
+have no title**, so title replay cannot establish their identity; do not
+automatically delete or retag them. A replay also lacks the original body,
+structured condition and variant signals, so it is evidence for review rather
+than a general-purpose destructive cleanup rule.
 
 ## Verification
 
