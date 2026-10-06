@@ -529,6 +529,18 @@ def is_system_listing(text: str, part: Part | None) -> bool:
     # The implicit case: a CPU and memory/storage named alongside the GPU.
     if CPU_RE.search(text) and STORAGE_RE.search(text):
         return True
+    # A server quoting its RAM needs no CPU. "Gigabyte NVIDIA HPC/AI Server -
+    # G292-Z20 + 2x A100 40GB PCIE + 256gb RAM" (eBay 389929023162) was logged
+    # on 2026-09-30 as two bare A100s at $8,750 each. "Server" alone describes
+    # cards too, and a seller may call VRAM "RAM". Excuse a card only when
+    # every quoted memory/storage field is exactly its own VRAM as RAM.
+    if re.search(r"\bserver\b", text, re.IGNORECASE) and STORAGE_RE.search(text):
+        vram_only = CARD_WORD_RE.search(text) and all(
+            re.fullmatch(rf"{part.vram_gb}\s?gb\s+(?:ecc\s+)?ram", field.group(), re.I)
+            for field in STORAGE_RE.finditer(text)
+        )
+        if not vram_only:
+            return True
     # ...or a CPU named alongside a build word, for the machines that quote
     # neither RAM nor storage in the title. "Intel Xeon w7-3565X 2x RTX PRO
     # 6000 Blackwell AI/Machine Learning Workstation" was logged at $21,954 as
