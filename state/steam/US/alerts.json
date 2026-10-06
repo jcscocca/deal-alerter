@@ -1,5 +1,96 @@
 {
   "version": 2,
-  "updated_at": "2026-09-30T22:23:12+00:00",
-  "alerts": {}
+  "updated_at": "2026-10-06T00:09:50+00:00",
+  "alerts": {
+    "steam:1043810": {
+      "deliveries": {
+        "email": {
+          "price": 10.99,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    },
+    "steam:1253920": {
+      "deliveries": {
+        "email": {
+          "price": 9.99,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    },
+    "steam:1904480": {
+      "deliveries": {
+        "email": {
+          "price": 18.74,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    },
+    "steam:2057760": {
+      "deliveries": {
+        "email": {
+          "price": 18.74,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    },
+    "steam:2370000": {
+      "deliveries": {
+        "email": {
+          "price": 29.99,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    },
+    "steam:2501600": {
+      "deliveries": {
+        "email": {
+          "price": 10.49,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    },
+    "steam:2853590": {
+      "deliveries": {
+        "email": {
+          "price": 14.99,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    },
+    "steam:294100": {
+      "deliveries": {
+        "email": {
+          "price": 27.99,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    },
+    "steam:314650": {
+      "deliveries": {
+        "email": {
+          "price": 17.99,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    },
+    "steam:3509230": {
+      "deliveries": {
+        "email": {
+          "price": 9.74,
+          "verdict": 5,
+          "alerted_at": "2026-10-01T22:47:00+00:00"
+        }
+      }
+    }
+  }
 }

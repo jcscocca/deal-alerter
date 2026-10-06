@@ -196,7 +196,6 @@ class TestGpuServerCards:
         "title",
         [
             "Supermicro GPU Server 4U RTX A6000 Render Node 512GB",
-            "ASUS ESC8000A-E12 4U 8 GPU Server For NVIDIA A100 H100 80GB, AMD EPYC",
             "GPU Server w/ 4x RTX A6000 48GB Graphics Card 512GB RAM 4TB NVMe",
             "GPU Server RTX A6000 48GB",
             # Card words that follow the server, or a card count, are the

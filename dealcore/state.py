@@ -37,14 +37,16 @@ class AlertRecord:
     price: float
     verdict: int
     alerted_at: datetime
+    revision: str | None = None
 
     @classmethod
     def from_json(cls, raw: dict) -> AlertRecord:
-        return cls(float(raw["price"]), int(raw["verdict"]), parse_time(raw["alerted_at"]))
+        return cls(float(raw["price"]), int(raw["verdict"]), parse_time(raw["alerted_at"]), raw.get("revision"))
 
     def to_json(self) -> dict:
         return {"price": round(self.price, 2), "verdict": self.verdict,
-                "alerted_at": self.alerted_at.isoformat(timespec="seconds")}
+                "alerted_at": self.alerted_at.isoformat(timespec="seconds"),
+                **({"revision": self.revision} if self.revision is not None else {})}
 
 
 class AlertState:
@@ -81,6 +83,8 @@ class AlertState:
     def is_new(self, item: Assessment, channel: str, policy: Improvement,
                remind_after_days: int, now: datetime) -> bool:
         previous = self.records.get(self.normalise(item.key), {}).get(channel)
+        if item.alert_revision is not None:
+            return previous is None or previous.revision != item.alert_revision
         return (previous is None
                 or policy.better(item.price, int(item.verdict), previous.price, previous.verdict)
                 or now - previous.alerted_at > timedelta(days=remind_after_days))
@@ -88,7 +92,7 @@ class AlertState:
     def record(self, items: list[Assessment], channel: str, now: datetime) -> None:
         for item in items:
             self.records.setdefault(self.normalise(item.key), {})[channel] = AlertRecord(
-                item.price, int(item.verdict), now)
+                item.price, int(item.verdict), now, item.alert_revision)
 
     def forget_missing(self, live: set[str], complete_sources: set[str]) -> None:
         live = {self.normalise(key) for key in live}

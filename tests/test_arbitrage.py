@@ -30,6 +30,7 @@ class Detail:
     multi_variant: bool = False
     title: str = ""
     verdict: int = 0
+    promotion_ceiling: Verdict = Verdict.GRAIL
     part: NS = field(default_factory=lambda: NS(key="rtx_3090", name="RTX 3090 24GB"))
 
 

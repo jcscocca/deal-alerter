@@ -61,7 +61,7 @@ jobs:
       (github.event.schedule == '22 18 * * *' && vars.ENABLE_STEAM == 'true') ||
       (github.event.schedule == '52 2 * * *' && vars.ENABLE_HARDWARE == 'true') ||
       (github.event.schedule == '*/15 * * * *' && vars.ENABLE_HARDWARE_FAST == 'true')
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, thinkpad]
     env:
       STEAM_ID: ${{ secrets.STEAM_ID }}
       ITAD_API_KEY: ${{ secrets.ITAD_API_KEY }}
@@ -80,17 +80,67 @@ jobs:
       EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
       REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
       REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+    defaults:
+      run:
+        working-directory: work/${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
     steps:
       - uses: actions/checkout@v7
         with:
+          path: work/${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}
+          clean: true
           fetch-depth: 0
           ref: ${{ github.ref_name }}
+      - name: Retain isolated checkouts for fourteen days
+        if: runner.environment == 'self-hosted'
+        shell: node {0}
+        run: |
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = fs.realpathSync(path.join(process.env.GITHUB_WORKSPACE, 'work'));
+          const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+          for (const name of fs.readdirSync(root)) {
+            if (!/^[0-9]+-[0-9]+-[A-Za-z0-9_-]+-[0-9]+$/.test(name)) continue;
+            const target = path.join(root, name);
+            const stat = fs.lstatSync(target);
+            if (!stat.isDirectory() || stat.isSymbolicLink() || stat.mtimeMs >= cutoff) continue;
+            if (!fs.realpathSync(target).startsWith(root + path.sep)) throw new Error('Unsafe cleanup path');
+            fs.rmSync(target, {recursive: true, force: true});
+          }
+      # Each registration has its own _work root; each job checks out a fresh subdirectory.
+      # GitHub Runner cleans RUNNER_TEMP and terminates processes carrying this job's tracking ID.
+      - name: Isolate Linux job environment
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # Chromium Unix sockets require a short path, even when _work is deeply nested.
+          job_tmp=$(mktemp -d /tmp/gha.XXXXXX)
+          echo "CI_JOB_TEMP=$job_tmp" >> "$GITHUB_ENV"
+          mkdir -p "$job_tmp" "$HOME/.cache"
+          printf 'TMPDIR=%s\nTMP=%s\nTEMP=%s\n' "$job_tmp" "$job_tmp" "$job_tmp" >> "$GITHUB_ENV"
+          # Do not accidentally invoke Windows executables through WSL interop.
+          linux_path=$(printf '%s' "$PATH" | tr ':' '\n' | sed '/^\/mnt\/[a-zA-Z]\//d' | paste -sd:)
+          echo "PATH=$linux_path" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
+      - name: Isolate Python dependencies and temporary files
+        shell: python {0}
+        run: |
+          import os, pathlib, tempfile, venv
+          root = pathlib.Path(tempfile.mkdtemp(prefix="ci-python-", dir=os.environ["RUNNER_TEMP"]))
+          venv.create(root / "venv", with_pip=True)
+          (root / "tmp").mkdir()
+          with open(os.environ["GITHUB_PATH"], "a") as output:
+              print(root / "venv" / ("Scripts" if os.name == "nt" else "bin"), file=output)
+          with open(os.environ["GITHUB_ENV"], "a") as output:
+              print("VIRTUAL_ENV=" + str(root / "venv"), file=output)
+              print("PYTHONNOUSERSITE=1", file=output)
+              for key in ("TMPDIR", "TMP", "TEMP"):
+                  print(key + "=" + os.environ.get("CI_JOB_TEMP", str(root / "tmp")), file=output)
       - name: Install
         run: python -m pip install -r requirements.txt -r alerters/hardware/native/requirements.txt
       - name: Check
+        id: check
         env:
           EVENT: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
@@ -98,6 +148,7 @@ jobs:
           MODE: ${{ inputs.mode }}
           DRY: ${{ inputs.dry_run }}
           HARDWARE_SOURCES: ${{ inputs.sources }}
+          HARDWARE_WRITER: ${{ vars.HARDWARE_WRITER }}
         run: |
           if [ "$EVENT" != workflow_dispatch ]; then
             case "$SCHEDULE" in
@@ -106,6 +157,11 @@ jobs:
               '*/15 * * * *') DOMAIN=hardware; MODE=fast; HARDWARE_SOURCES=ebay,slickdeals,reddit ;;
               *) echo "Unrecognised schedule: $SCHEDULE" >&2; exit 1 ;;
             esac
+          fi
+          echo "domain=$DOMAIN" >> "$GITHUB_OUTPUT"
+          if [ "$DOMAIN" = hardware ] && [ "$DRY" != true ] && [ "$HARDWARE_WRITER" = thinkpad ]; then
+            echo "Hardware state belongs to the ThinkPad monitor; use a dry run."
+            exit 0
           fi
           export HARDWARE_SOURCES
           flags=("--$MODE" --quiet-when-empty)
@@ -118,19 +174,32 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: preview-${{ inputs.domain }}-${{ inputs.mode }}
-          path: report-*.html
+          path: work/${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index || 0 }}/report-*.html
           if-no-files-found: ignore
           retention-days: 7
       - name: Preserve observations and successful delivery receipts
         if: always()
+        env:
+          DOMAIN: ${{ steps.check.outputs.domain }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           # Never stage secrets, previews or the disposable SQLite cache.
-          find state -type f \( -name '*.json' -o -name '*.jsonl' \) -print0 |
+          case "$DOMAIN" in steam|hardware) ;; *) exit 0 ;; esac
+          find "state/$DOMAIN" -type f \( -name '*.json' -o -name '*.jsonl' \) -print0 |
             xargs -0 -r git add --
           if ! git diff --cached --quiet; then
             git commit -m 'Update deal evidence and delivery receipts'
             git pull --rebase origin "$GITHUB_REF_NAME"
             git push origin "HEAD:$GITHUB_REF_NAME"
           fi
+      - name: Remove this job's Linux temporary directory
+        if: always() && runner.os == 'Linux'
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          case "${CI_JOB_TEMP:-}" in
+            /tmp/gha.*) rm -rf -- "$CI_JOB_TEMP" ;;
+            '') ;;
+            *) echo "Unexpected temporary directory; refusing cleanup" >&2; exit 1 ;;
+          esac

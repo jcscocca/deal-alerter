@@ -274,3 +274,45 @@ class TestLockedAndPreProductionListingsAreNotTheProduct:
         result = match(title, price=4000)
         assert not result.junk
         assert result.part.key == part
+
+
+class TestAServerChassisIsNotTheCardItTakes:
+    def test_a_server_named_for_supported_gpus_has_no_included_part(self) -> None:
+        """eBay 188936957585 ($5,549) and 318628291875 ($5,903), digest preview
+        2026-10-01: an empty chassis whose item specifics list the GPUs it
+        accepts, headlined as an H100 machine $37,651 under the loose card."""
+        result = match(
+            "ASUS ESC8000A-E12 4U 8 GPU Server For NVIDIA A100 H100 80GB , AMD EPYC 9004 CPU",
+            price=5549.01,
+        )
+        assert result.part is None
+
+    @pytest.mark.parametrize("supported", ["Tesla A100 80GB", "H200 141GB", "L40 48GB", "L40s 48GB"])
+    def test_supported_model_families_do_not_imply_included_cards(self, supported: str) -> None:
+        result = match(f"Supermicro 4U GPU Server for {supported}", price=6000)
+        assert result.part is None
+
+    def test_explicit_selected_configuration_survives_compatibility_title(self) -> None:
+        result = match(
+            "ASUS ESC8000A-E12 4U 8 GPU Server For NVIDIA A100 H100 80GB , AMD EPYC 9004 CPU",
+            body="Selected GPU: 2x H100 80GB; Processor: AMD EPYC; Memory: 256GB RAM",
+            price=30000,
+        )
+        assert result.part.key == "h100_80"
+        assert result.is_system and not result.is_bundle
+        assert result.quantity == 1 and result.unit_price == 30000
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            # Live listings that name the card they hold, and a prebuilt whose
+            # "for" is about its use or its CPU platform.
+            "Supermicro 4U GPU Server for AMD EPYC 7003 with 4x NVIDIA A100 80GB installed",
+            "Gigabyte NVIDIA HPC/AI Server - G292-Z20 + 2x A100 40GB PCIE + 256gb RAM",
+            "Nvidia A100 40GB HBM2e PCI-e 4.0 x16 Ampere Server AI Accelerator Graphics Card",
+            "Intel Core Ultra 7 265K RTX PRO 6000 Blackwell 32GB DDR5 Workstation for Enscape",
+        ],
+    )
+    def test_a_listing_holding_the_card_still_matches(self, title: str) -> None:
+        result = match(title, price=17000.0)
+        assert not result.junk and result.part is not None

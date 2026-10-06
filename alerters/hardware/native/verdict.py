@@ -107,6 +107,11 @@ class Assessment:
     # likely bait than a bargain. Such a listing is still shown -- your judgment
     # is better than the filter's -- but the distribution never sees it.
     loggable: bool = True
+    # Later target/prebuilt promotion must preserve price and trust vetoes.
+    # The ordinary whole-system cap is deliberately not a promotion veto.
+    promotion_ceiling: Verdict = Verdict.GRAIL
+    # A guessed or stale reference supports a watch, never a buy claim.
+    reference_trusted: bool = True
 
     @property
     def total_price(self) -> float:
@@ -206,11 +211,17 @@ def assess(
     dollars_per_gb = unit_price / part.vram_gb
     dollars_per_gb_bandwidth = unit_price / part.capacity_bandwidth
     percentile = stats.percentile_of(unit_price) if stats.trustworthy else None
-    before, after, unlock = capability_gain(part)
-    fit = check_fit(part, psu_headroom_w=psu_headroom_w)
+    if condition == "parts":
+        before = after = host_vram_gb()
+        unlock = "Sold for parts or not working; usable capacity is unverified. No model upgrade claimed."
+        fit = None
+    else:
+        before, after, unlock = capability_gain(part)
+        fit = check_fit(part, psu_headroom_w=psu_headroom_w)
     target_hit = target_price is not None and unit_price <= target_price + DOLLAR
+    reference_trusted = part.reference_basis == "sold" and not _anchor_is_stale(part, stats, thresholds)
 
-    verdict, headline, reason = _decide(
+    verdict, headline, reason, promotion_ceiling = _decide(
         part=part,
         unit_price=unit_price,
         dollars_per_gb=dollars_per_gb,
@@ -231,6 +242,7 @@ def assess(
         target_hit=target_hit,
         target_price=target_price,
         condition=condition,
+        reference_trusted=reference_trusted,
     )
     reason = " ".join(reason.split())
 
@@ -245,6 +257,8 @@ def assess(
         condition=condition,
         posted_at=posted_at,
         verdict=verdict,
+        promotion_ceiling=promotion_ceiling,
+        reference_trusted=reference_trusted,
         headline=headline,
         reason=reason,
         dollars_per_gb=dollars_per_gb,
@@ -290,7 +304,8 @@ def _decide(
     target_hit: bool,
     target_price: float | None,
     condition: str,
-) -> tuple[Verdict, str, str]:
+    reference_trusted: bool,
+) -> tuple[Verdict, str, str, Verdict]:
     """The actual call, plus the sentences explaining it."""
 
     class_median = class_median_dollars_per_gb(part.kind)
@@ -303,36 +318,37 @@ def _decide(
     )
 
     if percentile is not None:
-        verdict, headline, reason = _decide_from_history(
+        verdict, headline, reason, promotion_ceiling = _decide_from_history(
             part, unit_price, percentile, stats, thresholds
         )
     else:
         verdict, headline, reason = _decide_from_reference(
             part, unit_price, dollars_per_gb, class_median, stats, thresholds
         )
+        promotion_ceiling = Verdict.GRAIL
 
     # Both paths lean on `reference_price` -- one as the whole answer, one as
     # the sanity check on the percentile -- so an unverified anchor weakens both
     # equally. Half the catalog is still estimates, and on 2026-08-17 those sat
     # on a visibly different scale from the sold-sourced entries and produced
     # most of the candidate alerts, precisely because nobody had checked them.
-    # An estimate can still say "this looks cheap"; it may not ring a phone.
-    if part.reference_basis != "sold" and verdict > Verdict.STRONG:
-        verdict = Verdict.STRONG
-        reason += (
-            f" Held below push: the {_fmt(part.reference_price)} it is measured "
-            "against is an unverified estimate rather than a sold average."
-        )
-    # An anchor the market has walked away from is worth no more than an
-    # unverified one, and goes quiet the same way until the number is refreshed.
-    elif _anchor_is_stale(part, stats, thresholds) and verdict > Verdict.STRONG:
-        verdict = Verdict.STRONG
-        reason += (
-            f" Held below push: the last 30 days of asks median "
-            f"{_fmt(stats.recent_median)}, at or below the "
-            f"{_fmt(part.reference_price)} sold average this is measured "
-            "against, so that anchor is treated as out of date."
-        )
+    # A guessed or stale anchor can support a watch, not a buy recommendation.
+    if not reference_trusted:
+        promotion_ceiling = min(promotion_ceiling, Verdict.GOOD)
+        verdict = min(verdict, Verdict.GOOD)
+        headline = f"{_fmt(unit_price)} -- WATCH / UNVERIFIED reference"
+        if part.reference_basis != "sold":
+            reason += (
+                f" Watch only: the {_fmt(part.reference_price)} it is measured "
+                "against is an unverified estimate rather than a sold average."
+            )
+        else:
+            reason += (
+                f" Watch only: the last 30 days of asks median "
+                f"{_fmt(stats.recent_median)}, at or below the "
+                f"{_fmt(part.reference_price)} sold average this is measured "
+                "against, so that anchor is treated as out of date."
+            )
 
     reason = f"{reason} {value_note}"
 
@@ -345,6 +361,7 @@ def _decide(
     # burying it at the end of a paragraph.
     if after <= before + 1:
         verdict = min(verdict, Verdict.GOOD)
+        promotion_ceiling = min(promotion_ceiling, verdict)
         reason += (
             f" Capped: {part.vram_gb}GB against the {before:.0f}GB already in the "
             "desktop is not an upgrade, however good the price."
@@ -352,6 +369,7 @@ def _decide(
 
     if mining_risk == "high":
         verdict = max(Verdict.PASS, Verdict(max(int(verdict) - 1, 0)))
+        promotion_ceiling = min(promotion_ceiling, verdict)
         reason += (
             " Downgraded one level: the listing reads like an ex-mining card. "
             "Worth buying anyway if the seller allows returns, but assume the "
@@ -388,6 +406,7 @@ def _decide(
                 f" Downgraded one level: {seller_note or 'the seller looks risky'}. "
                 "Not recorded in the price history either way."
             )
+        promotion_ceiling = min(promotion_ceiling, verdict)
     elif seller_risk == "moderate" and seller_note:
         reason += f" {seller_note} -- worth a look before you commit."
 
@@ -404,6 +423,7 @@ def _decide(
     # price, that price has no business leading your email.
     if suspicious_price:
         verdict = min(verdict, Verdict.GOOD)
+        promotion_ceiling = min(promotion_ceiling, verdict)
         reason += (
             " This is far enough under the going rate to be bait rather than a "
             "bargain, so it is shown but never recorded, and held back from the "
@@ -419,8 +439,9 @@ def _decide(
         )
     # Its own sentence, because it used to borrow the one above and a listing
     # naming two graphics cards was told it was a complete system.
-    elif is_bundle:
+    if is_bundle:
         verdict = min(verdict, Verdict.GOOD)
+        promotion_ceiling = min(promotion_ceiling, verdict)
         reason += (
             " This listing names more than one card under a single price, so what "
             "is being asked for the one above can't be separated out. Often worth "
@@ -434,6 +455,7 @@ def _decide(
     # title names several cards, or the listing is a whole machine, it never
     # reaches here at all -- match() drops both.
     if multi_variant:
+        promotion_ceiling = min(promotion_ceiling, Verdict.STRONG)
         reason += (
             " The seller offers several options under this one listing and eBay "
             "quotes whichever it chose to show, so confirm which option this "
@@ -445,6 +467,7 @@ def _decide(
             Verdict.PASS,
             "Sold for parts",
             "Listed as for-parts or not-working. Not a deal at any price.",
+            Verdict.PASS,
         )
 
     # An explicit target gets through, the way targets.json did in the Steam
@@ -457,12 +480,11 @@ def _decide(
     # target says "this price is worth knowing about", not "trust any number
     # below it". The listing still shows, still says it beat the target; it
     # just doesn't get escalated on the strength of a price we won't record.
-    untrusted = suspicious_price or seller_risk == "high"
-    if target_hit and verdict < Verdict.STRONG and not untrusted:
+    if target_hit and verdict < Verdict.STRONG <= promotion_ceiling:
         verdict = Verdict.STRONG
         headline = f"{_fmt(unit_price)} -- under your {_fmt(target_price)} target"
 
-    return verdict, headline, reason
+    return verdict, headline, reason, promotion_ceiling
 
 
 def _decide_from_history(
@@ -471,7 +493,7 @@ def _decide_from_history(
     percentile: float,
     stats: PriceStats,
     thresholds: Thresholds,
-) -> tuple[Verdict, str, str]:
+) -> tuple[Verdict, str, str, Verdict]:
     """The real answer, once the log has enough observations to give one.
 
     Rank alone is not the answer, though. A percentile is a statement about the
@@ -535,7 +557,7 @@ def _decide_from_history(
     # worth waking up for.
     anchor_verdict = _verdict_from_anchor(unit_price, part.reference_price, thresholds)
     if anchor_verdict >= rank_verdict:
-        return rank_verdict, rank_headline, f"{basis} {rank_reason}{context}"
+        return rank_verdict, rank_headline, f"{basis} {rank_reason}{context}", Verdict.GRAIL
 
     return (
         anchor_verdict,
@@ -544,6 +566,7 @@ def _decide_from_history(
         f"{unit_price / part.reference_price:.2f}x the {_fmt(part.reference_price)} "
         "this part is worth, the pool it is beating is simply an expensive one."
         f"{context}",
+        anchor_verdict,
     )
 
 
@@ -604,8 +627,8 @@ def _decide_from_reference(
 
     The bands are ratios against *sold* value, and they mean what they say only
     because `reference_price` is sold-sourced. Where it isn't -- see
-    `Part.reference_basis` -- the result is capped below push, because an
-    estimate is not evidence and shouldn't be allowed to ring a phone.
+    `Part.reference_basis` -- the result is watch-only, because an estimate is
+    not evidence for a buy recommendation.
     """
     ratio = unit_price / part.reference_price
     seen = (

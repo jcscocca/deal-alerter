@@ -66,7 +66,7 @@ class Part:
     # different scales -- asking prices ran 1.48x a sold-sourced anchor at the
     # median but 1.69x an estimated one, with a low tail 15 points closer to
     # the alert line -- so a single set of thresholds cannot mean the same
-    # thing for both. Estimates are held below push until they are verified.
+    # thing for both. Estimates are watch-only until they are verified.
     reference_basis: str = "estimate"
     # PCIe slots physically occupied. None for things that aren't cards.
     slots: float | None = None
