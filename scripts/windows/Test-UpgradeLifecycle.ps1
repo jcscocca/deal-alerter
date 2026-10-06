@@ -84,3 +84,6 @@ try {
         Remove-Item -LiteralPath $resolvedTestRoot -Recurse -Force
     }
 }
+# Negative probe cases deliberately leave a nonzero native exit status. GitHub's
+# PowerShell wrapper otherwise propagates it after this successful test script.
+exit 0
