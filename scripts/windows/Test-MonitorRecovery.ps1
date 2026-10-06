@@ -31,6 +31,16 @@ function Task-Action([string]$Mode) {
 function Task-Settings {
     New-ScheduledTaskSettingsSet -Hidden -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -WakeToRun -ExecutionTimeLimit (New-TimeSpan -Minutes 20)
 }
+function Test-EnabledBootTrigger([xml]$TaskXml) {
+    # Task Scheduler omits Enabled=true from exported triggers. Its documented
+    # default is true; an explicit false must still fail the recovery preflight.
+    foreach ($trigger in @($TaskXml.Task.Triggers.BootTrigger)) {
+        if ($trigger -isnot [System.Xml.XmlElement]) { continue }
+        $enabled = $trigger.SelectSingleNode('./*[local-name()="Enabled"]')
+        if (-not $enabled -or [System.Xml.XmlConvert]::ToBoolean($enabled.InnerText.Trim())) { return $true }
+    }
+    return $false
+}
 try {
     $owner = Read-Json (Join-Path $runtime 'owner.json')
     if (-not $owner.approved -or $owner.hardware_writer -ne 'thinkpad' -or
@@ -51,7 +61,7 @@ try {
         $task = Get-ScheduledTask -TaskName $name
         [xml]$xml = Export-ScheduledTask -TaskName $name
         if ($task.Principal.UserId -notin @('SYSTEM','S-1-5-18') -or -not $task.Settings.Enabled -or
-            -not $xml.Task.Triggers.BootTrigger -or $xml.Task.Triggers.BootTrigger.Enabled -ne 'true' -or
+            -not (Test-EnabledBootTrigger $xml) -or
             $task.Settings.DisallowStartIfOnBatteries -or $task.Settings.StopIfGoingOnBatteries -or
             -not $task.Settings.WakeToRun -or $task.Actions.Execute -notlike '*\pythonw.exe') { throw "Unexpected installed task: $name" }
     }
