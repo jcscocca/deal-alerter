@@ -126,7 +126,14 @@ login. Task Scheduler restarts failures every minute. `DealAlerter-Watchdog`
 runs at boot and every minute, detects a heartbeat older than 90 seconds,
 restarts a stopped/hung monitor after 120 seconds, and reports stale source
 checks (max(10 minutes, three intervals)). It records transport receipts for
-health warnings as well. Restart is independent of ntfy connectivity. Both
+health warnings as well. Coverage warnings use low-priority pushes, stable job
+identities and a per-transport 30-minute interval for additional problems;
+unchanged degradation gets at most one reminder per day. Recovery removes the
+resolved identities without resetting the interval. A newly stale heartbeat
+alerts immediately at high priority, regardless of the coverage interval.
+Failed transports retry without repeating a successful delivery. Legacy health
+receipts are migrated using the prior diagnostic snapshot and delivery time.
+Restart is independent of ntfy connectivity. Both
 tasks allow battery operation and request wake timers; neither changes the
 machine's power plan. The process uses an OS lock, released on crashes, and the
 legacy hardware CLI refuses real writes when the machine has a local owner.
