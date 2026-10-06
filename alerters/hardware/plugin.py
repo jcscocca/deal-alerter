@@ -100,7 +100,8 @@ class HardwarePlugin:
         if hunt is None:
             return None
         self.matched += 1
-        condition = listing.condition_hint or result.condition
+        # Explicit nonworking seller text overrides a generic source condition.
+        condition = "parts" if result.condition == "parts" else listing.condition_hint or result.condition
         # r/buildapcsales is a board of retail deals, so an unstated condition
         # there means new. Observed 2026-09-22: "[gpu] rtx 5090 for $4299 at
         # Walmart" was ranked against used cards instead.
@@ -136,12 +137,14 @@ class HardwarePlugin:
             # Keep the claimed invariant independent of configurable alert floors.
             item = replace(item, verdict=min(item.verdict, self.bands.GOOD))
         return Assessment(self.key(listing), item.unit_price, item.verdict, item,
-            rank=(float(item.loggable), -item.dollars_per_gb), alertable=upgrade,
+            rank=(float(item.loggable), -item.dollars_per_gb),
+            alertable=upgrade and item.reference_trusted,
             # A price you named is worth your phone, not just the digest. The
             # native verdict lifts a hit to STRONG unless it looks like bait, so
-            # a hit left below STRONG is one it declined to trust. A drop-down
-            # option's price may belong to another option, so it never counts.
+            # a hit left below STRONG is one it declined to trust. Native
+            # reference/risk ceilings also apply to this floor bypass.
             target_override=(item.target_hit and item.verdict >= self.bands.STRONG
+                             and item.promotion_ceiling == self.bands.GRAIL
                              and not item.multi_variant),
             loggable=item.loggable, axes=(("cheapness", item.reason),
                 ("value", f"{money(item.dollars_per_gb, whole_above=100)}/GB, "
@@ -204,7 +207,8 @@ class HardwarePlugin:
 
         for item in assessments:
             detail = item.detail
-            if not detail.is_system:
+            if (not detail.is_system or detail.is_bundle or detail.multi_variant
+                    or detail.condition == "parts"):
                 continue
             pool = loose.get(detail.part.key, [])
             # eBay 377092731100, seen 2026-09-24: "... RTX PRO 6000 Blackwell
@@ -247,6 +251,8 @@ class HardwarePlugin:
         lifted: dict[str, Assessment] = {}
         for item, cheapest, matched in self.undercuts(assessments):
             bar, price = cheapest.detail.unit_price, item.detail.unit_price
+            if item.detail.promotion_ceiling < self.bands.EXCEPTIONAL:
+                continue
             if matched and item.alertable and bar * floor <= price <= bar * (1 - margin):
                 verdict = max(item.verdict, self.bands.EXCEPTIONAL)
                 lifted[item.key] = replace(item, verdict=verdict, detail=replace(item.detail, verdict=verdict))
@@ -289,8 +295,9 @@ class HardwarePlugin:
             self.bands.PASS: ("#5c5f66", "#eceef1"),
         }
         fg, bg = colours[item.verdict]
+        badge = item.verdict.label if item.reference_trusted else "WATCH / UNVERIFIED"
         return Card(item.part.name, item.url, money(item.unit_price, decimals=0),
-                    item.verdict.label + (" · HITS YOUR TARGET" if item.target_hit else ""),
+                    badge + (" · HITS YOUR TARGET" if item.target_hit else ""),
                     item.headline, item.reason, tuple(facts), tuple(warnings),
                     bar=((left, "#9aa0a6"), (gain, "#2f6f4e"), (100-left-gain, "#e3e6ea")),
                     bar_labels=(f"now {item.vram_before:.0f}GB ({before.name if before else 'below ladder'})",

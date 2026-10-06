@@ -73,8 +73,8 @@ Nothing like ITAD exists for hardware, so the tool logs what it sees to
 
 - **Until a part has 8 observations spanning 14 days,** it is judged against the
   catalog's reference price, labelled provisional, and capped at `EXCEPTIONAL`.
-  Where that reference is an estimate rather than a sold average the cap is
-  `STRONG`: it can reach the digest, never your phone.
+  An unverified or stale reference is shown as `WATCH / UNVERIFIED`, capped at
+  `GOOD`, and excluded from buy recommendations and notifications.
 - **Used, refurbished and new never pool.** Once a part has enough confirmed
   sales, those replace asking prices as what it is judged against.
 - **One listing gets one vote.** A listing seen every hour for a month is one
@@ -99,7 +99,8 @@ target = 700.0
 quantity_wanted = 2
 ```
 
-At or under `target` you are alerted whatever the history says. A part with no
+At or under `target` a trusted listing can alert, but inclusion, risk, and
+reference-quality vetoes still apply. A part with no
 hunt is matched and then never judged. Specs and reference prices live in
 `alerters/hardware/native/catalog.py`; used-market references decay, so retune
 them against sold data now and then. Your machines live in `rig.py`.
@@ -122,8 +123,13 @@ eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales. Retailers
 reach it second-hand: Best Buy, Walmart, Newegg and Amazon deals arrive as
 r/buildapcsales and Slickdeals posts.
 
-Going to retailers directly was looked at and ruled out (2026-09-28). Don't
-reopen it without a new fact:
+The optional [ThinkPad monitor](docs/thinkpad-monitor.md) adds direct HP OMEN
+and Newegg ABS/Skytech product checks, with exact configuration validation,
+separate PC history and stock/sale events. See its dry-run coverage report before
+cutover: dynamic HP configurations and blocked feeds cannot be treated as
+confirmed offers. It preserves the $5,000 RTX 5090 target.
+
+Other direct retailers were investigated on 2026-09-28:
 
 - **Best Buy.** The developer API refuses sign-ups from free email and `.edu`
   addresses, so there is no key to be had. Worth revisiting only with an
@@ -132,8 +138,7 @@ reopen it without a new fact:
   RSA-signed requests; walmart.com itself sits behind bot protection that is not
   worth fighting.
 
-Better retail coverage means reading the store out of those posts' titles, not
-adding a source.
+Community sources remain useful for discovery and advance sale notices.
 
 ## Running it
 
@@ -174,6 +179,18 @@ an email with nothing in it. Steam runs in digest mode only.
 Tunables are in `config/steam.toml` and `config/hardware.toml`.
 
 ## Scheduling
+
+**External-trigger proposal, currently superseded.** Hardware monitoring moved
+to the ThinkPad on October 4, 2026. `HARDWARE_WRITER=thinkpad` blocks GitHub
+hardware runs, and both GitHub hardware switches are disabled. The external
+dispatch jobs described below are an inactive alternative; do not enable them
+while the local monitor owns hardware state. See
+[ThinkPad monitoring](docs/thinkpad-monitor.md) for the active setup.
+
+For fast local hardware checks, prepare the Windows startup and watchdog tasks
+using [the ThinkPad cutover procedure](docs/thinkpad-monitor.md). Preparation and
+dry runs do not activate anything. Cutover closes both GitHub hardware gates,
+drains existing runs and transfers current hardware state; Steam stays on Actions.
 
 `.github/workflows/check.yml` runs on GitHub Actions and commits state back to
 the repository. The dailies are GitHub schedules, each with its own repository

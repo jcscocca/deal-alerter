@@ -34,6 +34,8 @@ class NativeAssessment:
     dollars_per_gb_bandwidth: float = 40.1
     reason: str = "Capped for no upgrade; target subsequently promoted it"
     target_hit: bool = False
+    promotion_ceiling: Bands = Bands.GRAIL
+    reference_trusted: bool = True
     multi_variant: bool = False
     unlock: str = "No new model fits"
 

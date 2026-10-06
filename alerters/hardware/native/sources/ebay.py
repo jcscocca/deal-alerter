@@ -19,6 +19,8 @@ Free production keyset: https://developer.ebay.com/ -> create app -> App ID
 from __future__ import annotations
 
 import base64
+import html
+import math
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -230,6 +232,7 @@ class EbaySource:
                 params={
                     "q": query,
                     "limit": self.limit_per_query,
+                    "fieldgroups": "EXTENDED",
                     # Deliberately unsorted -- eBay's Best Match. Sorting by
                     # price ascending seems obviously right for deal-hunting and
                     # is a trap: "RTX 3090" matches thousands of items and the
@@ -251,7 +254,7 @@ class EbaySource:
         now = datetime.now(timezone.utc)
         out: list[Listing] = []
         for item in resp.json().get("itemSummaries") or []:
-            price = _price_of(item)
+            price = _delivered_price(item)
             if price is None:
                 continue
             risk, note = _seller_risk(item)
@@ -267,6 +270,9 @@ class EbaySource:
                     # rather than dropping them on the age filter.
                     posted_at=now,
                     price=price,
+                    # EXTENDED adds eBay's short description to the
+                    # existing search response; no per-listing API calls.
+                    body=html.unescape(re.sub(r"<[^>]+>", "\n", item.get("shortDescription") or "")),
                     condition_hint=_condition_of(item),
                     seller_risk=risk,
                     seller_note=note,
@@ -386,6 +392,31 @@ def _variant_of_many(item_id: str) -> bool:
     """
     segments = item_id.split("|")
     return len(segments) >= 3 and segments[2] not in ("", "0")
+
+
+def _delivered_price(item: dict) -> float | None:
+    """Include the cheapest quoted delivery option in an active asking price.
+
+    Browse may omit shipping when a destination is needed; an absent quote is
+    still an asking price, not evidence of free delivery. Sold-price records
+    use their original transaction field and are not changed here.
+    """
+    price = _price_of(item)
+    if price is None:
+        return None
+    currency = (item.get("price") or {}).get("currency", "USD")
+    costs = []
+    for option in item.get("shippingOptions") or []:
+        quote = option.get("shippingCost") or {}
+        if quote.get("currency", currency) != currency:
+            continue
+        try:
+            cost = float(quote["value"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if math.isfinite(cost) and cost >= 0:
+            costs.append(cost)
+    return price + min(costs) if costs else price
 
 
 def _price_of(item: dict) -> float | None:
