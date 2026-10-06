@@ -1,3 +1,4 @@
 -r requirements.txt
+-r requirements-browser.txt
 -r alerters/hardware/native/requirements.txt
 pytest>=8

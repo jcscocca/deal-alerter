@@ -1,0 +1,3 @@
+# Optional HP browser reader. No browser download is needed for installed Edge.
+-r requirements.txt
+playwright==1.63.0

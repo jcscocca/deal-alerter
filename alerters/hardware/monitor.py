@@ -104,7 +104,14 @@ class Monitor:
         if not 1 <= self.cfg["workers"] <= 12 or not 1 <= self.cfg["max_products_per_retailer"] <= 100:
             raise ValueError("Invalid monitor concurrency/product limit")
         self.runtime.mkdir(parents=True, exist_ok=True)
-        self.client = PublicClient()
+        browser = self.config.get("hp_browser", {})
+        if not isinstance(browser.get("enabled", False), bool):
+            raise ValueError("hp_browser.enabled must be a boolean")
+        hp_reader = None
+        if browser.get("enabled", False):
+            from .hp_browser import HPBrowserReader
+            hp_reader = HPBrowserReader(browser.get("channel", "msedge"))
+        self.client = PublicClient(hp_reader=hp_reader)
         self.jobs = {}
         self.pending, self.cache, self.benchmarks = {}, {}, []
         self.started = time.time()
@@ -148,6 +155,15 @@ class Monitor:
     def add_product(self, url):
         url = canonical_product(url)
         kind = "hp" if "www.hp.com/" in url else "newegg"
+        if kind == "hp" and self.client.hp_reader:
+            from .hp_browser import hp_page_url
+            try:
+                hp_page_url(url)
+            except ValueError:
+                message = "HP browser: custom/configuration-selector URLs remain unverified"
+                if message not in self.problems:
+                    self.problems.append(message)
+                return None
         key = job_id(kind, url)
         count = sum(j["kind"] == kind for j in self.jobs.values())
         if key not in self.jobs and count >= self.cfg["max_products_per_retailer"]:
@@ -155,7 +171,8 @@ class Monitor:
             if message not in self.problems:
                 self.problems.append(message)
             return None
-        return self.add_job(kind, self.cfg["retailer_seconds"], url)
+        interval = max(300, self.cfg["retailer_seconds"]) if kind == "hp" and self.client.hp_reader else self.cfg["retailer_seconds"]
+        return self.add_job(kind, interval, url)
 
     def process(self, key: str, batch: Batch):
         now = datetime.now(timezone.utc)

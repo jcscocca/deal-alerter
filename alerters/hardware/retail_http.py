@@ -89,8 +89,9 @@ class Robots:
 
 
 class PublicClient:
-    def __init__(self, clock=time.time, sleeper=time.sleep):
+    def __init__(self, clock=time.time, sleeper=time.sleep, *, hp_reader=None):
         self.clock, self.sleep = clock, sleeper
+        self.hp_reader = hp_reader
         self.hosts, self.cache, self.guard = {}, {}, threading.Lock()
 
     def host(self, name):
@@ -139,6 +140,19 @@ class PublicClient:
                 raise Deferred("Waiting for published crawl delay", wait)
             if wait > 0:
                 self.sleep(wait)
+            if self.hp_reader is not None and name == "www.hp.com" and urlsplit(url).path.startswith(("/us-en/shop/pdp/", "/us-en/shop/mdp/")):
+                # Choose the configured transport once, before any product fetch.
+                # Never respond to an HTTP denial by retrying in another client.
+                try:
+                    body = self.hp_reader(url, host["robots"])
+                    if len(body.encode("utf-8")) > 8_000_000:
+                        raise Deferred("Unexpectedly large rendered response", 3600)
+                    return body
+                except Deferred as exc:
+                    host["blocked_until"] = self.clock() + exc.seconds
+                    raise
+                finally:
+                    host["next"] = self.clock() + host["robots"].delay()
             prior = self.cache.get(url, {})
             headers = {k: prior[v] for k, v in (("If-None-Match", "etag"), ("If-Modified-Since", "modified")) if prior.get(v)}
             try:
