@@ -232,6 +232,11 @@ heartbeat before starting the watchdog. Failed upgrades record a separate
 
 ## Approved physical recovery acceptance
 
+The recovery preflight accepts the Task Scheduler default of an enabled boot
+trigger when exported XML omits `Enabled`. An explicit disabled trigger or a
+missing boot trigger still fails. The Windows regression compares this check
+with Task Scheduler's XML parser, including its normalized exports.
+
 After applying the merged release, run the installed helper in an elevated
 session. It validates existing SYSTEM boot tasks, battery/wake settings, ownership
 and a fresh heartbeat before scheduling a disruptive check:
