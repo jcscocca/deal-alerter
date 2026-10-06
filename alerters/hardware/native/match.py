@@ -526,6 +526,14 @@ def is_system_listing(text: str, part: Part | None) -> bool:
         STORAGE_RE.search(text) or not CARD_WORD_RE.search(text)
     ):
         return True
+    # "PC" or "computer" quoting its RAM is a machine whatever CPU it names.
+    # "Fractal Custom PC 3.0GHz 64GB RAM 2TB SSD Nvidia GeForce RTX 4090" (eBay
+    # 820195368426) and two others were logged as bare cards in October 2026:
+    # one named no CPU, one misspelled it, one dropped the SKU. A card can say
+    # "PC" and write its VRAM as "24GB RAM" too, so the card word excuses it.
+    if (re.search(r"\b(?:pc|computer)\b", text, re.IGNORECASE) and STORAGE_RE.search(text)
+            and not CARD_WORD_RE.search(text)):
+        return True
     # The implicit case: a CPU and memory/storage named alongside the GPU.
     if CPU_RE.search(text) and STORAGE_RE.search(text):
         return True
