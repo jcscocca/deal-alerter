@@ -92,14 +92,14 @@ shutdown also leaves its previous snapshot outside the current ranking.
 
 ## How the dashboard ranks
 
-- Use independent **GPU**, **RAM**, **CPU**, **Storage**, **Condition**, and
+- Use independent **Product type**, **GPU**, **RAM**, **CPU**, **Storage**, **Condition**, and
   **Source** filters. For example, GPU **RTX 5090** includes every matching RAM
-  capacity and condition; adding **64GB** narrows that selection. All matching
-  ranking groups appear together, with their original group ranks. The same
-  filters apply to held offers and combined publisher cards. Counts include all
-  three sections; source counts can overlap on cards with multiple publishers.
-  **Clear filters** restores all configurations. Selections survive automatic
-  result updates, including zero matches, and reset when changing category.
+  capacity and condition; adding **64GB** narrows that selection. Filters without
+  established values hide unless selected. Filter counts include all exact matches;
+  source counts can overlap on cards with multiple publishers. Removable chips
+  stay visible as you scroll. **Clear filters** restores all configurations.
+  Each category remembers filters, budget, sorting, RAM-reuse preference and
+  alternative visibility in this browser, including zero-result selections.
   Missing or ambiguous specs appear as **Not established**; GPU VRAM is not
   system RAM. These listing attributes do not establish compatibility or stock.
   Saved comparisons remain visible regardless of filters.
@@ -110,19 +110,35 @@ shutdown also leaves its previous snapshot outside the current ranking.
   A failed source or a monitor heartbeat older than 90 seconds holds its offers. Expired results move outside the ranking even if the page is
   left open; only a manual check retrieves new Walmart data. Each source expires
   independently, so a failed Walmart request cannot invalidate fresh Newegg results.
-- Desktop rankings are separate for each GPU, factory RAM capacity and condition.
-  Configurations must remain eligible under the owned-memory profile. Documented
-  physical RAM layouts rank first; within each evidence level, lower price plus
-  shipping ranks first. CPU, storage, motherboard, warranty and seller can differ.
-  “Why this rank?” explains the rule; it does not claim benchmark superiority or
-  a historical discount. Mixed-kit compatibility still needs verification.
-- Other categories show price order within condition, with an explicit warning
-  that unlike models are not equivalent in performance or value. Known tablet
-  storage mismatches are held for verification.
-- Missing details, unavailable items and stale offers remain in **Outside the
-  ranking**. They can be saved for comparison, with their warnings preserved.
-- Save up to three finalists in the browser. Only their product IDs are stored
-  in local storage. If a saved ID disappears from the current results, the page
+- **Current offers** shows exact filter matches with recent retailer evidence.
+  **Other matching products** follows automatically, including builds outside
+  your RAM-reuse preference, missing details, unavailable items, stale offers,
+  and unverified publisher reports. Each card labels its status; the header
+  counts jump to their sections. Cards keep compact specs visible and move full
+  titles, original group ranks and detailed evidence into **Listing details**.
+- **Prioritize reusing my existing 64GB RAM kit** is enabled by default for
+  Desktops and separate from the category. Turning it off can promote a fresh,
+  otherwise verified off-plan build; it never promotes failed or stale checks,
+  unknown totals or publisher reports. With it enabled, documented physical RAM
+  layouts sort first, then price plus shipping. **Lowest known total** and
+  **Newest checked** provide other orders within each section. Missing totals
+  follow known totals, ordered by item price or highest publisher quote when
+  available. Unlike models
+  can differ in performance, warranty and value; mixed-kit stability is unverified.
+- **Similar alternatives** appears expanded after matches, with a blue divider
+  and the changed specification on each card. It relaxes at most one known facet,
+  retaining budget, source and product type. It also considers existing monitor
+  results from outside the selected category. Unknown replacement specs are not
+  suggested. Six alternatives appear initially; **Show more alternatives** reveals
+  the rest. **Hide alternatives** remembers your choice. Browsing this section
+  does not run additional retailer searches.
+- **Maximum price** uses known total where available, otherwise item price or the
+  highest publisher quote. Unknown prices are excluded when a budget is set;
+  unknown shipping can still add to the cost. Known tablet storage mismatches
+  remain marked for verification. Source status distinguishes failed checks,
+  stale monitor heartbeat, overdue checks and sources that are not enabled.
+- Save up to three finalists in the browser. Their product IDs and shopping
+  preferences are stored locally. If a saved ID disappears from loaded results, the page
   reports it as missing instead of displaying an old price.
 
 The server binds only to `127.0.0.1`. It serves a fixed set of assets and a public
@@ -250,6 +266,8 @@ that the entire catalog has been searched.
 ```powershell
 python -m pytest -q tests/test_techscout.py tests/test_techscout_dashboard.py
 python -m pytest -q tests/test_deal_feeds.py tests/test_shopping_sources.py
+python -m pytest -q tests/test_techscout_facets.py tests/test_techscout_browsing.py
+node --test tests/techscout_browsing.test.cjs
 ```
 
 Tests use generated test keys and fake API sessions, with no real credentials or

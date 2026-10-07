@@ -16,6 +16,12 @@ from alerters.techscout.facets import UNKNOWN, attributes
     ("NVIDIA RTX PRO 6000 Blackwell 96GB GDDR7", {"gpu": "RTX PRO 6000 BLACKWELL WORKSTATION", "ram": UNKNOWN}),
     ("iPad Air 256GB", {"gpu": UNKNOWN, "ram": UNKNOWN, "storage": UNKNOWN}),
     ("Memory kit 2 x 32GB DDR5", {"ram": "64GB"}),
+    ("CORSAIR DDR5 16GB (1 x 16GB) Up to 6000MHz RAM", {"ram": "16GB", "kind": "Memory"}),
+    ("Desktop RTX 5090 32GB DDR5 1000GB SSD", {"ram": "32GB", "kind": "Desktops"}),
+    ("Laptop pocket backpack", {"kind": "Accessories"}),
+    ("iPad case", {"kind": "Accessories"}),
+    ("USB-C laptop docking station", {"kind": "Docks & hubs"}),
+    ("B650 motherboard DDR5", {"kind": "Components"}),
     ("64GB (2x32GB) DDR5 memory kit", {"ram": "64GB"}),
     ("Gaming PC 32GB DDR5 supports up to 128GB RAM", {"ram": UNKNOWN}),
     ("Gaming PC 32GB RAM 64GB RAM", {"ram": UNKNOWN}),
@@ -39,6 +45,6 @@ def test_combined_publishers_supply_agreeing_details_without_splitting_card():
         {"title": "Gaming desktop RTX 5090 32GB DDR5 1000GB SSD"},
         {"title": "Gaming desktop RTX 5090 32GB DDR5 1TB SSD"},
     ]}
-    assert attributes(row) == {"gpu": "RTX 5090", "ram": "32GB", "storage": "1TB SSD", "cpu": UNKNOWN, "condition": UNKNOWN}
+    assert attributes(row) == {"kind": "Desktops", "gpu": "RTX 5090", "ram": "32GB", "storage": "1TB SSD", "cpu": UNKNOWN, "condition": UNKNOWN}
     row["reports"][1]["title"] = "Gaming desktop RTX 5080 64GB DDR5 2TB SSD"
     assert all(attributes(row)[key] == UNKNOWN for key in ("gpu", "ram", "storage"))

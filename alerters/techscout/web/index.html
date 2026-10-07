@@ -6,16 +6,17 @@
   <meta name="techscout-token" content="__LOCAL_TOKEN__">
   <title>TechScout · Your shopping shortlist</title>
   <link rel="stylesheet" href="/dashboard.css">
+  <script src="/browsing.js" defer></script>
   <script src="/dashboard.js" defer></script>
 </head>
 <body>
   <header class="app-header"><div class="brand-mark" aria-hidden="true">TS</div><div><strong>TechScout</strong><div class="muted small">Your shopping shortlist</div></div><span class="local-label">Private · on this computer</span></header>
   <main>
     <label class="compact-category" for="category-select">Category
-      <select id="category-select"><option value="desktop-memory">Desktops &amp; memory</option><option value="tablets">Tablets</option><option value="computers">Computers</option><option value="supplies">Tech supplies</option><option value="memory">Memory</option><option value="amazon">Amazon deals</option><option value="monitor">All deals</option></select>
+      <select id="category-select"><option value="desktop-memory">Desktops</option><option value="tablets">Tablets</option><option value="computers">Computers</option><option value="supplies">Tech supplies</option><option value="memory">Memory</option><option value="amazon">Amazon deals</option><option value="monitor">All deals</option></select>
     </label>
     <nav id="categories" aria-label="Shopping categories">
-      <button data-category="desktop-memory" aria-pressed="true">Desktops &amp; memory</button>
+      <button data-category="desktop-memory" aria-pressed="true">Desktops</button>
       <button data-category="tablets" aria-pressed="false">Tablets</button>
       <button data-category="computers" aria-pressed="false">Computers</button>
       <button data-category="supplies" aria-pressed="false">Tech supplies</button>
@@ -26,25 +27,32 @@
     <div class="heading-row"><div><h1 id="heading">Desktops worth a closer look</h1><p id="purpose" class="muted">RTX 5080/5090 · reuse your 64GB kit · aim for 96–128GB</p></div><button id="refresh" class="primary">Check now</button></div>
     <div id="status" class="status" role="status" aria-live="polite">Loading saved research…</div>
     <div id="notice" role="alert" hidden></div>
-    <section id="filters" aria-label="Filter products">
-      <div class="filter-heading"><strong>Filter products</strong><button id="reset-filters" type="button" disabled>Clear filters</button></div>
+    <details id="filters" open>
+      <summary>Filters &amp; shopping preferences</summary>
       <div class="filter-grid">
-        <label for="gpu-select">GPU<select id="gpu-select" data-facet="gpu"><option value="">All GPUs</option></select></label>
-        <label for="ram-select">RAM<select id="ram-select" data-facet="ram"><option value="">All RAM capacities</option></select></label>
-        <label for="cpu-select">CPU<select id="cpu-select" data-facet="cpu"><option value="">All CPUs</option></select></label>
-        <label for="storage-select">Storage<select id="storage-select" data-facet="storage"><option value="">All storage</option></select></label>
-        <label for="condition-select">Condition<select id="condition-select" data-facet="condition"><option value="">All conditions</option></select></label>
+        <label id="kind-filter" for="kind-select">Product type<select id="kind-select"><option value="">All product types</option></select></label>
+        <label id="gpu-filter" for="gpu-select">GPU<select id="gpu-select"><option value="">All GPUs</option></select></label>
+        <label id="ram-filter" for="ram-select">RAM<select id="ram-select"><option value="">All RAM capacities</option></select></label>
+        <label id="cpu-filter" for="cpu-select">CPU<select id="cpu-select"><option value="">All CPUs</option></select></label>
+        <label id="storage-filter" for="storage-select">Storage<select id="storage-select"><option value="">All storage</option></select></label>
+        <label id="condition-filter" for="condition-select">Condition<select id="condition-select"><option value="">All conditions</option></select></label>
         <label for="source-select">Source<select id="source-select"><option value="all">All sources</option></select></label>
+        <label for="budget">Maximum price ($)<input id="budget" type="number" min="0" max="999999" step="0.01" inputmode="decimal" placeholder="Any price"></label>
       </div>
-      <p id="filter-summary" class="small muted" role="status" aria-live="polite">Choose any combination. All configurations are shown by default.</p>
-    </section>
-    <div class="toolbar"><div class="view-switch" aria-label="View"><button id="list-view" aria-pressed="true">Ranked shortlist</button><button id="compare-view" aria-pressed="false">Compare <span id="compare-count">0</span>/3</button></div></div>
+      <div class="filter-footer"><label id="reuse-option"><input id="reuse" type="checkbox" checked> Prioritize reusing my existing 64GB RAM kit</label><button id="reset-filters" type="button" disabled>Clear filters</button></div>
+      <p id="filter-summary" class="small muted">Choose any combination. All configurations are shown by default.</p>
+    </details>
+    <div class="active-bar"><div id="filter-chips" aria-label="Active filters"></div><button id="edit-filters">Edit filters</button></div>
+    <div class="toolbar"><div class="view-switch" aria-label="View"><button id="list-view" aria-pressed="true">Browse deals</button><button id="compare-view" aria-pressed="false">Compare <span id="compare-count">0</span>/3</button></div><label class="sort-label" for="sort-select">Sort<select id="sort-select"><option value="recommended">RAM evidence, then price</option><option value="total">Lowest known total</option><option value="newest">Newest checked</option></select></label></div>
     <p id="ranking-note" class="small muted"></p>
-    <section id="ranked" aria-label="Ranked candidates"></section>
+    <p id="compare-note" class="small muted" hidden>Saved comparisons stay visible regardless of filters.</p>
+    <div id="results">
+      <section id="current-section" class="result-section" aria-labelledby="current-heading"><div class="section-heading"><div><span class="eyebrow">YOUR MATCHES</span><h2 id="current-heading">Current offers <span id="current-count" class="count">0</span></h2></div></div><p id="current-empty" class="empty" hidden></p><div id="current-cards" class="cards"></div><button id="current-more" class="show-more" data-more="current" hidden>Show more</button></section>
+      <section id="other-section" class="result-section secondary" aria-labelledby="other-heading" hidden><div class="section-heading"><div><span class="eyebrow">CONTINUE EXPLORING</span><h2><span id="other-heading">Other matching products</span> <span id="other-count" class="count">0</span></h2><p id="other-note" class="small muted"></p></div></div><div id="other-cards" class="cards"></div><button id="other-more" class="show-more" data-more="other" hidden>Show more</button></section>
+      <section id="similar-section" class="result-section alternatives" aria-labelledby="similar-heading" hidden><div class="section-heading"><div><span class="eyebrow">OUTSIDE YOUR SELECTION</span><h2 id="similar-heading">Similar alternatives <span id="similar-count" class="count">0</span></h2><p id="similar-note" class="small muted"></p></div><button id="toggle-similar" aria-expanded="true" aria-controls="similar-cards">Hide alternatives</button></div><div id="similar-cards" class="cards"></div><button id="similar-more" class="show-more" data-more="similar" hidden>Show more alternatives</button></section>
+    </div>
     <section id="comparison" aria-label="Compare finalists" hidden></section>
-    <details id="held-section"><summary>Outside the ranking <span id="held-count"></span></summary><div id="held"></div></details>
-    <details id="leads-section" hidden><summary>Reported deals <span id="leads-count"></span></summary><div id="leads"></div></details>
-    <details class="research-details" open><summary>Connected sources</summary><div id="source-health"></div></details>
+    <details class="research-details"><summary>Connected sources &amp; check status</summary><div id="source-health"></div></details>
     <details class="research-details"><summary>Search scope &amp; coverage</summary><div id="coverage"></div></details>
     <footer>Prices include published shipping and exclude tax. Check times and freshness are specific to each source; checkout can differ. Rankings use RAM-layout evidence and known totals, not a performance score or a historical discount claim. Mixed-kit stability remains unverified.</footer>
   </main>

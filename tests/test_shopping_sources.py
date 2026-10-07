@@ -64,6 +64,19 @@ def test_independent_walmart_failure_does_not_hold_monitor(tmp_path):
     assert app.start("monitor")[0] == 200 and app.running is None
 
 
+@pytest.mark.parametrize("category", ["desktop-memory", "monitor"])
+def test_build_preferences_are_separate_from_source_verification(tmp_path, category):
+    publish(tmp_path, Batch(offers=[offer(title=TITLE.replace("32GB", "96GB"),
+                                       specs={"Memory": "96GB DDR5"})]), failed=True)
+    result = state(tmp_path, category)
+    row = result["held"][0]
+    assert row["preference_reasons"]
+    assert row["verification_reasons"]
+    assert set(row["preference_reasons"]).isdisjoint(row["verification_reasons"])
+    source = next(s for s in result["sources"] if s["source"] == "newegg")
+    assert source["status"] == "Checks need attention"
+
+
 @pytest.mark.parametrize("failure", ["source", "heartbeat", "future", "dry_run", "expired"])
 def test_failure_and_staleness_never_rank_old_stock(tmp_path, failure):
     publish(tmp_path, failed=failure == "source")

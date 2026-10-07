@@ -113,8 +113,11 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
             row["reasons"].append("Seller or condition unknown")
         if capacity_mismatch(category, title, queries):
             row["reasons"].append("Storage variant differs from the search")
+        row["verification_reasons"] = list(row["reasons"])
+        row["preference_reasons"] = []
         if category == "desktop-memory" and (not model_gpu or not fit or fit.get("eligible") is not True or ram is None):
-            row["reasons"].append(row["fit_summary"] or "Desktop configuration needs verification / owned-kit reference")
+            row["preference_reasons"].append(row["fit_summary"] or "Desktop configuration needs verification / owned-kit reference")
+            row["reasons"] += row["preference_reasons"]
         if row["reasons"]:
             result["held"].append(row)
         else:
@@ -146,6 +149,7 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
                    expires_at=result["expires_at"], lead=False, cost_note="price + shipping · before tax")
     result["sources"] = ([{"source": "walmart", "label": "Walmart", "jobs": 1,
                             "ready": int(result["fresh"]), "count": len(rows),
+                            "status": "Last check failed" if failed_at is not None else "Current" if result["fresh"] else "Manual check overdue" if result["checked_at"] else "Not checked yet",
                             "checked_at": result["checked_at"], "truncated": False}]
                          if category not in ("monitor", "amazon") else [])
     monitor = read_monitor(monitor_runtime, category, now)
@@ -296,6 +300,7 @@ def create_server(dashboard: Dashboard, port=8768):
             if parsed.path == "/health":
                 return self.send(200, {"service": "TechScout", "status": "ok"})
             assets = {"/": ("index.html", "text/html; charset=utf-8"),
+                      "/browsing.js": ("browsing.js", "text/javascript; charset=utf-8"),
                       "/dashboard.css": ("dashboard.css", "text/css; charset=utf-8"),
                       "/dashboard.js": ("dashboard.js", "text/javascript; charset=utf-8")}
             if parsed.path not in assets:

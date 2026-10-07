@@ -63,6 +63,25 @@ def test_independent_facets_span_ranked_groups_and_held_offers(tmp_path):
     assert {row["id"] for row in result["held"]} == {"3"}
 
 
+def test_build_preferences_are_separate_from_availability_failures(tmp_path):
+    save(tmp_path, [product(title="Desktop RTX 5090 96GB RAM 6TB SSD",
+                           memory_fit={"eligible": False, "status": "OUTSIDE REUSE WATCH", "summary": "Outside reuse plan"})])
+    row = snapshot(tmp_path, "desktop-memory", now=NOW)["held"][0]
+    assert row["verification_reasons"] == []
+    assert row["preference_reasons"] == ["Outside reuse plan"]
+    assert row["facets"]["ram"] == "96GB"
+    failed = snapshot(tmp_path, "desktop-memory", now=NOW, failed_at=NOW)["held"][0]
+    assert failed["verification_reasons"] == ["Last check failed"]
+    assert failed["preference_reasons"] == ["Outside reuse plan"]
+
+
+def test_walmart_source_status_distinguishes_stale_missing_and_failure(tmp_path):
+    assert snapshot(tmp_path,"desktop-memory",now=NOW)["sources"][0]["status"] == "Not checked yet"
+    save(tmp_path,at=NOW-1800)
+    assert snapshot(tmp_path,"desktop-memory",now=NOW)["sources"][0]["status"] == "Manual check overdue"
+    assert snapshot(tmp_path,"desktop-memory",now=NOW,failed_at=NOW)["sources"][0]["status"] == "Last check failed"
+
+
 def test_cpu_display_reparses_old_truncated_comparison_keys(tmp_path):
     save(tmp_path,[product(title="Gaming PC RTX 5080 Ultra 5 250KF Plus 32GB DDR5 1TB SSD")])
     row = snapshot(tmp_path,"desktop-memory",now=NOW)["groups"][0]["rows"][0]
@@ -184,6 +203,7 @@ def test_gets_cannot_start_research_and_no_files_are_served(web):
     session,base,app,calls = web
     assert session.get(base + "/").status_code == 200
     assert session.get(base + "/dashboard.js").status_code == 200
+    assert session.get(base + "/browsing.js").status_code == 200
     response = session.get(base + "/api/state")
     assert response.status_code == 200 and response.json()["snapshot"]["fresh"]
     assert app.token not in response.text

@@ -33,7 +33,7 @@ def gpu(title):
 def ram(title):
     # Explicit RAM/DDR/unified-memory evidence only: 32GB GDDR7 is GPU VRAM,
     # and an unqualified 256GB tablet capacity is normally storage.
-    if re.search(r"\b(?:up to|max(?:imum)?|choose|select)\b", title, re.I):
+    if re.search(r"\b(?:choose|select)\b|\b(?:up to|max(?:imum)?|supports?)\s+\d+\s*GB\b", title, re.I):
         return None
     if re.search(r"\b\d+\s*GB\s*(?:/|\bor\b)\s*\d+\s*GB\b", title, re.I):
         return None
@@ -42,6 +42,7 @@ def ram(title):
     without_kits = re.sub(kit_pattern, "", title, flags=re.I)
     matches = re.findall(r"(?<![\w.])(\d+)\s*GB\s*(?:\(\s*\d+\s*[x×]\s*\d+\s*GB\s*\)\s*)?(?:DDR[345]\b|RAM\b|(?:system|unified)\s+memory\b)", without_kits, re.I)
     values = {int(value) for value in matches} | {int(count) * int(size) for count, size in kits}
+    values |= {int(value) for value in re.findall(r"\bDDR[345]\s+(\d+)\s*GB(?=\s*(?:\(|RAM\b|memory\b|$))", title, re.I)}
     capacity = one(values)
     return f"{capacity}GB" if capacity and capacity <= 4096 else None
 
@@ -53,6 +54,27 @@ def storage(title):
     if not capacity:
         return None
     return f"{capacity / 1000:g}TB SSD" if capacity >= 1000 else f"{capacity:g}GB SSD"
+
+
+def product_type(title):
+    for label, pattern in (
+        ("Accessories", r"\b(?:backpack|sleeve|case for|cover for|bag|insect bite|screen protector)\b|\b(?:iPad|tablet|laptop)\s+(?:case|cover|stand)\b"),
+        ("Docks & hubs", r"\b(?:dock|docking|hub|KVM)\b"),
+        ("Tablets", r"\b(?:iPad|tablet|Galaxy Tab)\b"),
+        ("Laptops", r"\b(?:laptop|notebook|MacBook)\b"),
+        ("Desktops", r"\b(?:desktop|gaming (?:PC|computer)|mini PC|Mac mini|Mac Studio|Mac Pro|workstation PC|AI workstation)\b"),
+        ("Monitors", r"\b(?:monitor|UltraWide|display)\b"),
+        ("Storage", r"\b(?:SSD|hard drive|flash drive|microSD|NAS)\b"),
+        ("Graphics cards", r"\b(?:GDDR\d|GPU|graphics card|GeForce|Radeon|RTX|GTX)\b"),
+        ("Components", r"\b(?:motherboard|PSU|power supply|CPU|processor|cooler)\b"),
+        ("Memory", r"\b(?:DDR[345]|DIMM|memory kit|RAM)\b"),
+        ("Keyboards & mice", r"\b(?:keyboard|mouse|trackpad)\b"),
+        ("Audio", r"\b(?:headphone|headphones|earbuds|speaker|headset|microphone)\b"),
+        ("Networking", r"\b(?:router|modem|mesh|network switch)\b"),
+    ):
+        if re.search(pattern, title, re.I):
+            return label
+    return "Other tech"
 
 
 def attributes(row):
@@ -67,6 +89,7 @@ def attributes(row):
     if condition in ("", "Not published", "Unknown", "Not established"):
         condition = UNKNOWN
     return {
+        "kind": product_type(row.get("product_name") or row["title"]),
         "gpu": one(gpu(title) for title in titles) or UNKNOWN,
         "ram": f"{row['ram']}GB" if type(row.get("ram")) is int and row["ram"] > 0 else one(ram(title) for title in titles) or UNKNOWN,
         "cpu": one(cpu_model(title) for title in titles) or UNKNOWN,

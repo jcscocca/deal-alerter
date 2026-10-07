@@ -362,5 +362,6 @@ class DealFeeds:
                     if category in ("monitor", "amazon") or category in categories(row["title"]):
                         result["rows"].append(row)
                 result["sources"].append({"source": source, "label": config["label"], "jobs": 1,
+                    "status": "Current" if fresh else "Last feed check failed" if batch.get("failed") else "Feed check overdue" if checked else "Not checked yet",
                     "ready": int(fresh), "count": len(rows), "checked_at": batch.get("checked_at"), "truncated": False})
         return result

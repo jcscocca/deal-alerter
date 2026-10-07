@@ -205,13 +205,21 @@ def read_monitor(runtime, category, now):
                 continue
         elif category != "monitor" and category not in row["categories"]:
             continue
-        if category == "desktop-memory" and (not row["eligible"] or row["ram"] not in (32, 64) or not row["gpu"]):
-            row["reasons"].append(row["fit_summary"] or "Desktop configuration needs verification")
+        if "desktop-memory" in row["categories"] and (not row["eligible"] or row["ram"] not in (32, 64) or not row["gpu"]):
+            row["preference_reasons"] = [row["fit_summary"] or "Desktop configuration needs verification"]
+        else:
+            row["preference_reasons"] = []
+        row["verification_reasons"] = list(row["reasons"])
+        if category == "desktop-memory":
+            row["reasons"] += row["preference_reasons"]
         result["rows"].append(row)
     result["sources"] = list(sources.values())
+    for info in result["sources"]:
+        info["status"] = ("Monitor heartbeat stale" if not alive else "Current" if info["ready"] == info["jobs"] else
+                          "Some checks need attention" if info["ready"] else "Checks need attention" if info["checked_at"] else "No successful check yet")
     # Absent jobs must never look enabled (eBay can be disabled for missing credentials).
     for source, label in LABELS.items():
         if source not in sources:
             result["sources"].append({"source": source, "label": label, "jobs": 0, "ready": 0,
-                                      "count": 0, "checked_at": None, "truncated": False})
+                                      "count": 0, "checked_at": None, "truncated": False, "status": "Not enabled"})
     return result
