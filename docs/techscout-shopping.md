@@ -17,7 +17,30 @@ while using the page; Ctrl+C stops it. After restarting the computer, run the
 command again. `--port` selects another local port. No account or public hosting
 is needed, and the page is not accessible from another computer or phone.
 
-The page initially reads saved reports. **Check now** runs only the selected
+The page combines saved Walmart research with the running hardware monitor's
+public shopping snapshot. On Windows it reads
+`C:\ProgramData\DealAlerter\shopping-sources.json`; `--monitor-runtime` selects
+another runtime. The monitor must be upgraded to the version that publishes this
+file. No API credentials, notification settings, history files, or raw API bodies
+are exposed to the browser. The dashboard never writes monitor state.
+
+**All monitor deals** shows the existing watchlist's eBay/Apple hardware results,
+Newegg desktops, and community leads. Other category views include matching
+monitor products alongside Walmart. Use **Source** to narrow the list; retailer,
+seller, condition and check time appear on every card. Complete desktops and loose
+components remain in separate groups. Listings with the same ID in different
+sources do not overwrite each other; exact duplicate source identities collapse.
+Different retailer/seller offers remain separately comparable.
+
+The browser rereads local monitor results every 15 seconds without additional
+retailer requests. The collector retains its existing schedules, backoff and
+notification behavior. HP and Reddit remain visible as unavailable until their
+access actually recovers. Slickdeals/Reddit posts appear under **Community leads**,
+never as confirmed inventory. eBay variants, risky sellers, multi-item lots, and
+missing shipping quotes remain held. Apple's current collector does not establish
+shipping, so its finds remain visible outside the delivered-price ranking.
+
+**Check Walmart now** runs only the selected
 category's preset searches (10 results per search), then replaces its snapshot.
 Opening the page, changing categories and checking refresh progress do not make
 Walmart calls. Custom CLI searches remain available through the commands below;
@@ -28,10 +51,13 @@ shutdown also leaves its previous snapshot outside the current ranking.
 
 ## How the dashboard ranks
 
-- Main rankings require availability confirmed by the last localized lookup,
+- Main rankings require availability from a recent retailer check,
   a positive price, known shipping, seller and condition, and a snapshot no older
-  than 15 minutes. Expired results move outside the ranking even if the page is
-  left open; only a manual check retrieves new Walmart data.
+  than 15 minutes for Walmart. Monitor freshness follows its collection interval
+  plus 90 seconds (at least 15 minutes, at most 61.5 minutes for hourly Apple checks).
+  A failed source or a monitor heartbeat older than 90 seconds holds its offers. Expired results move outside the ranking even if the page is
+  left open; only a manual check retrieves new Walmart data. Each source expires
+  independently, so a failed Walmart request cannot invalidate fresh Newegg results.
 - Desktop rankings are separate for each GPU, factory RAM capacity and condition.
   Configurations must remain eligible under the owned-memory profile. Documented
   physical RAM layouts rank first; within each evidence level, lower price plus

@@ -77,3 +77,9 @@ footer { margin-top:26px;color:var(--muted);font-size:12px;max-width:900px; }
   .held-row .price { text-align:left; }
   button { min-height:42px; }
 }
+
+.source-filter { display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted); }
+#source-health { display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:12px; }
+.source-card { padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--paper); }
+.source-card strong { display:block;margin-bottom:6px; }
+#leads-section { margin-top:22px; }

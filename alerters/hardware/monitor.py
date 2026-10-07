@@ -35,6 +35,7 @@ from .prebuilt import OfferState
 from .prebuilt_plugin import MonitorHardwarePlugin, community_offer, offer_listing
 from .retailers import canonical_product
 from .retail_http import Deferred, PublicClient, public_url
+from .shopping_export import ShoppingExport
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUNTIME = Path(os.environ.get("PROGRAMDATA", ROOT / ".local")) / "DealAlerter"
@@ -117,6 +118,8 @@ class Monitor:
         self.started = time.time()
         self.problems = [SLICKDEALS_COVERAGE]
         self.results = []
+        self.shopping = ShoppingExport(runtime)
+        first_shopping_export = not self.shopping.path.exists()
         self.last_digest = ""
         self.stopping = False
         self.delivery = channels(email=False, push=True, dry_run=dry_run)
@@ -144,6 +147,12 @@ class Monitor:
                 for field in ("last_success", "next", "failures", "error"):
                     if field in old:
                         self.jobs[key][field] = old[field]
+        # First rollout needs one snapshot of the hourly/15-minute legacy jobs.
+        # Use the existing worker and receipts; never override a failure/backoff.
+        if first_shopping_export:
+            for job in self.jobs.values():
+                if job["kind"] == "legacy" and not job["failures"] and not job["error"]:
+                    job["next"] = 0
         self.write_health()
 
     def add_job(self, kind, interval, url=""):
@@ -204,6 +213,11 @@ class Monitor:
         preview = self.runtime / "previews" / f"{key}.html"
         options = replace(plugin.options, dry_run=self.dry_run, quiet_when_empty=True, preview=preview)
         result = run(plugin, state, options, self.delivery, now=now)
+        try:
+            self.shopping.record(key, batch, result.assessments, now)
+        except (ValueError, TypeError, AttributeError):
+            self.shopping.batches.pop(key, None)
+            LOG.warning("Shopping batch could not be exported")
         for item in result.assessments:
             if item.loggable and not item.detail.is_system and not item.detail.is_bundle:
                 self.benchmarks = [(stamp, old) for stamp, old in self.benchmarks if old.key != item.key and time.time() - stamp <= 1200]
@@ -278,6 +292,11 @@ class Monitor:
         value = {"version": 1, "pid": os.getpid(), "started": self.started, "heartbeat": time.time(),
                  "dry_run": self.dry_run, "jobs": self.jobs, "problems": self.problems, "results": self.results}
         atomic_write(self.runtime / "health.json", json.dumps(value, indent=2) + "\n")
+        try:
+            self.shopping.write(self.jobs, value["heartbeat"], dry_run=self.dry_run)
+        except (OSError, ValueError, TypeError):
+            # A presentation failure must not interrupt the alert writer or delivery receipts.
+            LOG.warning("Shopping snapshot unavailable; dashboard will show its last data as stale")
         if not self.dry_run:
             atomic_write(self.runtime / "schedule.json", json.dumps({"jobs": self.jobs, "last_digest": self.last_digest,
                          "host_backoff": {host: value.get("blocked_until", 0) for host, value in self.client.hosts.items()}}, indent=2) + "\n")

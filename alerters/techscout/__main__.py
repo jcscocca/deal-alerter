@@ -29,6 +29,9 @@ def main(argv=None) -> int:
     parser.add_argument("--output", type=Path, default=local_directory() / "reports")
     parser.add_argument("--serve", action="store_true", help="Open the local dashboard server; API calls require Check now")
     parser.add_argument("--port", type=int, default=8768, help="Local dashboard port (default 8768)")
+    parser.add_argument("--monitor-runtime", type=Path,
+                        default=Path(os.environ.get("PROGRAMDATA", "C:/ProgramData")) / "DealAlerter" if os.name == "nt" else None,
+                        help="Read public shopping snapshots from the installed monitor (Windows default: ProgramData/DealAlerter)")
     args = parser.parse_args(argv)
     if args.serve:
         from .dashboard import serve
@@ -38,7 +41,7 @@ def main(argv=None) -> int:
                 request += ["--zip-code", args.zip_code]
             return main(request)
         try:
-            serve(args.output, refresh, args.port)
+            serve(args.output, refresh, args.port, monitor_runtime=args.monitor_runtime)
             return 0
         except (OSError, ValueError):
             print("Cannot start the local dashboard. Check the port and output permissions.", file=sys.stderr)
