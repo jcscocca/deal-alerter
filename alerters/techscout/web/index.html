@@ -36,7 +36,7 @@
       <div class="filter-grid">
         <label id="kind-filter" for="kind-select">Product type<select id="kind-select"><option value="">All product types</option></select></label>
         <label id="gpu-filter" for="gpu-select">GPU<select id="gpu-select"><option value="">All GPUs</option></select></label>
-        <label id="ram-filter" for="ram-select">RAM<select id="ram-select"><option value="">All RAM capacities</option></select></label>
+        <label id="ram-filter" for="ram-select">Included RAM<select id="ram-select"><option value="">Any included RAM</option></select></label>
         <label id="cpu-filter" for="cpu-select">CPU<select id="cpu-select"><option value="">All CPUs</option></select></label>
         <label id="storage-filter" for="storage-select">Storage<select id="storage-select"><option value="">All storage</option></select></label>
         <label id="condition-filter" for="condition-select">Condition<select id="condition-select"><option value="">All conditions</option></select></label>
@@ -45,7 +45,7 @@
         <label for="budget">Maximum price ($)<input id="budget" type="number" min="0" max="999999" step="0.01" inputmode="decimal" placeholder="Any price"></label>
       </div>
       <div class="filter-footer"><label id="reuse-option"><input id="reuse" type="checkbox" checked> Prioritize reusing my existing 64GB RAM kit</label><button id="reset-filters" type="button" disabled>Clear filters</button></div>
-      <p id="filter-summary" class="small muted">Choose any combination. All configurations are shown by default.</p>
+      <p id="filter-summary" class="small muted">Included RAM is what comes with the product. Your existing 64GB kit is assessed separately.</p>
     </details>
     <div class="active-bar"><div id="filter-chips" aria-label="Active filters"></div><button id="edit-filters">Edit filters</button></div>
     <div class="toolbar"><button id="watch-search">Watch this search</button><div class="view-switch" aria-label="View"><button id="list-view" aria-pressed="true">Browse deals</button><button id="compare-view" aria-pressed="false">Compare <span id="compare-count">0</span>/3</button></div><label class="sort-label" for="sort-select">Sort<select id="sort-select"><option value="recommended">RAM evidence, then price</option><option value="total">Lowest known total</option><option value="newest">Newest checked</option><option value="best">Best deal verdict</option></select></label></div>

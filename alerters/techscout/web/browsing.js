@@ -3,7 +3,7 @@
   'use strict';
   const unknown = 'Not established';
   const keys = ['kind','gpu','ram','cpu','storage','condition'];
-  const labels = {kind:'Product type',gpu:'GPU',ram:'RAM',cpu:'CPU',storage:'Storage',condition:'Condition'};
+  const labels = {kind:'Product type',gpu:'GPU',ram:'Included RAM',cpu:'CPU',storage:'Storage',condition:'Condition'};
   const defaults = () => ({filters:{},source:'all',budget:null,sort:'recommended',reuse:true,similar:true,quality:'all'});
   const value = (row,key) => row.facets?.[key] || unknown;
   const hasSource = (row,source) => row.source === source || (row.sources || []).includes(source);
@@ -31,6 +31,15 @@
   function preferenceReasons(row) {
     if (row.preference_reasons?.length) return row.preference_reasons;
     return value(row,'kind')==='Desktops' && (!row.fit || row.fit==='Not assessed') ? ['RAM reuse has not been assessed for this build.'] : [];
+  }
+  function ramReuse(row) {
+    if(value(row,'kind')!=='Desktops')return null;
+    if(row.fit==='NO REUSE PATH')return {total:'RAM reuse blocked for the planned layout.',check:row.fit_summary || 'The published layout does not support the planned combination.'};
+    if(row.fit==='OUTSIDE REUSE WATCH')return {total:'Outside the current 32GB/64GB reuse preference.',check:'Compatibility with your kit has not been established. See the included RAM capacity and listing details.'};
+    const included=Number(/^(\d+)GB$/.exec(value(row,'ram'))?.[1]);
+    const total=included>0 ? `${included}GB included + your 64GB kit = ${included+64}GB potential.` : 'Combined capacity unknown: included system RAM is not established.';
+    const check=row.fit==='POSSIBLE REUSE' ? 'Slot and capacity requirements documented; mixed-kit stability is unverified.' : `Compatibility unconfirmed. ${row.fit_summary || 'Verify DDR5, space for both of your modules, and supported capacity.'}`;
+    return {total,check};
   }
   function status(row,prefs,now) {
     if (row.lead) return {label:fresh(row,now) ? 'Publisher report' : 'Publisher report · needs recheck',tone:'review'};
@@ -77,7 +86,7 @@
       // specification and keep unestablished variants out of recommendations.
       if (differences.includes('kind') || differences.length>1 || differences.some(key=>value(row,key)===unknown)) continue;
       if (!differences.length && ids.has(row.id)) continue;
-      const reasons = differences.map(key=>`${labels[key]}: ${value(row,key)} instead of ${prefs.filters[key]}`);
+      const reasons = differences.map(key=>key==='ram' ? `Includes ${value(row,key)} of system RAM` : `${labels[key]}: ${value(row,key)} instead of ${prefs.filters[key]}`);
       if (!ids.has(row.id)) reasons.push('Outside this category');
       similar.push({...row,differences:reasons});
     }
@@ -97,7 +106,7 @@
     if (typeof raw.similar==='boolean') prefs.similar=raw.similar;
     return prefs;
   }
-  const api = {unknown,keys,labels,defaults,value,hasSource,fresh,budgetPrice,matches,verification,preferenceReasons,status,sortRows,rowsOf,unique,partition,restore};
+  const api = {unknown,keys,labels,defaults,value,hasSource,fresh,budgetPrice,matches,verification,preferenceReasons,ramReuse,status,sortRows,rowsOf,unique,partition,restore};
   if (typeof module==='object' && module.exports) module.exports=api;
   else root.TechScoutBrowsing=api;
 })(typeof globalThis==='object' ? globalThis : this);
