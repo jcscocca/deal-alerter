@@ -119,6 +119,7 @@ class Monitor:
         self.problems = [SLICKDEALS_COVERAGE]
         self.results = []
         self.shopping = ShoppingExport(runtime)
+        first_shopping_export = not self.shopping.path.exists()
         self.last_digest = ""
         self.stopping = False
         self.delivery = channels(email=False, push=True, dry_run=dry_run)
@@ -146,6 +147,12 @@ class Monitor:
                 for field in ("last_success", "next", "failures", "error"):
                     if field in old:
                         self.jobs[key][field] = old[field]
+        # First rollout needs one snapshot of the hourly/15-minute legacy jobs.
+        # Use the existing worker and receipts; never override a failure/backoff.
+        if first_shopping_export:
+            for job in self.jobs.values():
+                if job["kind"] == "legacy" and not job["failures"] and not job["error"]:
+                    job["next"] = 0
         self.write_health()
 
     def add_job(self, kind, interval, url=""):

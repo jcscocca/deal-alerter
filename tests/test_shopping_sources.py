@@ -181,3 +181,24 @@ def test_newer_duplicate_wins_and_pc_component_groups_stay_separate(tmp_path):
     assert result["count"] == 2 and len(result["groups"]) == 2
     desktop = next(g for g in result["groups"] if g["name"].startswith("Desktops"))
     assert desktop["rows"][0]["total"] == 1920
+
+
+def test_initial_legacy_snapshot_does_not_override_failure_backoff(tmp_path, monkeypatch):
+    from pathlib import Path
+    from alerters.hardware import monitor
+    monkeypatch.setattr(monitor, "channels", lambda **kwargs: [])
+    monkeypatch.setenv("EBAY_CLIENT_ID", "test")
+    monkeypatch.setenv("EBAY_CLIENT_SECRET", "test")
+    future = NOW.timestamp()+3600
+    jobs = {monitor.job_id("legacy", source): {"next": future, "error": "backoff" if source == "ebay" else "",
+                                             "failures": 1 if source == "ebay" else 0}
+            for source in ("ebay", "apple-refurb")}
+    (tmp_path / "schedule.json").write_text(json.dumps({"jobs": jobs}))
+    root = Path(__file__).resolve().parents[1]
+    app = monitor.Monitor(root / "config/monitor.toml", tmp_path / "state", tmp_path, dry_run=False)
+    assert app.jobs[monitor.job_id("legacy", "apple-refurb")]["next"] == 0
+    assert app.jobs[monitor.job_id("legacy", "ebay")]["next"] == future
+    app.jobs[monitor.job_id("legacy", "apple-refurb")]["next"] = future
+    app.write_health()
+    restarted = monitor.Monitor(root / "config/monitor.toml", tmp_path / "state", tmp_path, dry_run=False)
+    assert restarted.jobs[monitor.job_id("legacy", "apple-refurb")]["next"] == future

@@ -336,7 +336,9 @@ automatically start both writers to recover. Steam continues independently.
 
 The monitor atomically publishes `shopping-sources.json` beside `health.json`.
 It contains bounded public product fields from the most recent fetched batch per
-job, with source status and a heartbeat. Newegg/HP export exact selected offers;
+job, with source status and a heartbeat. On the first upgrade that adds this file,
+healthy eBay/Apple jobs collect one initial snapshot through their normal worker;
+failing jobs keep their existing backoff. Later restarts keep the saved schedule. Newegg/HP export exact selected offers;
 eBay/Apple export the current run's assessed listings, excluding sold history;
 community sources export discovery leads. A successful empty batch replaces old
 results, and restarting clears the in-memory snapshot until new checks complete.
