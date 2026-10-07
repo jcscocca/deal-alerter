@@ -34,6 +34,8 @@
     const groups = current ? data.groups : [];
     if (!groups.some(g => g.name === group)) group = groups[0]?.name || '';
     el('groups').innerHTML = groups.map(g=>`<button data-group="${escape(g.name)}" aria-pressed="${g.name === group}">${escape(g.name)} · ${g.rows.length}</button>`).join('');
+    el('group-select').innerHTML = groups.map(g=>`<option value="${escape(g.name)}" ${g.name === group ? 'selected' : ''}>${escape(g.name)} · ${g.rows.length}</option>`).join('');
+    el('group-menu').hidden = !groups.length || view !== 'list';
     const rows = groups.find(g => g.name === group)?.rows || [];
     el('ranked').innerHTML = rows.length ? rows.map(rowCard).join('') : `<div class="empty">${!data.checked_at ? 'Choose Check now to create this category’s first shopping report.' : !current ? 'The saved offers need a new availability check before they can be ranked.' : 'No offers currently meet the ranking requirements. Check the held offers for missing details.'}</div>`;
     const held = current ? data.held : allRows();
@@ -84,24 +86,31 @@
     } catch (_) { notice('The check could not start. Reload the local page and try again.'); }
     finally { pending = false; render(); }
   });
-  el('categories').addEventListener('click',event => {
-    const button = event.target.closest('[data-category]');
-    if (!button) return;
-    category = button.dataset.category; group = ''; state = null; notice('');
+  function chooseCategory(value) {
+    if (!Object.hasOwn(categoryNames,value)) return;
+    category = value; group = ''; state = null; notice('');
     clearTimeout(poll);
     el('heading').textContent = categoryNames[category];
     el('purpose').textContent = 'Loading saved research…';
     el('status').textContent = 'Loading…';
     el('groups').replaceChildren();
+    el('group-menu').hidden = true;
     el('ranked').replaceChildren();
     el('comparison').replaceChildren();
     el('coverage').replaceChildren();
     el('ranking-note').textContent = '';
     el('held-section').hidden = true;
     el('refresh').disabled = true;
-    document.querySelectorAll('[data-category]').forEach(b=>b.setAttribute('aria-pressed',String(b === button)));
+    el('category-select').value = category;
+    document.querySelectorAll('[data-category]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.category === category)));
     load();
+  }
+  el('categories').addEventListener('click',event => {
+    const button = event.target.closest('[data-category]');
+    if (button) chooseCategory(button.dataset.category);
   });
+  el('category-select').addEventListener('change',event=>chooseCategory(event.target.value));
+  el('group-select').addEventListener('change',event=>{group=event.target.value;render();});
   el('groups').addEventListener('click',event => { const b = event.target.closest('[data-group]'); if (b) {group=b.dataset.group;render();} });
   el('list-view').addEventListener('click',()=>{view='list';render();});
   el('compare-view').addEventListener('click',()=>{view='compare';render();});

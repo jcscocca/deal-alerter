@@ -3,6 +3,8 @@
 body { margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Segoe UI",Arial,sans-serif; }
 [hidden] { display:none!important; }
 button,select { font:inherit; }
+select { border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--text);padding:9px;max-width:100%; }
+.compact-category,#group-menu { display:none; }
 button { cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:8px 13px;background:var(--paper);color:var(--text); }
 button:hover { border-color:var(--accent); }
 button:focus-visible,a:focus-visible,summary:focus-visible { outline:3px solid var(--accent);outline-offset:3px; }
@@ -53,4 +55,25 @@ a { color:var(--accent);text-underline-offset:3px; }
 .compare-card .actions { align-items:flex-start; }
 .coverage-item { padding:8px 0;color:var(--muted); }
 footer { margin-top:26px;color:var(--muted);font-size:12px;max-width:900px; }
-@media(max-width:760px) { #comparison { grid-template-columns:1fr; } .deal { grid-template-columns:24px minmax(0,1fr);padding:15px; } .deal>.price { grid-column:2;text-align:left; } .heading-row { align-items:flex-start;flex-direction:column;gap:10px; } .local-label { display:none; } main { padding:20px 14px; } h1 { font-size:24px; } .held-row { flex-direction:column;gap:8px; } .held-row .price { text-align:left; } nav button,button { min-height:42px; } }
+@media(max-width:760px) {
+  #comparison { grid-template-columns:1fr; }
+  .deal { grid-template-columns:24px minmax(0,1fr);padding:15px; }
+  .deal>.price { grid-column:2;grid-row:1;text-align:left; }
+  .deal>div:nth-child(2) { grid-column:2;grid-row:2; }
+  .heading-row { align-items:center;gap:12px; }
+  .heading-row>div { min-width:0; }
+  .heading-row>button { padding:8px 10px; }
+  .local-label,#categories,#groups { display:none; }
+  main { padding:16px 14px; }
+  h1 { font-size:22px; }
+  .compact-category { display:flex;align-items:center;gap:12px;margin-bottom:18px;font-size:12px;color:var(--muted); }
+  .compact-category select { flex:1;font-size:16px;min-width:0; }
+  #group-menu { display:grid;gap:4px;flex:1;min-width:180px;font-size:12px;color:var(--muted); }
+  #group-menu select { font-size:16px; }
+  .toolbar { margin-top:16px;gap:10px;align-items:flex-end; }
+  .view-switch { gap:6px; }
+  .view-switch button { padding:8px;font-size:12px; }
+  .held-row { flex-direction:column;gap:8px; }
+  .held-row .price { text-align:left; }
+  button { min-height:42px; }
+}
