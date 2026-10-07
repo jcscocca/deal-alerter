@@ -26,8 +26,19 @@
     <div class="heading-row"><div><h1 id="heading">Desktops worth a closer look</h1><p id="purpose" class="muted">RTX 5080/5090 · reuse your 64GB kit · aim for 96–128GB</p></div><button id="refresh" class="primary">Check now</button></div>
     <div id="status" class="status" role="status" aria-live="polite">Loading saved research…</div>
     <div id="notice" role="alert" hidden></div>
-    <label class="source-filter" for="source-select">Source <select id="source-select"><option value="all">All sources</option></select></label>
-    <div class="toolbar"><div id="groups" aria-label="Comparable configurations"></div><label id="group-menu" for="group-select">Configuration<select id="group-select"></select></label><div class="view-switch" aria-label="View"><button id="list-view" aria-pressed="true">Ranked shortlist</button><button id="compare-view" aria-pressed="false">Compare <span id="compare-count">0</span>/3</button></div></div>
+    <section id="filters" aria-label="Filter products">
+      <div class="filter-heading"><strong>Filter products</strong><button id="reset-filters" type="button" disabled>Clear filters</button></div>
+      <div class="filter-grid">
+        <label for="gpu-select">GPU<select id="gpu-select" data-facet="gpu"><option value="">All GPUs</option></select></label>
+        <label for="ram-select">RAM<select id="ram-select" data-facet="ram"><option value="">All RAM capacities</option></select></label>
+        <label for="cpu-select">CPU<select id="cpu-select" data-facet="cpu"><option value="">All CPUs</option></select></label>
+        <label for="storage-select">Storage<select id="storage-select" data-facet="storage"><option value="">All storage</option></select></label>
+        <label for="condition-select">Condition<select id="condition-select" data-facet="condition"><option value="">All conditions</option></select></label>
+        <label for="source-select">Source<select id="source-select"><option value="all">All sources</option></select></label>
+      </div>
+      <p id="filter-summary" class="small muted" role="status" aria-live="polite">Choose any combination. All configurations are shown by default.</p>
+    </section>
+    <div class="toolbar"><div class="view-switch" aria-label="View"><button id="list-view" aria-pressed="true">Ranked shortlist</button><button id="compare-view" aria-pressed="false">Compare <span id="compare-count">0</span>/3</button></div></div>
     <p id="ranking-note" class="small muted"></p>
     <section id="ranked" aria-label="Ranked candidates"></section>
     <section id="comparison" aria-label="Compare finalists" hidden></section>

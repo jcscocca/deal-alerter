@@ -46,6 +46,23 @@ def test_documented_layout_ranks_before_unverified_not_claiming_compatibility(tm
     assert rows[0]["id"] == "2" and "unverified" in rows[0]["fit_summary"]
 
 
+def test_independent_facets_span_ranked_groups_and_held_offers(tmp_path):
+    save(tmp_path, [
+        product("1", title="Desktop RTX 5090 32GB DDR5 1TB SSD"),
+        product("2", title="Desktop RTX 5090 64GB DDR5 2TB SSD", condition="Used",
+                memory_fit={"eligible": True, "installed_gb": 64, "status": "NEEDS SPECS"}),
+        product("3", title="Desktop RTX 5090 32GB DDR5 1TB SSD", shipping=None),
+        product("4"),
+    ])
+    result = snapshot(tmp_path, "desktop-memory", now=NOW)
+    rows = [row for group in result["groups"] for row in group["rows"]] + result["held"]
+    matching = [row for row in rows if row["facets"]["gpu"] == "RTX 5090"]
+    assert {row["id"] for row in matching} == {"1", "2", "3"}
+    assert {row["facets"]["ram"] for row in matching} == {"32GB", "64GB"}
+    assert {row["facets"]["condition"] for row in matching} == {"New", "Used"}
+    assert {row["id"] for row in result["held"]} == {"3"}
+
+
 def test_cpu_display_reparses_old_truncated_comparison_keys(tmp_path):
     save(tmp_path,[product(title="Gaming PC RTX 5080 Ultra 5 250KF Plus 32GB DDR5 1TB SSD")])
     row = snapshot(tmp_path,"desktop-memory",now=NOW)["groups"][0]["rows"][0]

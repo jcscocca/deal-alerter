@@ -92,6 +92,17 @@ shutdown also leaves its previous snapshot outside the current ranking.
 
 ## How the dashboard ranks
 
+- Use independent **GPU**, **RAM**, **CPU**, **Storage**, **Condition**, and
+  **Source** filters. For example, GPU **RTX 5090** includes every matching RAM
+  capacity and condition; adding **64GB** narrows that selection. All matching
+  ranking groups appear together, with their original group ranks. The same
+  filters apply to held offers and combined publisher cards. Counts include all
+  three sections; source counts can overlap on cards with multiple publishers.
+  **Clear filters** restores all configurations. Selections survive automatic
+  result updates, including zero matches, and reset when changing category.
+  Missing or ambiguous specs appear as **Not established**; GPU VRAM is not
+  system RAM. These listing attributes do not establish compatibility or stock.
+  Saved comparisons remain visible regardless of filters.
 - Main rankings require availability from a recent retailer check,
   a positive price, known shipping, seller and condition, and a snapshot no older
   than 15 minutes for Walmart. Monitor freshness follows its collection interval

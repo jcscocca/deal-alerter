@@ -19,6 +19,7 @@ from alerters.hardware.prebuilt import gpu_model
 from .research import PRESETS, capacity_mismatch, cpu_model
 from .monitor_bridge import read_monitor
 from .deal_overlap import combine_leads
+from .facets import attributes
 
 FRESH_SECONDS = 15 * 60
 ASSETS = Path(__file__).with_name("web")
@@ -178,6 +179,8 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
         result["groups"].append({"name": name, "rows": candidates})
     result["report_count"] = len(result["leads"])
     result["leads"] = combine_leads(result["leads"])
+    for row in [r for group in result["groups"] for r in group["rows"]] + result["held"] + result["leads"]:
+        row["facets"] = attributes(row)
     result["overlap_count"] = result["report_count"] - len(result["leads"])
     result["count"] = len(rows) - result["overlap_count"]
     if monitor["sources"] or deal_feeds is not None:
