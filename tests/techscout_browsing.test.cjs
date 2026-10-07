@@ -27,7 +27,7 @@ test('5090 spans RAM capacities, while alternatives relax only one known specifi
   const result=B.partition([exact,row('near'),double,unknown],[],prefs,'desktop-memory',now);
   assert.deepEqual(result.current.map(r=>r.id),['exact']);
   assert.deepEqual(result.similar.map(r=>r.id),['near']);
-  assert.deepEqual(result.similar[0].differences,['RAM: 64GB instead of 96GB']);
+  assert.deepEqual(result.similar[0].differences,['Includes 64GB of system RAM']);
   assert.deepEqual(prefs.filters,{gpu:'RTX 5090',ram:'96GB'});
 });
 test('budget and source are hard constraints even for outside-category alternatives',()=>{
@@ -78,4 +78,17 @@ test('new finds use first sighting, not a repeated check, and exclude unknown or
     row('old',{first_seen:new Date((now-90000)*1000).toISOString()}),
     row('future',{first_seen:new Date((now+1)*1000).toISOString()}),row('unknown')];
   assert.deepEqual(B.partition(rows,[],{...B.defaults(),quality:'new'},'monitor',now).current.map(r=>r.id),['new']);
+});
+
+test('RAM reuse separates included capacity, potential total and missing compatibility evidence',()=>{
+  const pc=row('pc',{facets:{kind:'Desktops',ram:'32GB'},fit:'NEEDS SPECS'});
+  assert.equal(B.ramReuse(pc).total,'32GB included + your 64GB kit = 96GB potential.');
+  assert.match(B.ramReuse(pc).check,/Compatibility unconfirmed/);
+  const blocked=B.ramReuse({...pc,fit:'NO REUSE PATH',fit_summary:'DDR4 board cannot accept your DDR5 kit.'});
+  assert.match(blocked.total,/blocked/);
+  assert.match(blocked.check,/DDR4/);
+  assert.doesNotMatch(blocked.total,/96GB potential/);
+  const outside=B.ramReuse({...pc,fit:'OUTSIDE REUSE WATCH'});
+  assert.match(outside.check,/has not been established/);
+  assert.equal(B.ramReuse({...pc,facets:{kind:'Memory',ram:'32GB'}}),null);
 });
