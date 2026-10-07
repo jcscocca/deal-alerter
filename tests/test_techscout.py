@@ -53,11 +53,11 @@ def product(item_id="123", **changes):
 
 def test_signature_and_sanitized_audit(credentials):
     session, events = Session([Response({"items": [product()]})]), []
-    client = WalmartClient(credentials, "98104", session=session, audit=events.append, clock=lambda: 123.456)
+    client = WalmartClient(credentials, "94105", session=session, audit=events.append, clock=lambda: 123.456)
     assert client.lookup(["123"])[0]["itemId"] == "123"
     url, args = session.calls[0]
     assert url.endswith("/product/v2/items")
-    assert args["params"] == {"ids": "123", "zipCode": "98104"}
+    assert args["params"] == {"ids": "123", "zipCode": "94105"}
     headers = args["headers"]
     credentials.private_key.public_key().verify(base64.b64decode(headers["WM_SEC.AUTH_SIGNATURE"]),
         f"{credentials.consumer_id}\n123456\n1\n".encode(), padding.PKCS1v15(), hashes.SHA256())
@@ -70,7 +70,7 @@ def test_signature_and_sanitized_audit(credentials):
 @pytest.mark.parametrize("status", [301, 401, 403, 429, 500])
 def test_errors_do_not_retry_or_expose_bodies(credentials, status):
     session = Session([Response({"secret": "DO NOT PRINT"}, status)])
-    client = WalmartClient(credentials, "98104", session=session)
+    client = WalmartClient(credentials, "94105", session=session)
     with pytest.raises(WalmartError, match=f"HTTP {status}") as error:
         client.lookup([123])
     assert "DO NOT PRINT" not in str(error.value)
@@ -83,14 +83,14 @@ def test_errors_do_not_retry_or_expose_bodies(credentials, status):
 
 def test_cache_and_request_budget(credentials):
     session = Session([Response({"items": [product()]})])
-    client = WalmartClient(credentials, "98104", session=session, max_requests=1)
+    client = WalmartClient(credentials, "94105", session=session, max_requests=1)
     assert client.lookup([123]) == client.lookup([123, 123])
     with pytest.raises(WalmartError, match="limit"):
         client.search("tablet")
     assert len(session.calls) == 1
 
 
-@pytest.mark.parametrize("value", [None, 98104, "", "9810", "98104-1234", "98104&storeId=1"])
+@pytest.mark.parametrize("value", [None, 94105, "", "9810", "94105-1234", "94105&storeId=1"])
 def test_explicit_zip_required(value):
     with pytest.raises(ValueError):
         validate_zip(value)
@@ -108,7 +108,7 @@ def test_malformed_products_not_treated_as_empty(data):
 
 
 def test_lookup_rejects_unrequested_item(credentials):
-    client = WalmartClient(credentials, "98104", session=Session([Response({"items": [product("456")]})]))
+    client = WalmartClient(credentials, "94105", session=Session([Response({"items": [product("456")]})]))
     with pytest.raises(WalmartError, match="unrequested"):
         client.lookup([123])
 
@@ -129,7 +129,7 @@ def test_load_protected_metadata_contract(tmp_path, credentials):
 
 
 class FakeClient:
-    zip_code = "98104"
+    zip_code = "94105"
     stopped = False
 
     def __init__(self, rows, discovery=None):
@@ -171,11 +171,11 @@ def test_search_price_never_used_when_localized_lookup_missing():
 def test_search_is_discovery_then_zip_localized_lookup(credentials):
     session = Session([Response({"items": [product(salePrice=1)], "totalResults": 999}),
                        Response({"items": [product(salePrice=2000)]})])
-    client = WalmartClient(credentials, "98104", session=session)
+    client = WalmartClient(credentials, "94105", session=session)
     result = research(client, queries=["desktop"], seeds=[])
     assert result.products[0].price == 2000
     assert "zipCode" not in session.calls[0][1]["params"]
-    assert session.calls[1][1]["params"]["zipCode"] == "98104"
+    assert session.calls[1][1]["params"]["zipCode"] == "94105"
     assert result.coverage[0]["total"] == 999
 
 
@@ -209,6 +209,11 @@ def test_vram_is_not_system_ram():
     assert fit["installed_gb"] is None and fit["potential_gb"] is None
 
 
+def test_unknown_memory_generation_not_averaged_with_ddr5():
+    result = run([product("1"), product("2", name="Gaming PC RTX 5080 9800X3D 32GB RAM 1TB SSD")])
+    assert result.averages() == []
+
+
 def test_conflicting_ram_attributes_require_review():
     fit = run([product(attributes={"ramMemory": "32GB DDR5", "ramMemorySize": "64GB"})]).products[0].memory_fit
     assert fit["status"] == "NEEDS SPECS" and fit["installed_gb"] is None
@@ -236,7 +241,7 @@ def test_malformed_credential_metadata_is_sanitized(tmp_path):
 
 def test_http_auth_failure_stops_entire_research(credentials):
     session = Session([Response({"error": "denied"}, 403)])
-    result = research(WalmartClient(credentials, "98104", session=session))
+    result = research(WalmartClient(credentials, "94105", session=session))
     assert len(session.calls) == 1 and not result.products
     assert "403" in result.problems[0]
 
@@ -244,7 +249,7 @@ def test_http_auth_failure_stops_entire_research(credentials):
 def test_oversized_response_is_rejected(credentials, monkeypatch):
     from alerters.techscout import walmart
     monkeypatch.setattr(walmart, "MAX_RESPONSE", 10)
-    client = WalmartClient(credentials, "98104", session=Session([Response(product())]))
+    client = WalmartClient(credentials, "94105", session=Session([Response(product())]))
     with pytest.raises(WalmartError, match="size limit"):
         client.lookup([123])
 
@@ -293,7 +298,7 @@ def test_invalid_plans_make_no_calls(kwargs):
 
 def test_cli_creates_local_snapshot_without_notifications(tmp_path, monkeypatch, credentials):
     settings = tmp_path / "settings.json"
-    settings.write_text(json.dumps({"walmart": {"zip_code": "98104", "credential_file": "fake.json"}}))
+    settings.write_text(json.dumps({"walmart": {"zip_code": "94105", "credential_file": "fake.json"}}))
     session = Session([Response({"items": [product()]}), Response({"items": [product()]})])
     monkeypatch.setattr(cli.Credentials, "load", lambda _: credentials)
     monkeypatch.setattr(cli, "WalmartClient", lambda cred, zipcode, audit: WalmartClient(cred, zipcode, audit=audit, session=session))

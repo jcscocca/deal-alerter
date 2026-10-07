@@ -124,7 +124,9 @@ def normalize(row: dict, queries: list[str], category: str, profile: DesktopProf
             product.memory_fit = asdict(fit)
             # Keep off-plan configurations visible with their rejection reason.
             product.warnings.append(fit.summary)
-            if fit.eligible and fit.installed_gb in (32, 64):
+            memory_type = " ".join([title, *(specs.get(key, "") for key in
+                                           ("RAM", "Memory Type", "Memory Size", "System Memory"))])
+            if fit.eligible and fit.installed_gb in (32, 64) and re.search(r"\bDDR5\b", memory_type, re.I):
                 # Require an exact CPU and one stated SSD capacity for build cohorts.
                 cpu = re.findall(r"\b(?:[1-9]\d{3}X3D|[1-9]\d{3}[XF]|i[3579]-\d{4,5}[A-Z]{0,3}|(?:Ultra\s+[579]\s+)\d{3}[A-Z]{0,2})\b", title, re.I)
                 storage = re.findall(r"\b(\d+(?:\.\d+)?)\s*(TB|GB)\s*(?:Gen[345]\s+)?(?:NVMe\s+)?SSD\b", title, re.I)
@@ -132,7 +134,7 @@ def normalize(row: dict, queries: list[str], category: str, profile: DesktopProf
                     amount, unit = storage[0]
                     capacity = float(amount) * (1000 if unit.upper() == "TB" else 1)
                     product.comparison_key = ("desktop", f"RTX {gpu_model(title)}", cpu[0].upper(),
-                                              f"{fit.installed_gb}GB RAM", f"{capacity:g}GB SSD",
+                                              f"{fit.installed_gb}GB DDR5 RAM", f"{capacity:g}GB SSD",
                                               product.condition.lower())
         else:
             return None

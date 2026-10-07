@@ -51,7 +51,7 @@ The credential metadata file references a local RSA PEM key of at least 2048 bit
 Relative paths resolve beside their containing JSON file. Restrict access to the
 credential directory using OS permissions. Register the corresponding public key
 with Walmart; do not paste or upload the private key. The existing local TechScout
-setup on this ThinkPad already supplies the production credential and ZIP 98104.
+setup on this ThinkPad already supplies the production credential and selected ZIP.
 
 ## Choose a shopping task
 
@@ -105,8 +105,8 @@ that the entire catalog has been searched.
   can match a parent listing while lookup selects a different storage variant;
   explicit capacity mismatches are flagged and excluded from averages.
 - Averages need at least two distinct, available offers with identified sellers,
-  conditions and positive prices. Desktop cohorts match CPU, GPU, installed RAM
-  capacity and SSD capacity; other components can differ. Other products require
+  conditions and positive prices. Desktop cohorts match CPU, GPU, installed DDR5
+  RAM capacity and SSD capacity; other components can differ. Other products require
   matching model, title, condition and returned attributes. These are selected
   sample means of current item prices before shipping/tax, not market averages
   or historical price baselines. Sparse or ambiguous specifications produce no
