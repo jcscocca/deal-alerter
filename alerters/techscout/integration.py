@@ -30,7 +30,9 @@ def text(value, limit=1200):
 
 
 def price(value):
-    return value if type(value) in (int, float) and math.isfinite(value) and 0 <= value < 1_000_000 else None
+    # Announcement receipts use zero as an unknown-price sentinel. Retained
+    # events must not present that bookkeeping value as a free product.
+    return value if type(value) in (int, float) and math.isfinite(value) and 0 < value < 1_000_000 else None
 
 
 def judgment(raw):

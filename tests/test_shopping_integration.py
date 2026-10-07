@@ -78,3 +78,17 @@ def test_activity_retains_sent_receipt_without_duplicates_and_rejects_bad_links(
 def test_judgment_projection_does_not_expose_arbitrary_fields():
     row = judgment({"verdict": "GOOD", "secret": "never", "reason": "Evidence", "eligible": False})
     assert row["reason"] == "Evidence" and row["eligible"] is False and "secret" not in row
+
+
+def test_unpriced_announcement_receipt_is_not_a_free_product(tmp_path):
+    exporter = ShoppingExport(tmp_path)
+    exporter.record_activity({"announcement": {
+        "id": "slickdeals:" + "b" * 24, "source": "slickdeals",
+        "title": "Desktop announcement", "url": "https://slickdeals.net/f/123-example",
+        "verdict": "GOOD", "price": None, "decisions": [],
+        "deliveries": [{"channel": "ntfy", "at": "2026-10-07T01:00:00+00:00", "price": 0}],
+    }})
+    # The original receipt remains intact; only its public price is unknown.
+    restarted = ShoppingExport(tmp_path)
+    assert len(restarted.events) == 1
+    assert activity(tmp_path)[0]["price"] is None
