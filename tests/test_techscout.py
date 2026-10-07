@@ -214,6 +214,13 @@ def test_unknown_memory_generation_not_averaged_with_ddr5():
     assert result.averages() == []
 
 
+def test_cpu_plus_suffix_keeps_different_models_out_of_same_average():
+    result = run([product("1", name="Gaming PC RTX 5080 Core Ultra 5 250KF Plus 32GB DDR5 1TB SSD"),
+                  product("2", name="Gaming PC RTX 5080 Core Ultra 5 250KF 32GB DDR5 1TB SSD")])
+    assert result.products[0].comparison_key[2] == "ULTRA 5 250KF PLUS"
+    assert result.averages() == []
+
+
 def test_conflicting_ram_attributes_require_review():
     fit = run([product(attributes={"ramMemory": "32GB DDR5", "ramMemorySize": "64GB"})]).products[0].memory_fit
     assert fit["status"] == "NEEDS SPECS" and fit["installed_gb"] is None

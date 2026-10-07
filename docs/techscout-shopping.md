@@ -5,6 +5,55 @@ compares RTX 5080/5090 desktops and assesses reuse of the owned Corsair 64GB DDR
 kit. The same product cards support tablets, other computers, memory, monitors,
 docks and other tech supplies through selectable searches.
 
+The local dashboard adds a ranked shortlist, saved finalists and a side-by-side
+comparison view. Start it from the repository's virtual environment:
+
+```powershell
+python -m alerters.techscout --serve
+```
+
+Open [TechScout on this computer](http://127.0.0.1:8768/). Keep the process running
+while using the page; Ctrl+C stops it. After restarting the computer, run the
+command again. `--port` selects another local port. No account or public hosting
+is needed, and the page is not accessible from another computer or phone.
+
+The page initially reads saved reports. **Check now** runs only the selected
+category's preset searches (10 results per search), then replaces its snapshot.
+Opening the page, changing categories and checking refresh progress do not make
+Walmart calls. Custom CLI searches remain available through the commands below;
+the dashboard button always uses presets. One check runs at a time, with a
+30-second pause between starts. Failed checks are recorded locally and do not
+make an older snapshot look newly available. A check interrupted by server
+shutdown also leaves its previous snapshot outside the current ranking.
+
+## How the dashboard ranks
+
+- Main rankings require availability confirmed by the last localized lookup,
+  a positive price, known shipping, seller and condition, and a snapshot no older
+  than 15 minutes. Expired results move outside the ranking even if the page is
+  left open; only a manual check retrieves new Walmart data.
+- Desktop rankings are separate for each GPU, factory RAM capacity and condition.
+  Configurations must remain eligible under the owned-memory profile. Documented
+  physical RAM layouts rank first; within each evidence level, lower price plus
+  shipping ranks first. CPU, storage, motherboard, warranty and seller can differ.
+  “Why this rank?” explains the rule; it does not claim benchmark superiority or
+  a historical discount. Mixed-kit compatibility still needs verification.
+- Other categories show price order within condition, with an explicit warning
+  that unlike models are not equivalent in performance or value. Known tablet
+  storage mismatches are held for verification.
+- Missing details, unavailable items and stale offers remain in **Outside the
+  ranking**. They can be saved for comparison, with their warnings preserved.
+- Save up to three finalists in the browser. Only their product IDs are stored
+  in local storage. If a saved ID disappears from the current results, the page
+  reports it as missing instead of displaying an old price.
+
+The server binds only to `127.0.0.1`. It serves a fixed set of assets and a public
+shopping-field projection, never arbitrary files or credential metadata. Refresh
+requires the local page's token and matching origin; mismatched Host headers are
+rejected. `dashboard-last-check.json` contains only the latest per-category check
+status and time, with no prices or authentication data. Keep credentials in the
+existing protected directory. The local server does not start at Windows login.
+
 This is independent of the installed alert monitor: it creates no tasks, sends
 no notifications, and writes no price history or monitor state. It does not read
 `.env` or `secrets.env`. The reports contain current API evidence, not fabricated
@@ -120,7 +169,7 @@ that the entire catalog has been searched.
 ## Validation
 
 ```powershell
-python -m pytest -q tests/test_techscout.py
+python -m pytest -q tests/test_techscout.py tests/test_techscout_dashboard.py
 ```
 
 Tests use generated test keys and fake API sessions, with no real credentials or

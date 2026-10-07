@@ -144,7 +144,9 @@ Other direct retailers were investigated on 2026-09-28:
   [TechScout shopping research](docs/techscout-shopping.md) now provides on-demand
   desktop/memory, tablet, computer and tech-supply reports. It uses localized
   product lookups after search discovery and remains separate from the alert
-  monitor. API access does not establish approval of every downstream use.
+  monitor. Run `python -m alerters.techscout --serve` for the local ranked shortlist
+  and comparison dashboard, with manual availability checks. API access does not
+  establish approval of every downstream use.
 
 Community sources remain useful for discovery and advance sale notices.
 

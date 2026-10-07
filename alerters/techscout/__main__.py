@@ -27,7 +27,22 @@ def main(argv=None) -> int:
     parser.add_argument("--settings", type=Path, default=local_directory() / "settings.json")
     parser.add_argument("--zip-code", help="Override the ZIP in local settings")
     parser.add_argument("--output", type=Path, default=local_directory() / "reports")
+    parser.add_argument("--serve", action="store_true", help="Open the local dashboard server; API calls require Check now")
+    parser.add_argument("--port", type=int, default=8768, help="Local dashboard port (default 8768)")
     args = parser.parse_args(argv)
+    if args.serve:
+        from .dashboard import serve
+        def refresh(category):
+            request = ["--category", category, "--settings", str(args.settings), "--output", str(args.output)]
+            if args.zip_code:
+                request += ["--zip-code", args.zip_code]
+            return main(request)
+        try:
+            serve(args.output, refresh, args.port)
+            return 0
+        except (OSError, ValueError):
+            print("Cannot start the local dashboard. Check the port and output permissions.", file=sys.stderr)
+            return 2
     try:
         settings = json.loads(args.settings.read_text(encoding="utf-8-sig"))["walmart"]
         zip_code = validate_zip(args.zip_code or settings["zip_code"])
