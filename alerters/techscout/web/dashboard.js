@@ -5,7 +5,9 @@
   const dollars = value => value == null ? 'Unknown' : new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value);
   const token = document.querySelector('meta[name="techscout-token"]').content;
   const categoryNames = {'desktop-memory':'Desktops & memory',tablets:'Tablets',computers:'Computers',supplies:'Tech supplies',memory:'Memory',amazon:'Amazon deals',monitor:'All deals'};
-  let category = 'desktop-memory', group = '', view = 'list', state = null, pending = false, poll = null, source = 'all';
+  const facetNames = {gpu:'All GPUs',ram:'All RAM capacities',cpu:'All CPUs',storage:'All storage',condition:'All conditions'};
+  let filters = {};
+  let category = 'desktop-memory', view = 'list', state = null, pending = false, poll = null, source = 'all';
   let picks = new Set();
   let expandedReports = new Set();
   try { const saved = JSON.parse(localStorage.getItem('techscout-shortlist') || '[]'); if (Array.isArray(saved)) picks = new Set(saved.filter(s => typeof s === 'string' && /^(?:\d{1,20}|[a-z-]+:[a-f0-9]{24})$/.test(s)).slice(0,3)); } catch (_) {}
@@ -15,7 +17,39 @@
   function rowFresh(row) { return Number.isFinite(row.expires_at) && Date.now()/1000 <= row.expires_at; }
   function date(value) { return value ? new Date(value).toLocaleString([], {dateStyle:'medium',timeStyle:'short'}) : 'No successful check'; }
   function hasSource(row, value) { return row.source === value || (row.sources || []).includes(value); }
-  function matches(row) { return source === 'all' || hasSource(row,source); }
+  function facetValue(row, key) { return row.facets?.[key] || 'Not established'; }
+  function matches(row, except = '') {
+    return (except === 'source' || source === 'all' || hasSource(row,source)) &&
+      Object.keys(facetNames).every(key=>key === except || !filters[key] || facetValue(row,key) === filters[key]);
+  }
+  function hasFilters() { return source !== 'all' || Object.values(filters).some(Boolean); }
+  function resetFilters() { filters={};source='all';render(); }
+  function renderFilters() {
+    const rows = allRows();
+    for (const [key, label] of Object.entries(facetNames)) {
+      // Count with the other filters applied; keep zero-result selections across
+      // polling so missing offers never silently broaden the user's request.
+      const candidates = rows.filter(row=>matches(row,key));
+      const values = [...new Set(rows.map(row=>facetValue(row,key)).concat(filters[key] || []))];
+      values.sort((a,b)=>(a==='Not established')-(b==='Not established') || a.localeCompare(b,undefined,{numeric:true}));
+      el(`${key}-select`).innerHTML = `<option value="">${label} · ${candidates.length}</option>` + values.map(value=>{
+        const count = candidates.filter(row=>facetValue(row,key)===value).length;
+        return `<option value="${escape(value)}" ${filters[key]===value ? 'selected' : ''} ${!count && filters[key]!==value ? 'disabled' : ''}>${escape(value)} · ${count}</option>`;
+      }).join('');
+    }
+    const candidates = rows.filter(row=>matches(row,'source'));
+    const options = state.snapshot.sources.filter(s=>rows.some(r=>hasSource(r,s.source)) || s.source===source);
+    if (source !== 'all' && !options.some(s=>s.source===source)) options.push({source,label:source});
+    el('source-select').innerHTML = `<option value="all">All sources · ${candidates.length}</option>` + options.map(s=>{
+      const count = candidates.filter(row=>hasSource(row,s.source)).length;
+      return `<option value="${escape(s.source)}" ${source===s.source ? 'selected' : ''} ${!count && source!==s.source ? 'disabled' : ''}>${escape(s.label)} · ${count}</option>`;
+    }).join('');
+    el('reset-filters').disabled = !hasFilters();
+    const count = rows.filter(row=>matches(row)).length;
+    const selected = Object.values(filters).filter(Boolean);
+    if (source !== 'all') selected.push(options.find(s=>s.source===source).label);
+    el('filter-summary').textContent = view === 'compare' ? 'Filters apply to the shortlist and reported deals. Saved comparisons stay visible.' : `${count} of ${rows.length} products match · ${selected.length ? selected.join(' · ') : 'All configurations shown'}. Counts include held offers and reported deals.`;
+  }
   function price(row) {
     if (row.reported_prices?.length > 1) return `${dollars(row.reported_prices[0])}–${dollars(row.reported_prices.at(-1))}<small>reported prices differ · see source reports</small>`;
     return row.total != null ? `${dollars(row.total)}<small>${escape(row.cost_note || 'price + shipping · before tax')}</small>` : `${dollars(row.price)}<small>${row.lead ? 'publisher-quoted price · unverified' : 'item price · shipping unknown'}</small>`;
@@ -36,8 +70,7 @@
     // Preserve saved choices when their individual reports become one shared card.
     const remapped = new Set([...picks].map(id=>allRows().find(r=>(r.aliases || []).includes(id))?.id || id));
     if ([...picks].some(id=>!remapped.has(id))) { picks=remapped;remember(); }
-    const options = data.sources.filter(s=>allRows().some(r=>hasSource(r,s.source)));
-    if (!options.some(s=>s.source===source)) source='all';
+    renderFilters();
     const recent = data.groups.flatMap(g=>g.rows).filter(r=>rowFresh(r)&&matches(r)).length;
     el('status').innerHTML = `<span class="badge ${recent ? '' : 'warning'}">${recent} ranked offers</span><span>${allRows().filter(matches).length} products & leads in this view</span>${data.zip_code ? `<span>· Walmart ZIP ${escape(data.zip_code)}</span>` : ''}`;
     if (category === 'amazon') el('status').innerHTML = `<span class="badge">${allRows().filter(matches).length} product cards</span><span>Published deal leads · prices unverified</span>`;
@@ -46,7 +79,6 @@
     if (state.running) el('status').innerHTML += `<span class="badge">Checking Walmart ${escape(categoryNames[state.running])}…</span>`;
     el('refresh').disabled = pending || Boolean(state.running);
     el('refresh').textContent = ['monitor','amazon'].includes(category) ? 'Reload results' : state.running ? 'Checking Walmart…' : 'Check Walmart now';
-    el('source-select').innerHTML = '<option value="all">All sources</option>' + options.map(s=>`<option value="${escape(s.source)}" ${source===s.source ? 'selected' : ''}>${escape(s.label)}</option>`).join('');
     el('source-health').innerHTML = data.sources.map(s=>`<div class="source-card"><strong>${escape(s.label)}</strong><span class="badge ${s.ready ? '' : 'warning'}">${s.ready ? `${s.ready}/${s.jobs} checks current` : s.jobs ? 'Waiting / unavailable' : 'Not enabled'}</span><div class="small muted">${escape(date(s.checked_at))} · ${s.count} products/leads${s.truncated ? ' · result cap reached' : ''}</div></div>`).join('') || '<p class="fit">Monitor export unavailable. Update the installed monitor to connect its results.</p>';
     const heading = category === 'amazon' ? 'Amazon deals, sources combined' : category === 'monitor' ? 'Deals across your sources' : category === 'desktop-memory' ? 'Desktops worth a closer look' : `${categoryNames[category]} worth a closer look`;
     el('heading').textContent = heading;
@@ -54,12 +86,9 @@
     el('ranking-note').textContent = category === 'amazon' ? 'Matches use exact Amazon product IDs or exact product names and retailer. Different prices, dates and coupon requirements remain visible in source reports. Confirm the final offer at Amazon.' : category === 'desktop-memory' ? 'Within each GPU/RAM group: documented layout first, then known total. CPU and storage can differ.' : 'Ordered by known total within condition. This is price order, not a performance or value ranking across different models.';
     el('list-view').textContent = category === 'amazon' ? 'Reported deals' : 'Ranked shortlist';
     const groups = data.groups.map(g=>({...g,rows:g.rows.filter(r=>rowFresh(r)&&matches(r))})).filter(g=>g.rows.length);
-    if (!groups.some(g => g.name === group)) group = groups[0]?.name || '';
-    el('groups').innerHTML = groups.map(g=>`<button data-group="${escape(g.name)}" aria-pressed="${g.name === group}">${escape(g.name)} · ${g.rows.length}</button>`).join('');
-    el('group-select').innerHTML = groups.map(g=>`<option value="${escape(g.name)}" ${g.name === group ? 'selected' : ''}>${escape(g.name)} · ${g.rows.length}</option>`).join('');
-    el('group-menu').hidden = !groups.length || view !== 'list';
-    const rows = groups.find(g => g.name === group)?.rows || [];
-    el('ranked').innerHTML = rows.length ? rows.map(rowCard).join('') : `<div class="empty">No current offers meet this view’s ranking requirements. See held offers, community leads, and source coverage below.</div>`;
+    const noMatches = !allRows().some(row=>matches(row));
+    const empty = noMatches && hasFilters() ? 'No products match these filters. Clear a filter to broaden the results.' : 'No current offers meet this view’s ranking requirements. See held offers, reported deals, and source coverage below.';
+    el('ranked').innerHTML = groups.length ? groups.map(g=>`<section class="rank-group" aria-label="${escape(g.name)}"><h2>${escape(g.name)} · ${g.rows.length} offer${g.rows.length===1 ? '' : 's'}</h2>${g.rows.map(rowCard).join('')}</section>`).join('') : `<div class="empty">${empty}${hasFilters() ? ' <button data-reset-filters>Clear filters</button>' : ''}</div>`;
     const held = [...data.held,...data.groups.flatMap(g=>g.rows).filter(r=>!rowFresh(r))].filter(matches);
     el('held-count').textContent = `· ${held.length}`;
     el('held').innerHTML = held.map(row=>`<article class="held-row"><div><h3 class="deal-title">${escape(row.title)}</h3><p class="small muted">${escape(row.retailer)} · ${escape(row.seller)} · ${escape(row.condition)}<br>Checked ${escape(date(row.checked_at))}</p><p class="fit">${escape(row.reasons.length ? row.reasons.join(' · ') : 'Availability needs a new check')}</p><div class="actions">${selectButton(row)}${link(row)}</div></div><div class="price">${price(row)}</div></article>`).join('') || '<p class="muted">No held offers.</p>';
@@ -72,14 +101,14 @@
     }).join('') : '<div class="empty">Choose up to three products with “Save & compare.” Saved choices persist in this browser.</div>';
     if (picks.size > selected.length) el('comparison').innerHTML += '<div class="empty">Some saved products are outside this category or no longer in the latest results. <button id="clear-picks">Clear saved choices</button></div>';
     el('ranked').hidden = view !== 'list' || category === 'amazon';
-    el('groups').hidden = view !== 'list';
     el('comparison').hidden = view !== 'compare';
     el('list-view').setAttribute('aria-pressed',String(view === 'list'));
     el('compare-view').setAttribute('aria-pressed',String(view === 'compare'));
     const leads = (data.leads || []).filter(matches);
     el('leads-count').textContent = `· ${leads.length}`;
-    el('leads-section').hidden = !leads.length || category === 'amazon' && view !== 'list';
+    el('leads-section').hidden = (!leads.length && category !== 'amazon') || category === 'amazon' && view !== 'list';
     el('leads').innerHTML = leads.map(row=>`<article class="held-row"><div class="lead-content"><h3>${escape(row.product_name || row.title)}</h3><p class="small muted">${escape(row.retailer)} · Found via ${escape([...new Set((row.reports || []).map(r=>r.retailer))].join(', ') || row.retailer)}</p><p class="fit">${escape(row.reasons.join(' · '))}${!rowFresh(row) ? ' · Needs a new source check' : ''}</p><div class="actions">${selectButton(row)}${link(row)}</div>${reports(row)}</div><div class="price">${price(row)}</div></article>`).join('');
+    if (!leads.length) el('leads').innerHTML = `<div class="empty">${hasFilters() ? 'No reported deals match these filters. <button data-reset-filters>Clear filters</button>' : 'No reported deals in this category yet.'}</div>`;
     const coverage = data.coverage.map(c=>`<div class="coverage-item">Walmart ${escape(c.query)}: ${escape(c.returned)} of ${escape(c.total ?? 'unknown')} results inspected</div>`).join('');
     el('coverage').innerHTML = `<p class="small muted">Local results update here every 15 seconds. While this dashboard server runs, public deal feeds are checked every 15 minutes, with a bounded metadata pass on linked publisher pages. No Amazon product pages are polled and no alerts are sent. “Check Walmart now” runs only Walmart’s preset searches (up to 10 results each).</p><p class="small muted">Amazon coverage uses recent tech posts from Ben’s Bargains, DealNews and 9to5Toys. Exact product matches share a card; uncertain matches and distinct variants stay separate. Overlapping reports are discovery evidence, not independent confirmation of stock or a market average. Original publisher links and quoted descriptions are retained.</p><p class="small muted">Monitor scope: watched hardware, Newegg desktop discovery, Apple Mac mini/Studio/Pro, and the latest Slickdeals Computers page. Missing search results do not prove a product is sold out.</p>${coverage}${data.problems.map(p=>`<p class="fit">${escape(p)}</p>`).join('')}`;
 
@@ -116,13 +145,15 @@
   });
   function chooseCategory(value) {
     if (!Object.hasOwn(categoryNames,value)) return;
-    category = value; group = ''; source = 'all'; state = null; notice('');
+    category = value; filters = {}; source = 'all'; state = null; notice('');
     clearTimeout(poll);
     el('heading').textContent = categoryNames[category];
     el('purpose').textContent = 'Loading saved research…';
     el('status').textContent = 'Loading…';
-    el('groups').replaceChildren();
-    el('group-menu').hidden = true;
+    for (const [key,label] of Object.entries(facetNames)) el(`${key}-select`).innerHTML = `<option value="">${label}</option>`;
+    el('source-select').innerHTML = '<option value="all">All sources</option>';
+    el('filter-summary').textContent = 'Loading filters…';
+    el('reset-filters').disabled = true;
     el('ranked').replaceChildren();
     el('comparison').replaceChildren();
     el('coverage').replaceChildren();
@@ -141,13 +172,14 @@
     if (button) chooseCategory(button.dataset.category);
   });
   el('category-select').addEventListener('change',event=>chooseCategory(event.target.value));
-  el('source-select').addEventListener('change',event=>{source=event.target.value;group='';render();});
-  el('group-select').addEventListener('change',event=>{group=event.target.value;render();});
-  el('groups').addEventListener('click',event => { const b = event.target.closest('[data-group]'); if (b) {group=b.dataset.group;render();} });
+  el('source-select').addEventListener('change',event=>{source=event.target.value;render();});
+  for (const key of Object.keys(facetNames)) el(`${key}-select`).addEventListener('change',event=>{filters[key]=event.target.value;render();});
+  el('reset-filters').addEventListener('click',resetFilters);
   el('list-view').addEventListener('click',()=>{view='list';render();});
   el('compare-view').addEventListener('click',()=>{view='compare';render();});
   document.querySelector('main').addEventListener('click',event => {
     const button = event.target.closest('[data-pick]');
+    if (event.target.closest('[data-reset-filters]')) { resetFilters();return; }
     if (event.target.id === 'clear-picks') { picks.clear();remember();render();return; }
     if (!button) return;
     const id = button.dataset.pick;
