@@ -35,7 +35,7 @@
     if (!groups.some(g => g.name === group)) group = groups[0]?.name || '';
     el('groups').innerHTML = groups.map(g=>`<button data-group="${escape(g.name)}" aria-pressed="${g.name === group}">${escape(g.name)} · ${g.rows.length}</button>`).join('');
     const rows = groups.find(g => g.name === group)?.rows || [];
-    el('ranked').innerHTML = rows.length ? rows.map(rowCard).join('') : `<div class="empty">${data.checked_at && !current ? 'The saved offers need a new availability check before they can be ranked.' : 'No offers currently meet the ranking requirements. Check the held offers for missing details.'}</div>`;
+    el('ranked').innerHTML = rows.length ? rows.map(rowCard).join('') : `<div class="empty">${!data.checked_at ? 'Choose Check now to create this category’s first shopping report.' : !current ? 'The saved offers need a new availability check before they can be ranked.' : 'No offers currently meet the ranking requirements. Check the held offers for missing details.'}</div>`;
     const held = current ? data.held : allRows();
     el('held-count').textContent = `· ${held.length}`;
     el('held').innerHTML = held.map(row=>`<article class="held-row"><div><h3 class="deal-title">${escape(row.title)}</h3><p class="small muted">${escape(row.seller)} · ${escape(row.condition)}</p><p class="fit">${escape(row.reasons.length ? row.reasons.join(' · ') : 'Availability needs a new check')}</p><div class="actions">${selectButton(row)}${link(row)}</div></div><div class="price">${price(row)}</div></article>`).join('') || '<p class="muted">No held offers.</p>';
@@ -75,7 +75,11 @@
     try {
       const response = await fetch('/api/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-TechScout-Token':token},body:JSON.stringify({category})});
       const result = await response.json();
-      if (!response.ok) notice(result.error || 'The check could not start.');
+      if (!response.ok) {
+        await load();
+        notice(response.status === 403 ? 'The local page authorization changed. Reload this page and try again.' : result.error || 'The check could not start.');
+        return;
+      }
       await load();
     } catch (_) { notice('The check could not start. Reload the local page and try again.'); }
     finally { pending = false; render(); }
