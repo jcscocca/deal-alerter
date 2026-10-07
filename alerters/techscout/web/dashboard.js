@@ -23,13 +23,13 @@
   function render() {
     if (!state) return;
     const data = state.snapshot;
-    const recent = data.groups.flatMap(g=>g.rows).filter(rowFresh).length;
-    el('status').innerHTML = `<span class="badge ${recent ? '' : 'warning'}">${recent} ranked offers</span><span>${data.count} products & leads across connected sources</span>${data.zip_code ? `<span>· Walmart ZIP ${escape(data.zip_code)}</span>` : ''}`;
+    const options = data.sources.filter(s=>allRows().some(r=>r.source===s.source));
+    if (!options.some(s=>s.source===source)) source='all';
+    const recent = data.groups.flatMap(g=>g.rows).filter(r=>rowFresh(r)&&matches(r)).length;
+    el('status').innerHTML = `<span class="badge ${recent ? '' : 'warning'}">${recent} ranked offers</span><span>${allRows().filter(matches).length} products & leads in this view</span>${data.zip_code ? `<span>· Walmart ZIP ${escape(data.zip_code)}</span>` : ''}`;
     if (state.running) el('status').innerHTML += `<span class="badge">Checking Walmart ${escape(categoryNames[state.running])}…</span>`;
     el('refresh').disabled = pending || Boolean(state.running);
     el('refresh').textContent = category === 'monitor' ? 'Reload monitor results' : state.running ? 'Checking Walmart…' : 'Check Walmart now';
-    const options = data.sources.filter(s=>allRows().some(r=>r.source===s.source));
-    if (!options.some(s=>s.source===source)) source='all';
     el('source-select').innerHTML = '<option value="all">All sources</option>' + options.map(s=>`<option value="${escape(s.source)}" ${source===s.source ? 'selected' : ''}>${escape(s.label)}</option>`).join('');
     el('source-health').innerHTML = data.sources.map(s=>`<div class="source-card"><strong>${escape(s.label)}</strong><span class="badge ${s.ready ? '' : 'warning'}">${s.ready ? `${s.ready}/${s.jobs} checks current` : s.jobs ? 'Waiting / unavailable' : 'Not enabled'}</span><div class="small muted">${escape(date(s.checked_at))} · ${s.count} products/leads${s.truncated ? ' · result cap reached' : ''}</div></div>`).join('') || '<p class="fit">Monitor export unavailable. Update the installed monitor to connect its results.</p>';
     const heading = category === 'monitor' ? 'Deals from your running monitor' : category === 'desktop-memory' ? 'Desktops worth a closer look' : `${categoryNames[category]} worth a closer look`;
