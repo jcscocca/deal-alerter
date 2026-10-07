@@ -30,6 +30,19 @@ def failed_job(error="Network request failed"):
     return {"interval": 120, "last_success": 0, "error": error}
 
 
+def test_new_discoveries_get_their_own_initial_check_window():
+    job = {**failed_job(""), "created_at": 10_000}
+    status = {"started": 1_000, "heartbeat": 10_600, "jobs": {"new": job}}
+    assert monitor.health_problems(status, 10_600) == []
+    assert monitor.health_problems(status, 10_601) == ["new: no successful check"]
+    job["error"] = "Network request failed"
+    status["heartbeat"] = 10_001
+    assert monitor.health_problems(status, 10_001) == ["new: Network request failed"]
+    # Old schedules without a creation timestamp retain their original fallback.
+    del job["created_at"]
+    assert monitor.health_problems(status, 10_001) == ["new: no successful check"]
+
+
 def test_error_wording_and_stale_transition_do_not_repeat_an_outage(health_watchdog):
     _, clock, sent, check = health_watchdog
     jobs = {"hp-example": failed_job()}

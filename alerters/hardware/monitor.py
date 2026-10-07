@@ -76,7 +76,7 @@ def health_problems(status: dict, now: float, stale: int = 600) -> list[str]:
         problems.append("Monitor heartbeat is stale")
     for key, job in status.get("jobs", {}).items():
         limit = max(stale, job["interval"] * 3)
-        if not job.get("last_success") and now - status.get("started", 0) > limit:
+        if not job.get("last_success") and now - job.get("created_at", status.get("started", 0)) > limit:
             problems.append(f"{key}: no successful check")
         elif job.get("last_success") and now - job["last_success"] > limit:
             problems.append(f"{key}: checks stale ({job.get('error') or 'no result'})")
@@ -147,7 +147,7 @@ class Monitor:
             if key not in self.jobs and old.get("kind") in ("hp", "newegg"):
                 self.add_product(old["url"])
             if key in self.jobs:
-                for field in ("last_success", "next", "failures", "error"):
+                for field in ("created_at", "last_success", "next", "failures", "error"):
                     if field in old:
                         self.jobs[key][field] = old[field]
         # First rollout needs one snapshot of the hourly/15-minute legacy jobs.
@@ -161,7 +161,7 @@ class Monitor:
     def add_job(self, kind, interval, url=""):
         key = job_id(kind, url)
         self.jobs.setdefault(key, {"kind": kind, "url": url, "interval": interval, "next": 0,
-                                   "failures": 0, "last_success": 0, "error": ""})
+                                   "created_at": time.time(), "failures": 0, "last_success": 0, "error": ""})
         return key
 
     def add_product(self, url):
@@ -352,10 +352,11 @@ class Monitor:
                     break
                 self.recheck_starts()
                 busy = set(self.pending.values())
-                # Seeds first, then community/discovery. Slow hosts do not consume
-                # all workers: at most one in-flight public request job per host.
+                # Oldest due first: an earlier product becoming due again must
+                # not starve later discoveries. Seeds win initial deadline ties.
+                # Keep at most one in-flight public request job per host.
                 busy_hosts = {self.jobs[k].get("url", "").split("/")[2] for k in busy if self.jobs[k].get("url", "").startswith("https://")}
-                for key, job in list(self.jobs.items()):
+                for key, job in sorted(self.jobs.items(), key=lambda item: item[1]["next"]):
                     if len(self.pending) >= self.cfg["workers"]:
                         break
                     if key in busy or job["next"] > now or (once and (key in completed or key not in initial)):
