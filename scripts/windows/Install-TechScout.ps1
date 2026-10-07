@@ -5,6 +5,9 @@ $local=Join-Path $env:LOCALAPPDATA 'TechScout'
 New-Item -ItemType Directory -Force -Path $local | Out-Null
 $app='C:\ProgramData\DealAlerter\app'
 $basePython='C:\ProgramData\DealAlerter\venv\Scripts\python.exe'
+# Resolve MSIX/AppData redirection before writing shortcuts used outside the app.
+$local = & $basePython -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' $local
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $local)) { throw 'Cannot resolve the TechScout data directory.' }
 $venv=Join-Path $local 'venv'
 $python=Join-Path $venv 'Scripts\python.exe'
 if (-not (Test-Path -LiteralPath (Join-Path $app 'alerters\techscout\web\workspace.js'))) { throw 'Deploy the merged monitor integration before installing shortcuts.' }
