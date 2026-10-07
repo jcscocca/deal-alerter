@@ -12,7 +12,7 @@
   <header class="app-header"><div class="brand-mark" aria-hidden="true">TS</div><div><strong>TechScout</strong><div class="muted small">Your shopping shortlist</div></div><span class="local-label">Private · on this computer</span></header>
   <main>
     <label class="compact-category" for="category-select">Category
-      <select id="category-select"><option value="desktop-memory">Desktops &amp; memory</option><option value="tablets">Tablets</option><option value="computers">Computers</option><option value="supplies">Tech supplies</option><option value="memory">Memory</option><option value="monitor">All monitor deals</option></select>
+      <select id="category-select"><option value="desktop-memory">Desktops &amp; memory</option><option value="tablets">Tablets</option><option value="computers">Computers</option><option value="supplies">Tech supplies</option><option value="memory">Memory</option><option value="amazon">Amazon deals</option><option value="monitor">All deals</option></select>
     </label>
     <nav id="categories" aria-label="Shopping categories">
       <button data-category="desktop-memory" aria-pressed="true">Desktops &amp; memory</button>
@@ -20,7 +20,8 @@
       <button data-category="computers" aria-pressed="false">Computers</button>
       <button data-category="supplies" aria-pressed="false">Tech supplies</button>
       <button data-category="memory" aria-pressed="false">Memory</button>
-      <button data-category="monitor" aria-pressed="false">All monitor deals</button>
+      <button data-category="amazon" aria-pressed="false">Amazon deals</button>
+      <button data-category="monitor" aria-pressed="false">All deals</button>
     </nav>
     <div class="heading-row"><div><h1 id="heading">Desktops worth a closer look</h1><p id="purpose" class="muted">RTX 5080/5090 · reuse your 64GB kit · aim for 96–128GB</p></div><button id="refresh" class="primary">Check now</button></div>
     <div id="status" class="status" role="status" aria-live="polite">Loading saved research…</div>
@@ -31,7 +32,7 @@
     <section id="ranked" aria-label="Ranked candidates"></section>
     <section id="comparison" aria-label="Compare finalists" hidden></section>
     <details id="held-section"><summary>Outside the ranking <span id="held-count"></span></summary><div id="held"></div></details>
-    <details id="leads-section" hidden><summary>Community leads <span id="leads-count"></span></summary><div id="leads"></div></details>
+    <details id="leads-section" hidden><summary>Reported deals <span id="leads-count"></span></summary><div id="leads"></div></details>
     <details class="research-details" open><summary>Connected sources</summary><div id="source-health"></div></details>
     <details class="research-details"><summary>Search scope &amp; coverage</summary><div id="coverage"></div></details>
     <footer>Prices include published shipping and exclude tax. Check times and freshness are specific to each source; checkout can differ. Rankings use RAM-layout evidence and known totals, not a performance score or a historical discount claim. Mixed-kit stability remains unverified.</footer>

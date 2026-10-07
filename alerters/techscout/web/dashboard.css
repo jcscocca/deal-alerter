@@ -83,3 +83,8 @@ footer { margin-top:26px;color:var(--muted);font-size:12px;max-width:900px; }
 .source-card { padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--paper); }
 .source-card strong { display:block;margin-bottom:6px; }
 #leads-section { margin-top:22px; }
+.lead-content { min-width:0;flex:1; }
+.source-reports { margin-top:14px; }
+.source-report { padding:12px 0;border-top:1px solid var(--line);overflow-wrap:anywhere; }
+.source-report>strong { margin-left:14px; }
+.publisher-text { font-size:13px;color:var(--muted);white-space:pre-wrap; }
