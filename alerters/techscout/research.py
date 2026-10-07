@@ -26,6 +26,12 @@ PRESETS = {
 DESKTOP_SEEDS = ("20707507998",)
 
 
+def cpu_model(title: str) -> str | None:
+    matches = re.findall(r"\b(?:[1-9]\d{3}X3D|[1-9]\d{3}[XF]|i[3579][-\s]\d{4,5}[A-Z]{0,3}|Ultra\s+[579]\s+\d{3}[A-Z]{0,2}(?:\s+Plus)?)\b", title, re.I)
+    models = {re.sub(r"\s+", " ", value.upper()) for value in matches}
+    return next(iter(models)) if len(models) == 1 else None
+
+
 def text(value) -> str:
     return value.strip() if isinstance(value, str) else ""
 
@@ -128,12 +134,12 @@ def normalize(row: dict, queries: list[str], category: str, profile: DesktopProf
                                            ("RAM", "Memory Type", "Memory Size", "System Memory"))])
             if fit.eligible and fit.installed_gb in (32, 64) and re.search(r"\bDDR5\b", memory_type, re.I):
                 # Require an exact CPU and one stated SSD capacity for build cohorts.
-                cpu = re.findall(r"\b(?:[1-9]\d{3}X3D|[1-9]\d{3}[XF]|i[3579]-\d{4,5}[A-Z]{0,3}|(?:Ultra\s+[579]\s+)\d{3}[A-Z]{0,2})\b", title, re.I)
+                cpu = cpu_model(title)
                 storage = re.findall(r"\b(\d+(?:\.\d+)?)\s*(TB|GB)\s*(?:Gen[345]\s+)?(?:NVMe\s+)?SSD\b", title, re.I)
-                if len(set(s.upper() for s in cpu)) == 1 and len(storage) == 1:
+                if cpu and len(storage) == 1:
                     amount, unit = storage[0]
                     capacity = float(amount) * (1000 if unit.upper() == "TB" else 1)
-                    product.comparison_key = ("desktop", f"RTX {gpu_model(title)}", cpu[0].upper(),
+                    product.comparison_key = ("desktop", f"RTX {gpu_model(title)}", cpu,
                                               f"{fit.installed_gb}GB DDR5 RAM", f"{capacity:g}GB SSD",
                                               product.condition.lower())
         else:
