@@ -16,6 +16,8 @@ Open [TechScout on this computer](http://127.0.0.1:8768/). Keep the process runn
 while using the page; Ctrl+C stops it. After restarting the computer, run the
 command again. `--port` selects another local port. No account or public hosting
 is needed, and the page is not accessible from another computer or phone.
+Only one dashboard can listen on a port; Windows uses an exclusive socket so an
+older server cannot silently share requests with a newer one.
 
 The page combines saved Walmart research with the running hardware monitor's
 public shopping snapshot. On Windows it reads

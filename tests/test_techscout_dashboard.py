@@ -210,3 +210,14 @@ def test_dashboard_cli_start_does_not_load_credentials(tmp_path, monkeypatch):
     monkeypatch.setattr(cli.Credentials, "load", forbidden)
     assert cli.main(["--serve", "--output", str(tmp_path), "--settings", str(tmp_path / "missing.json")]) == 0
     assert called == [(tmp_path,8768)]
+
+
+def test_dashboard_port_cannot_be_claimed_by_second_instance(tmp_path):
+    app = Dashboard(tmp_path, lambda _: 0)
+    server = create_server(app, 0)
+    try:
+        with pytest.raises(OSError):
+            duplicate = create_server(app, server.server_port)
+            duplicate.server_close()
+    finally:
+        server.server_close()

@@ -5,6 +5,7 @@ import hmac
 import json
 import math
 import secrets
+import socket
 import threading
 import time
 from datetime import datetime, timezone
@@ -319,7 +320,17 @@ def create_server(dashboard: Dashboard, port=8768):
             status, content = dashboard.start(data["category"])
             self.send(status, content)
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    class LocalServer(ThreadingHTTPServer):
+        # Windows SO_REUSEADDR permits two listeners on the same address, routing
+        # requests to old/new dashboards unpredictably. Claim the port exclusively.
+        allow_reuse_address = not hasattr(socket, "SO_EXCLUSIVEADDRUSE")
+
+        def server_bind(self):
+            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            super().server_bind()
+
+    server = LocalServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
     return server
 
