@@ -140,9 +140,11 @@ Other direct retailers were investigated on 2026-09-28:
 - **Best Buy.** The developer API refuses sign-ups from free email and `.edu`
   addresses, so there is no key to be had. Worth revisiting only with an
   address on your own domain.
-- **Walmart.** The affiliate API needs approval against a business case and
-  RSA-signed requests; walmart.com itself sits behind bot protection that is not
-  worth fighting.
+- **Walmart.** Signed affiliate API lookup was verified on October 6, 2026.
+  [TechScout shopping research](docs/techscout-shopping.md) now provides on-demand
+  desktop/memory, tablet, computer and tech-supply reports. It uses localized
+  product lookups after search discovery and remains separate from the alert
+  monitor. API access does not establish approval of every downstream use.
 
 Community sources remain useful for discovery and advance sale notices.
 

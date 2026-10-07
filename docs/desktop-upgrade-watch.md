@@ -109,11 +109,13 @@ The existing target cadences remain 2 minutes for products, 5 for community
 feeds and 10 for discovery, subject to failures, robots rules and backoff.
 
 Observed on October 6: the installed monitor was checking Newegg and Slickdeals;
-HP requests were failing and Reddit was disallowed by robots.txt. Walmart,
-Best Buy and Micro Center still depend on discovery posts/manual review rather
-than a direct automated adapter. This does not cover the entire market.
-Native store restock alerts and periodic manual searches are useful complements,
-particularly for the Walmart offers found during this conversation.
+HP requests were failing and Reddit was disallowed by robots.txt. Best Buy and
+Micro Center still depend on discovery posts/manual review. Walmart now has a
+separate [on-demand TechScout report](techscout-shopping.md) using signed API
+search and ZIP-specific lookups; it does not feed the live monitor or alerts.
+Its desktop mode applies this same RAM reuse profile. This does not cover the
+entire market. Native store restock alerts and manual searches remain useful
+complements.
 
 ## Preview, tests and release
 
