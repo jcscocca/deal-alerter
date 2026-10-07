@@ -16,6 +16,8 @@ Open [TechScout on this computer](http://127.0.0.1:8768/). Keep the process runn
 while using the page; Ctrl+C stops it. After restarting the computer, run the
 command again. `--port` selects another local port. No account or public hosting
 is needed, and the page is not accessible from another computer or phone.
+Only one dashboard can listen on a port; Windows uses an exclusive socket so an
+older server cannot silently share requests with a newer one.
 
 The page combines saved Walmart research with the running hardware monitor's
 public shopping snapshot. On Windows it reads
@@ -24,21 +26,60 @@ another runtime. The monitor must be upgraded to the version that publishes this
 file. No API credentials, notification settings, history files, or raw API bodies
 are exposed to the browser. The dashboard never writes monitor state.
 
-**All monitor deals** shows the existing watchlist's eBay/Apple hardware results,
-Newegg desktops, and community leads. Other category views include matching
+**All deals** shows the existing watchlist's eBay/Apple hardware results,
+Newegg desktops, and publisher/community leads. Other category views include matching
 monitor products alongside Walmart. Use **Source** to narrow the list; retailer,
 seller, condition and check time appear on every card. Complete desktops and loose
 components remain in separate groups. Listings with the same ID in different
 sources do not overwrite each other; exact duplicate source identities collapse.
 Different retailer/seller offers remain separately comparable.
 
-The browser rereads local monitor results every 15 seconds without additional
-retailer requests. The collector retains its existing schedules, backoff and
+The browser rereads local results every 15 seconds without additional
+retailer requests. The installed monitor retains its existing schedules, backoff and
 notification behavior. HP and Reddit remain visible as unavailable until their
-access actually recovers. Slickdeals/Reddit posts appear under **Community leads**,
+access actually recovers. Slickdeals/Reddit posts appear under **Reported deals**,
 never as confirmed inventory. eBay variants, risky sellers, multi-item lots, and
 missing shipping quotes remain held. Apple's current collector does not establish
 shipping, so its finds remain visible outside the delivered-price ranking.
+
+## Amazon deal reports and overlap
+
+**Amazon deals** collects recent Amazon tech reports from the publishers' public
+RSS feeds: Ben's Bargains (Amazon, desktops and memory), DealNews (computers and
+recent deals), and 9to5Toys. A background worker checks the six feed URLs every
+15 minutes while the dashboard server runs. Restarting respects the saved check
+schedule. Browser polling and **Reload results** only read the local cache.
+This uses no Amazon credentials or paid service and sends no alerts.
+
+Each source can inspect up to eight new or changed publisher articles per check,
+respecting its robots rules. Structured product names and an unambiguous Amazon
+product ID can improve matching. For 9to5Toys a single Amazon short link in the
+article's first relevant paragraph may be resolved to its redirect destination;
+Amazon product pages are never fetched. Other affiliate click trackers and forms
+are not followed. Roundups and ambiguous multi-product links supply no product ID.
+
+Matching reports become one card when they share an Amazon product ID or an exact
+normalized product name and the same retailer. Title normalization removes the
+trailing quoted-price clause but preserves configuration words. Conflicting known
+ASINs, capacities, quantities, colors and conditions stay separate; generic names
+and uncertain title similarities do not merge. Existing community posts can join
+when they explicitly identify Amazon and match the exact product name. Direct
+retailer inventory remains separately ranked and never inherits publisher prices.
+
+A card preserves every report's original publisher URL, title, description,
+quoted price, publication/check time and mentioned Prime/coupon/subscription
+terms. Differing quotes display a range, with each quote still visible in
+**Source reports**. Filtering by a publisher retains the complete combined card.
+Saving the card uses one comparison slot; previous individual report selections
+can resolve to that card. Extra reports do not create market averages or verify
+Amazon stock, seller, shipping, final price or a historical discount.
+
+Feed entries expire from discovery after 72 hours. A feed check older than 30
+minutes or a failed check labels its reports as needing another check. A current
+report from one publisher cannot refresh another publisher's old quote. The
+bounded public cache is `reports/deal-feeds.json`; it contains no credentials.
+Original DealNews content and publisher/referral links are retained in source
+reports, following its [published feed guidance](https://www.dealnews.com/pages/rss.html).
 
 **Check Walmart now** runs only the selected
 category's preset searches (10 results per search), then replaces its snapshot.
@@ -81,7 +122,8 @@ status and time, with no prices or authentication data. Keep credentials in the
 existing protected directory. The local server does not start at Windows login.
 
 This is independent of the installed alert monitor: it creates no tasks, sends
-no notifications, and writes no price history or monitor state. It does not read
+no notifications, and writes no price history or monitor state. Public feed
+reports overwrite a bounded cache while the dashboard is running. It does not read
 `.env` or `secrets.env`. The reports contain current API evidence, not fabricated
 traffic or a claim that an application description grants additional rights.
 Account access alone is not approval of downstream uses; the account holder
@@ -196,6 +238,7 @@ that the entire catalog has been searched.
 
 ```powershell
 python -m pytest -q tests/test_techscout.py tests/test_techscout_dashboard.py
+python -m pytest -q tests/test_deal_feeds.py tests/test_shopping_sources.py
 ```
 
 Tests use generated test keys and fake API sessions, with no real credentials or

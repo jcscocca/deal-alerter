@@ -141,7 +141,8 @@ def public_row(raw, source, checked, expires, problems, now, profile):
             "fit": fit.get("status", "Not assessed"), "fit_summary": fit.get("summary", ""),
             "layout_documented": fit.get("status") == "POSSIBLE REUSE", "warnings": warnings,
             "rank": None, "reasons": reasons, "checked_at": checked, "expires_at": expires,
-            "lead": community, "categories": sorted(kinds), "product_group": product_group}
+            "lead": community, "categories": sorted(kinds), "product_group": product_group,
+            "merchant": "Amazon" if community and re.search(r"\bat Amazon\b|\[Amazon\]|\(Amazon\)", title, re.I) else None}
 
 
 def read_monitor(runtime, category, now):
@@ -199,7 +200,10 @@ def read_monitor(runtime, category, now):
                 selected[row["id"]] = row
     for row in selected.values():
         sources[row["source"]]["count"] += 1
-        if category != "monitor" and category not in row["categories"]:
+        if category == "amazon":
+            if not row["lead"] or row.get("merchant") != "Amazon":
+                continue
+        elif category != "monitor" and category not in row["categories"]:
             continue
         if category == "desktop-memory" and (not row["eligible"] or row["ram"] not in (32, 64) or not row["gpu"]):
             row["reasons"].append(row["fit_summary"] or "Desktop configuration needs verification")

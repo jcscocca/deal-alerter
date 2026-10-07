@@ -27,7 +27,7 @@ def main(argv=None) -> int:
     parser.add_argument("--settings", type=Path, default=local_directory() / "settings.json")
     parser.add_argument("--zip-code", help="Override the ZIP in local settings")
     parser.add_argument("--output", type=Path, default=local_directory() / "reports")
-    parser.add_argument("--serve", action="store_true", help="Open the local dashboard server; API calls require Check now")
+    parser.add_argument("--serve", action="store_true", help="Serve local dashboard and public deal feeds; Walmart API calls require Check now")
     parser.add_argument("--port", type=int, default=8768, help="Local dashboard port (default 8768)")
     parser.add_argument("--monitor-runtime", type=Path,
                         default=Path(os.environ.get("PROGRAMDATA", "C:/ProgramData")) / "DealAlerter" if os.name == "nt" else None,

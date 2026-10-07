@@ -5,6 +5,7 @@ import hmac
 import json
 import math
 import secrets
+import socket
 import threading
 import time
 from datetime import datetime, timezone
@@ -17,12 +18,13 @@ from dealcore.state import atomic_write
 from alerters.hardware.prebuilt import gpu_model
 from .research import PRESETS, capacity_mismatch, cpu_model
 from .monitor_bridge import read_monitor
+from .deal_overlap import combine_leads
 
 FRESH_SECONDS = 15 * 60
 ASSETS = Path(__file__).with_name("web")
 CATEGORIES = {"desktop-memory": "Desktops & memory", "tablets": "Tablets",
               "computers": "Computers", "supplies": "Tech supplies", "memory": "Memory",
-              "monitor": "All monitor deals"}
+              "monitor": "All deals", "amazon": "Amazon deals"}
 
 
 def amount(value):
@@ -127,11 +129,11 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
     return result
 
 
-def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monitor_runtime=None) -> dict:
+def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monitor_runtime=None, deal_feeds=None) -> dict:
     if category not in CATEGORIES:
         raise ValueError("Unknown category")
     now = time.time() if now is None else now
-    if category == "monitor":
+    if category in ("monitor", "amazon"):
         result = {"category": category, "label": CATEGORIES[category], "checked_at": None,
                   "expires_at": None, "fresh": False, "zip_code": None, "groups": [],
                   "held": [], "problems": [], "coverage": [], "queries": [], "count": 0}
@@ -144,10 +146,14 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
     result["sources"] = ([{"source": "walmart", "label": "Walmart", "jobs": 1,
                             "ready": int(result["fresh"]), "count": len(rows),
                             "checked_at": result["checked_at"], "truncated": False}]
-                         if category != "monitor" else [])
+                         if category not in ("monitor", "amazon") else [])
     monitor = read_monitor(monitor_runtime, category, now)
     rows += monitor["rows"]
     result["sources"] += monitor["sources"]
+    if deal_feeds is not None:
+        feeds = deal_feeds.snapshot(category, now)
+        rows += feeds["rows"]
+        result["sources"] += feeds["sources"]
     result["problems"] += monitor["problems"]
     result["monitor_connected"] = bool(monitor["sources"])
     result["groups"], result["held"], result["leads"] = [], [], []
@@ -170,8 +176,11 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
             row["why"] = ("Documented RAM layout first, then known total within this GPU/RAM/condition group."
                           if category == "desktop-memory" else "Known total within this group; unlike models are not equivalent in performance or value.")
         result["groups"].append({"name": name, "rows": candidates})
-    result["count"] = len(rows)
-    if monitor["sources"]:
+    result["report_count"] = len(result["leads"])
+    result["leads"] = combine_leads(result["leads"])
+    result["overlap_count"] = result["report_count"] - len(result["leads"])
+    result["count"] = len(rows) - result["overlap_count"]
+    if monitor["sources"] or deal_feeds is not None:
         result["fresh"] = any(source["ready"] for source in result["sources"])
         dates = [row["checked_at"] for row in rows if timestamp(row.get("checked_at")) is not None]
         result["checked_at"] = max(dates, key=timestamp) if dates else result["checked_at"]
@@ -180,9 +189,10 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
 
 
 class Dashboard:
-    def __init__(self, directory: Path, refresh, *, clock=time.time, cooldown=30, monitor_runtime=None):
+    def __init__(self, directory: Path, refresh, *, clock=time.time, cooldown=30, monitor_runtime=None, deal_feeds=None):
         self.directory, self.refresh, self.clock, self.cooldown = directory, refresh, clock, cooldown
         self.monitor_runtime = monitor_runtime
+        self.deal_feeds = deal_feeds
         self.token = secrets.token_urlsafe(32)
         self.lock = threading.Lock()
         self.running = None
@@ -206,11 +216,11 @@ class Dashboard:
             failed_at = job.get("at") if job.get("status") in ("failed", "checking") and self.running != category else None
             running = self.running
             remaining = max(0, self.cooldown - (self.clock() - self.last_start)) if self.last_start is not None else 0
-        return {"snapshot": snapshot(self.directory, category, now=self.clock(), failed_at=failed_at, monitor_runtime=self.monitor_runtime),
+        return {"snapshot": snapshot(self.directory, category, now=self.clock(), failed_at=failed_at, monitor_runtime=self.monitor_runtime, deal_feeds=self.deal_feeds),
                 "running": running, "last_check": job, "retry_after": math.ceil(remaining), "fresh_seconds": FRESH_SECONDS}
 
     def start(self, category):
-        if category == "monitor":
+        if category in ("monitor", "amazon"):
             return 200, {"status": "Monitor results are read automatically; no extra retailer requests"}
         if category not in PRESETS:
             return 400, {"error": "Unknown category"}
@@ -310,7 +320,17 @@ def create_server(dashboard: Dashboard, port=8768):
             status, content = dashboard.start(data["category"])
             self.send(status, content)
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    class LocalServer(ThreadingHTTPServer):
+        # Windows SO_REUSEADDR permits two listeners on the same address, routing
+        # requests to old/new dashboards unpredictably. Claim the port exclusively.
+        allow_reuse_address = not hasattr(socket, "SO_EXCLUSIVEADDRUSE")
+
+        def server_bind(self):
+            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            super().server_bind()
+
+    server = LocalServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
     return server
 
@@ -318,11 +338,15 @@ def create_server(dashboard: Dashboard, port=8768):
 def serve(directory: Path, refresh, port=8768, *, monitor_runtime=None):
     if not 1 <= port <= 65535:
         raise ValueError("Port must be between 1 and 65535")
-    server = create_server(Dashboard(directory, refresh, monitor_runtime=monitor_runtime), port)
+    from .deal_feeds import DealFeeds
+    feeds = DealFeeds(directory)
+    server = create_server(Dashboard(directory, refresh, monitor_runtime=monitor_runtime, deal_feeds=feeds), port)
+    feeds.start()
     print(f"TechScout is ready at http://127.0.0.1:{server.server_port}/ (Ctrl+C to stop)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        feeds.close()
         server.server_close()
