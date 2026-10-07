@@ -27,12 +27,19 @@ next attempt and sanitized failure. Rotating logs retain five 2 MB files.
 `config/monitor.toml` requests a 120-second interval after each successful
 retailer check, 300 seconds for feeds, 600 seconds for retailer discovery,
 900 seconds for eBay and one hour for Apple refurb. Fetch jobs run concurrently;
-only the main process judges, sends and writes state. A slow retailer/feed
-does not hold up a different host. Each public host has a two-second minimum
+only the main process judges, sends and writes state. Due jobs run in deadline
+order, so earlier products cannot repeatedly jump ahead of overdue discoveries.
+A slow retailer/feed does not hold up a different host. Each public host has
+at most one in-flight job and a two-second minimum
 request gap (or its longer robots crawl delay). Product discovery is bounded
-to 24 URLs per retailer and reports a coverage warning when full. Search
+to 48 URLs per retailer and reports a coverage warning when full. Search
 results are partial discovery, never proof of delisting. The seed URL remains
 watched after it drops out of search results.
+
+New jobs have an initial check window measured from their own creation time:
+ten minutes or three polling intervals, whichever is longer. This timestamp
+survives restarts. Actual fetch errors are still reported immediately, and
+previously successful checks become stale after the same window.
 
 Retailers use conditional requests where supported. HTTP 429/503 Retry-After
 (seconds or HTTP date), exponential backoff and host cooldown survive restarts.
