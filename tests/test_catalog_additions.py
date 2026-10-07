@@ -21,6 +21,7 @@ from alerters.hardware.native.match import find_all_parts, find_part
 ADDED = [
     ("radeon_pro_w7900", "AMD Radeon PRO W7900 48GB Workstation Graphics Card"),
     ("radeon_pro_w7800", "AMD Radeon PRO W7800 32GB Professional GPU"),
+    ("radeon_pro_w7800_48", "AMD Radeon PRO W7800 48GB Professional GPU"),
     ("radeon_ai_pro_r9700", "AMD Radeon AI PRO R9700 32GB"),
     ("rx_7900_xtx", "XFX Speedster MERC310 Radeon RX 7900 XTX 24GB GDDR6"),
     ("arc_pro_b60", "ASRock Intel Arc Pro B60 Creator 24GB"),
@@ -45,6 +46,26 @@ class TestEachNewPartIsReachable:
 
 
 class TestTheCollisionsWorthNaming:
+    @pytest.mark.parametrize("title,key", [
+        ("AMD Radeon PRO W7800 32 GB Graphics Card", "radeon_pro_w7800"),
+        ("Sapphire Radeon PRO W7800 48GB GDDR6", "radeon_pro_w7800_48"),
+        ("GIGABYTE Radeon PRO W7800 AI TOP 48G", "radeon_pro_w7800_48"),
+        ("Radeon PRO W7800 48GB workstation 64GB RAM 2TB SSD", "radeon_pro_w7800_48"),
+    ])
+    def test_w7800_capacity_selects_exactly_one_variant(self, title, key):
+        assert find_part(title)[0] is BY_KEY[key]
+        assert find_all_parts(title) == [BY_KEY[key]]
+
+    @pytest.mark.parametrize("title", [
+        "AMD Radeon PRO W7800 Graphics Card",
+        "Radeon PRO W7800 workstation 48GB RAM 2TB SSD",
+        "Radeon PRO W7800 32GB / 48GB Graphics Card",
+        "Radeon PRO W7800 64GB Graphics Card",
+    ])
+    def test_w7800_unknown_or_conflicting_capacity_is_not_guessed(self, title):
+        assert find_part(title)[0] is None
+        assert find_all_parts(title) == []
+
     def test_a_gx10_is_not_also_a_dgx_spark(self) -> None:
         # Same GB10 superchip in someone else's case, so a GX10 title naming
         # its own chip matches both entries and reads as two machines.

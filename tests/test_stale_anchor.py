@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
+
 from alerters.hardware.native.catalog import BY_KEY
 from alerters.hardware.native.config import Thresholds
 from alerters.hardware.native.history import PriceStats
@@ -50,6 +52,15 @@ def score(price: float = PUSHED, part=SOLD, **kwargs):
 
 
 class TestStaleAnchor:
+    @pytest.mark.parametrize("key", ["radeon_pro_w7800", "radeon_pro_w7800_48"])
+    def test_w7800_family_estimates_cannot_promote_a_target_hit(self, key):
+        part = BY_KEY[key]
+        item = score(price=1200, part=part, title=part.name,
+                     stats=PriceStats(part_key=key, bucket="used", count=0), target_price=1800)
+        assert item is not None and item.verdict <= Verdict.GOOD
+        assert not item.reference_trusted
+        assert "unverified estimate" in item.reason
+
     def test_asks_that_have_fallen_to_the_anchor_are_watch_only(self) -> None:
         item = score(stats=stats(recent_median=5999.0, recent_count=5))
         assert item.verdict == Verdict.GOOD

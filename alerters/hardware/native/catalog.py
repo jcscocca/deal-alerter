@@ -93,6 +93,8 @@ class Part:
     # title that names the variant, and both entries match at once -- which
     # find_all_parts then reads as a two-card bundle.
     excludes: tuple[str, ...] = ()
+    # Shared model names with different VRAM need an explicit, unique capacity.
+    require_capacity: bool = False
     note: str = ""
 
     @property
@@ -335,6 +337,23 @@ PARTS: tuple[Part, ...] = (
         arch="RDNA3",
         slots=2.0,
         aliases=("w7800", "radeon pro w7800"),
+        require_capacity=True,
+    ),
+    Part(
+        key="radeon_pro_w7800_48",
+        name="Radeon PRO W7800 48GB",
+        kind=Kind.PRO_GPU,
+        vram_gb=48,
+        bandwidth_gb_s=864,
+        tdp_w=260,
+        # Provisional family estimate, not a verified sale or a buy target.
+        reference_price=1800.0,
+        year=2024,
+        arch="RDNA3",
+        aliases=("w7800", "radeon pro w7800"),
+        require_capacity=True,
+        note="48GB variant; verify the vendor's cooler dimensions and board power. "
+        "Price reference is an unverified family estimate.",
     ),
     Part(
         key="radeon_ai_pro_r9700",

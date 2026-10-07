@@ -192,6 +192,15 @@ class TestGpuServerCards:
         assert result.part is not None and result.part.key == "rtx_a6000"
         assert not result.is_system
 
+    @pytest.mark.parametrize("title", [
+        "NVIDIA RTX A6000 GPU Server Graphics Card",
+        "NVIDIA RTX A6000 GPU Server - Graphics Card 48GB",
+    ])
+    def test_model_first_server_card_is_not_a_whole_machine(self, title: str) -> None:
+        result = match(title, price=6087.8)
+        assert result.part is not None and result.part.key == "rtx_a6000"
+        assert not result.is_system and not result.is_bundle
+
     @pytest.mark.parametrize(
         "title",
         [
@@ -209,6 +218,14 @@ class TestGpuServerCards:
             "RTX A6000 x4 Graphics Card GPU Server",
             "NVIDIA A100 80GB GPU Card Dell PowerEdge R750xa GPU Server",
             "Supermicro SYS-4029GP RTX A6000 Graphics Card GPU Server",
+            "GPU Server Graphics Card RTX A6000",
+            "GPU Server with NVIDIA RTX A6000 Graphics Card",
+            "NVIDIA RTX A6000 GPU Server with Graphics Card",
+            "NVIDIA RTX A6000 GPU Server Graphics Card 256GB RAM",
+            "NVIDIA RTX A6000 GPU Server Graphics Card 2TB SSD",
+            "NVIDIA RTX A6000 GPU Server Graphics Card Xeon w7-3565X",
+            "Dual NVIDIA RTX A6000 GPU Server Graphics Card",
+            "Supermicro NVIDIA RTX A6000 GPU Server Graphics Card",
         ],
     )
     def test_a_server_is_still_a_server(self, title: str) -> None:

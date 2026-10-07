@@ -239,9 +239,9 @@ AI_WORKSTATION_RE = re.compile(r"\bai\s+work\s*station\b", re.IGNORECASE)
 # Checked apart from SYSTEM_PATTERNS so a bare card can name where it goes.
 # "NVIDIA RTX A6000 48GB GDDR6 Graphics Card GPU Server Workstation GPU PCIe
 # 4.0" (eBay 389904816813, $6,087.80, 2026-09-28) was pushed as a whole machine
-# undercutting the loose A6000. A card sells itself first and its use after; a
-# server leads with the server and counts its cards, so the card word only
-# excuses the phrase when it comes first on a single-card listing.
+# undercutting the loose A6000. A card can also lead with its model and call
+# itself a "GPU Server Graphics Card". Server-first or populated builds must
+# still keep their whole-machine classification.
 GPU_SERVER_RE = re.compile(r"\bgpu\s+server\b", re.IGNORECASE)
 # Card counts written as words or trailing "x4", and server makers' names, mark
 # the machine even with the card word first. "Dual" can be a card's cooler
@@ -516,9 +516,18 @@ def is_system_listing(text: str, part: Part | None) -> bool:
     server = GPU_SERVER_RE.search(text)
     if server:
         card = CARD_WORD_RE.search(text)
+        # Resolve the PR #18 leftover without treating "GPU Server with an
+        # RTX A6000 Graphics Card" as a card. The model must precede the
+        # server phrase, followed immediately by the card description.
+        model_first_card = bool(
+            card
+            and card.start() >= server.end()
+            and not text[server.end():card.start()].strip(" -:/,()")
+            and any(hit[3] is part for hit in _alias_hits(_normalize(text[:server.start()])))
+        )
         if not (
             card
-            and card.start() < server.start()
+            and (card.start() < server.start() or model_first_card)
             and detect_quantity(text) == 1
             and not SERVER_HINT_RE.search(text)
             and not STORAGE_RE.search(text)
@@ -701,7 +710,14 @@ def _alias_hits(haystack: str) -> list[tuple[int, int, str, Part]]:
     hits.sort(key=lambda hit: (hit[1], hit[1] - hit[0]), reverse=True)
     kept: list[tuple[int, int, str, Part]] = []
     for start, end, term, part in hits:
-        if any(start < k_end and k_start < end for k_start, k_end, _, _ in kept):
+        # Capacity variants intentionally share a model alias. Preserve both
+        # equal spans so _capacity_agrees can select the stated variant.
+        if any(
+            start < k_end and k_start < end
+            and not (start == k_start and end == k_end
+                     and part.require_capacity and kept_part.require_capacity)
+            for k_start, k_end, _, kept_part in kept
+        ):
             continue
         kept.append((start, end, term, part))
     return kept
@@ -838,6 +854,8 @@ def _capacity_agrees(haystack: str, part: Part) -> bool:
         for m in CARD_CAPACITY_RE.finditer(haystack)
         if 8 <= int(m.group(1)) <= 200
     }
+    if part.require_capacity:
+        return card == {part.vram_gb}
     if not card:
         return True
     return part.vram_gb in card
