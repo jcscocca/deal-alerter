@@ -13,8 +13,8 @@ python -m alerters.techscout --serve
 ```
 
 Open [TechScout on this computer](http://127.0.0.1:8768/). Keep the process running
-while using the page; Ctrl+C stops it. After restarting the computer, run the
-command again. `--port` selects another local port. No account or public hosting
+while using the page; Ctrl+C stops it. For automatic startup and a desktop shortcut on the installed Windows monitor,
+use the setup below. Otherwise run the command again after restarting. `--port` selects another local port. No account or public hosting
 is needed, and the page is not accessible from another computer or phone.
 Only one dashboard can listen on a port; Windows uses an exclusive socket so an
 older server cannot silently share requests with a newer one.
@@ -24,10 +24,13 @@ public shopping snapshot. On Windows it reads
 `C:\ProgramData\DealAlerter\shopping-sources.json`; `--monitor-runtime` selects
 another runtime. The monitor must be upgraded to the version that publishes this
 file. No API credentials, notification settings, history files, or raw API bodies
-are exposed to the browser. The dashboard never writes monitor state.
+are exposed to the browser. The dashboard only writes the bounded, non-secret
+`ui/watches.json` preferences through the Watching view; delivery receipts and
+price history remain owned by the monitor.
 
-**All deals** shows the existing watchlist's eBay/Apple hardware results,
-Newegg desktops, and publisher/community leads. Other category views include matching
+**All deals** combines saved Walmart research across categories with the existing
+watchlist's eBay/Apple hardware results, Newegg desktops, and publisher/community
+leads. Duplicate Walmart IDs use the latest saved lookup. Other category views include matching
 monitor products alongside Walmart. Use **Source** to narrow the list; retailer,
 seller, condition and check time appear on every card. Complete desktops and loose
 components remain in separate groups. Listings with the same ID in different
@@ -36,7 +39,7 @@ Different retailer/seller offers remain separately comparable.
 
 The browser rereads local results every 15 seconds without additional
 retailer requests. The installed monitor retains its existing schedules, backoff and
-notification behavior. HP and Reddit remain visible as unavailable until their
+notification rules, subject to the notification mode you select in Watching. HP and Reddit remain visible as unavailable until their
 access actually recovers. Slickdeals/Reddit posts appear under **Reported deals**,
 never as confirmed inventory. eBay variants, risky sellers, multi-item lots, and
 missing shipping quotes remain held. Apple's current collector does not establish
@@ -146,10 +149,12 @@ shopping-field projection, never arbitrary files or credential metadata. Refresh
 requires the local page's token and matching origin; mismatched Host headers are
 rejected. `dashboard-last-check.json` contains only the latest per-category check
 status and time, with no prices or authentication data. Keep credentials in the
-existing protected directory. The local server does not start at Windows login.
+existing protected directory. The optional Windows shortcut setup starts the
+local dashboard at sign-in.
 
-This is independent of the installed alert monitor: it creates no tasks, sends
-no notifications, and writes no price history or monitor state. Public feed
+The dashboard shares public results and watch preferences with the installed
+alert monitor. The monitor remains responsible for notifications and price
+history; the dashboard creates no additional monitoring tasks. Public feed
 reports overwrite a bounded cache while the dashboard is running. It does not read
 `.env` or `secrets.env`. The reports contain current API evidence, not fabricated
 traffic or a claim that an application description grants additional rights.
@@ -157,6 +162,68 @@ Account access alone is not approval of downstream uses; the account holder
 must keep actual use and application information aligned with applicable
 [Walmart API terms](https://walmart.io/termsandcondition) and, where applicable,
 [affiliate terms](https://affiliates.walmart.com/terms).
+
+## Deals, Watching, Alerts and Sources
+
+The blue dashboard has four views. **Deals** includes the alerter's existing
+verdict, target, evidence and latest per-channel decision on assessed cards.
+**Qualifying deals** and **Target price met** require both an eligible engine
+judgment and current retailer evidence. Unassessed Walmart research and publisher
+reports remain labeled. **Best deal verdict** sorts eligible judgments first
+within each section. **New monitor finds · 24h** uses first sighting, preserved
+across checks and restarts; it starts tracking with this upgrade.
+
+**Watching** saves up to 40 exact searches or products, including GPU, RAM, CPU,
+storage, condition, source, budget and the RAM-reuse preference. Edit or pause
+individual watches here. The notification mode defaults to **All qualifying
+deals**, preserving existing alerts. **Only enabled watches** narrows delivery
+to matching watches; zero enabled watches means zero deal notifications.
+**Pause deal notifications** suspends delivery while collection continues.
+Health warnings are separate. Changes apply on the next monitor job, including
+the next digest, and never relax the engine's deal or evidence requirements.
+Alternative cards do not broaden a saved search's filters. Watches use existing
+monitor coverage; they do not start new queries. Walmart and publisher-only
+coverage remains browse-only. A malformed preferences file pauses deal delivery
+until repaired; an absent file uses the existing all-deals default.
+
+**Alerts** retains up to 500 successful sends and failed attempts, with event
+prices and times. Sent means the transport accepted the notification. Existing
+receipts seed history as products are assessed again; this is not a complete
+historical inbox. **Why didn't this alert?** shows the latest per-channel decisions
+for loaded monitor results, including unchanged, filtered, ineligible and failed.
+**Open current card** opens its latest result; missing products retain their
+original source link. **Sources** separates coverage and health from shopping.
+
+## Windows shortcut and automatic startup
+
+First deploy the merged application with the existing monitor Prepare/Update
+procedure. Shortcut setup creates a separate per-user virtual environment with
+`requirements-techscout.txt`, keeping the monitor environment unchanged. From the
+ordinary account that will use TechScout,
+obtain its SID with `[Security.Principal.WindowsIdentity]::GetCurrent().User.Value`.
+Then run this once from an administrator PowerShell, substituting that SID:
+
+```powershell
+& 'C:\ProgramData\DealAlerter\app\scripts\windows\Enable-TechScoutControls.ps1' -UserSid 'YOUR_WINDOWS_ACCOUNT_SID'
+```
+
+This grants that account Modify access only to `C:\ProgramData\DealAlerter\ui`,
+which contains validated watch preferences. The protected application, secrets,
+notification receipts and price history keep their existing permissions.
+Back in ordinary PowerShell, install the per-user shortcuts:
+
+```powershell
+& 'C:\ProgramData\DealAlerter\app\scripts\windows\Install-TechScout.ps1'
+& "$env:LOCALAPPDATA\TechScout\Start-TechScout.ps1" -OpenBrowser
+```
+
+The desktop and Start menu **TechScout** shortcuts start the local dashboard if
+needed and open it. The Startup shortcut starts it silently at sign-in. Use
+`-NoStartup` when installing if you only want launch shortcuts. To turn automatic
+startup off later, remove TechScout from the Windows Startup folder. Repeated
+launches reuse the same listening dashboard. Logs are under
+`%LOCALAPPDATA%\TechScout\logs`. The protected hardware monitor continues to run
+through its existing tasks, including when the dashboard is closed.
 
 ## Local setup
 
@@ -265,7 +332,7 @@ that the entire catalog has been searched.
 
 ```powershell
 python -m pytest -q tests/test_techscout.py tests/test_techscout_dashboard.py
-python -m pytest -q tests/test_deal_feeds.py tests/test_shopping_sources.py
+python -m pytest -q tests/test_deal_feeds.py tests/test_shopping_sources.py tests/test_shopping_integration.py
 python -m pytest -q tests/test_techscout_facets.py tests/test_techscout_browsing.py
 node --test tests/techscout_browsing.test.cjs
 ```

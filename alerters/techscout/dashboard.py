@@ -20,6 +20,7 @@ from .research import PRESETS, capacity_mismatch, cpu_model
 from .monitor_bridge import read_monitor
 from .deal_overlap import combine_leads
 from .facets import attributes
+from .integration import Workspace
 
 FRESH_SECONDS = 15 * 60
 ASSETS = Path(__file__).with_name("web")
@@ -133,7 +134,7 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
     return result
 
 
-def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monitor_runtime=None, deal_feeds=None) -> dict:
+def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monitor_runtime=None, deal_feeds=None, failed_checks=None) -> dict:
     if category not in CATEGORIES:
         raise ValueError("Unknown category")
     now = time.time() if now is None else now
@@ -152,6 +153,26 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
                             "status": "Last check failed" if failed_at is not None else "Current" if result["fresh"] else "Manual check overdue" if result["checked_at"] else "Not checked yet",
                             "checked_at": result["checked_at"], "truncated": False}]
                          if category not in ("monitor", "amazon") else [])
+    if category == "monitor":
+        walmart_rows, walmart_sources = {}, []
+        for saved_category in PRESETS:
+            if not (directory / f"latest-{saved_category}.json").exists():
+                continue
+            saved = snapshot(directory, saved_category, now=now, failed_at=(failed_checks or {}).get(saved_category))
+            walmart_sources += saved["sources"]
+            result["coverage"] += saved["coverage"]
+            result["problems"] += saved["problems"]
+            for row in [r for group in saved["groups"] for r in group["rows"]] + saved["held"]:
+                previous = walmart_rows.get(row["id"])
+                if previous is None or (timestamp(row["checked_at"]) or 0) > (timestamp(previous["checked_at"]) or 0):
+                    walmart_rows[row["id"]] = row
+        rows += list(walmart_rows.values())
+        if walmart_sources:
+            ready = sum(s["ready"] for s in walmart_sources)
+            result["sources"].append({"source": "walmart", "label": "Walmart", "jobs": len(walmart_sources),
+                                      "ready": ready, "count": len(walmart_rows), "truncated": False,
+                                      "checked_at": max((s["checked_at"] or "" for s in walmart_sources), default="") or None,
+                                      "status": "Current" if ready == len(walmart_sources) else "Some saved categories need a check"})
     monitor = read_monitor(monitor_runtime, category, now)
     rows += monitor["rows"]
     result["sources"] += monitor["sources"]
@@ -187,7 +208,7 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
         row["facets"] = attributes(row)
     result["overlap_count"] = result["report_count"] - len(result["leads"])
     result["count"] = len(rows) - result["overlap_count"]
-    if monitor["sources"] or deal_feeds is not None:
+    if result["sources"]:
         result["fresh"] = any(source["ready"] for source in result["sources"])
         dates = [row["checked_at"] for row in rows if timestamp(row.get("checked_at")) is not None]
         result["checked_at"] = max(dates, key=timestamp) if dates else result["checked_at"]
@@ -200,6 +221,7 @@ class Dashboard:
         self.directory, self.refresh, self.clock, self.cooldown = directory, refresh, clock, cooldown
         self.monitor_runtime = monitor_runtime
         self.deal_feeds = deal_feeds
+        self.workspace = Workspace(monitor_runtime)
         self.token = secrets.token_urlsafe(32)
         self.lock = threading.Lock()
         self.running = None
@@ -223,7 +245,9 @@ class Dashboard:
             failed_at = job.get("at") if job.get("status") in ("failed", "checking") and self.running != category else None
             running = self.running
             remaining = max(0, self.cooldown - (self.clock() - self.last_start)) if self.last_start is not None else 0
-        return {"snapshot": snapshot(self.directory, category, now=self.clock(), failed_at=failed_at, monitor_runtime=self.monitor_runtime, deal_feeds=self.deal_feeds),
+            failed_checks = {key: check["at"] for key, check in self.checks.items()
+                             if check["status"] in ("failed", "checking") and running != key}
+        return {"snapshot": snapshot(self.directory, category, now=self.clock(), failed_at=failed_at, monitor_runtime=self.monitor_runtime, deal_feeds=self.deal_feeds, failed_checks=failed_checks),
                 "running": running, "last_check": job, "retry_after": math.ceil(remaining), "fresh_seconds": FRESH_SECONDS}
 
     def start(self, category):
@@ -297,10 +321,14 @@ def create_server(dashboard: Dashboard, port=8768):
                 if category not in CATEGORIES:
                     return self.send(400, {"error": "Unknown category"})
                 return self.send(200, dashboard.state(category))
+            if parsed.path == "/api/workspace":
+                with dashboard.lock:
+                    return self.send(200, dashboard.workspace.state())
             if parsed.path == "/health":
                 return self.send(200, {"service": "TechScout", "status": "ok"})
             assets = {"/": ("index.html", "text/html; charset=utf-8"),
                       "/browsing.js": ("browsing.js", "text/javascript; charset=utf-8"),
+                      "/workspace.js": ("workspace.js", "text/javascript; charset=utf-8"),
                       "/dashboard.css": ("dashboard.css", "text/css; charset=utf-8"),
                       "/dashboard.js": ("dashboard.js", "text/javascript; charset=utf-8")}
             if parsed.path not in assets:
@@ -314,18 +342,22 @@ def create_server(dashboard: Dashboard, port=8768):
         def do_POST(self):
             if not self.permitted(write=True):
                 return self.send(403, {"error": "Local page authorization required"})
-            if self.path != "/api/refresh":
+            if self.path not in ("/api/refresh", "/api/watches"):
                 return self.send(404, {"error": "Not found"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 1024 or self.headers.get("Content-Type") != "application/json":
+                if not 0 < length <= (64000 if self.path == "/api/watches" else 1024) or self.headers.get("Content-Type") != "application/json":
                     raise ValueError()
                 data = json.loads(self.rfile.read(length))
-                if not isinstance(data, dict) or set(data) != {"category"} or not isinstance(data["category"], str):
+                if not isinstance(data, dict) or self.path == "/api/refresh" and (set(data) != {"category"} or not isinstance(data["category"], str)):
                     raise ValueError()
             except (ValueError, TypeError):
                 return self.send(400, {"error": "Invalid request"})
-            status, content = dashboard.start(data["category"])
+            if self.path == "/api/watches":
+                with dashboard.lock:
+                    status, content = dashboard.workspace.update(data)
+            else:
+                status, content = dashboard.start(data["category"])
             self.send(status, content)
 
     class LocalServer(ThreadingHTTPServer):

@@ -143,9 +143,10 @@ Other direct retailers were investigated on 2026-09-28:
 - **Walmart.** Signed affiliate API lookup was verified on October 6, 2026.
   [TechScout shopping research](docs/techscout-shopping.md) now provides on-demand
   desktop/memory, tablet, computer and tech-supply reports. It uses localized
-  product lookups after search discovery and remains separate from the alert
-  monitor. Run `python -m alerters.techscout --serve` for the local ranked shortlist
-  and comparison dashboard, with manual availability checks. API access does not
+  product lookups after search discovery. The unified dashboard also shows
+  monitor verdicts, saved watches, alert history and source health. Run `python -m alerters.techscout --serve` for the local ranked shortlist
+  and comparison dashboard, with manual Walmart checks and optional Windows
+  desktop/startup shortcuts. Walmart results remain browse-only. API access does not
   establish approval of every downstream use.
 
 Community sources remain useful for discovery and advance sale notices.

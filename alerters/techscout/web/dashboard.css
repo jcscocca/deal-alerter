@@ -117,3 +117,18 @@ footer { color:var(--muted);font-size:11px;margin-top:24px; }
   #comparison { grid-template-columns:1fr; }
   button { min-height:40px; }
 }
+#workspace-nav {display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid var(--line);padding-bottom:12px;}
+#workspace-nav button {font-weight:650;}
+#workspace-notice {padding:12px;background:var(--soft);border-left:3px solid var(--accent);margin:12px 0;}
+#watching-pane>label,#alerts-pane>label {display:flex;gap:12px;align-items:center;margin:20px 0;}
+.watch-card {padding:20px;background:var(--paper);border:1px solid var(--line);border-radius:10px;}
+.watch-card h2 {font-size:18px;}
+.deal-judgment {margin:10px 0;padding-top:10px;border-top:1px solid var(--line);}
+.deal-judgment p {margin:6px 0;}
+.focused-deal {outline:3px solid var(--accent);outline-offset:3px;}
+dialog {color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:12px;width:min(480px,90vw);padding:24px;}
+dialog::backdrop {background:#10274c80;}
+dialog label {display:block;margin:16px 0;}
+dialog input:not([type=checkbox]) {display:block;width:100%;margin-top:7px;padding:10px;color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:6px;}
+#watch-error {color:var(--warn);}
+@media(max-width:760px){#workspace-nav{gap:4px;}#workspace-nav button{flex:1;padding:8px;}#watching-pane>label,#alerts-pane>label{align-items:stretch;flex-direction:column;}}

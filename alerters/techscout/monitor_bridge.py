@@ -63,6 +63,7 @@ def categories(title, is_system=False):
 
 
 def public_row(raw, source, checked, expires, problems, now, profile):
+    from .integration import judgment
     is_offer = raw.get("type") == "offer"
     data = raw.get("offer") if is_offer else raw
     if not isinstance(data, dict):
@@ -132,7 +133,8 @@ def public_row(raw, source, checked, expires, problems, now, profile):
     kinds = categories(title, data.get("is_system", False))
     product_group = (f"Desktops · RTX {gpu_model(title)} · {fit.get('installed_gb') or '?'}GB" if fit else
                      ("Computers" if "computers" in kinds else "Components") + " · " + str(data.get("product_group") or "Other tech")[:150])
-    return {"id": source + ":" + hashlib.sha256(identity.encode()).hexdigest()[:24],
+    return {"id": source + ":" + hashlib.sha256(identity.encode()).hexdigest()[:24], "judgment": judgment(raw.get("judgment")),
+            "first_seen": raw.get("first_seen") if stamp(raw.get("first_seen")) is not None else None,
             "title": title, "url": url, "source": source, "retailer": LABELS[source],
             "seller": str(seller)[:250], "condition": condition, "price": price, "shipping": shipping,
             "total": total, "cost_note": cost_note, "available": available, "gpu": gpu_model(title),

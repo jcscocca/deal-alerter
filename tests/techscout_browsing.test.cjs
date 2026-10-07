@@ -62,3 +62,20 @@ test('saved zero-result selections persist and malformed storage is sanitized',(
   assert.equal(saved.filters.ram,'96GB');
   assert.deepEqual(B.restore({budget:-1,source:'<script>',filters:{gpu:[]},sort:'invalid'}),B.defaults());
 });
+
+test('qualifying and target views require current retailer evidence as well as a verdict',()=>{
+  const eligible=row('qualified',{judgment:{eligible:true,level:3,target_hit:true}});
+  const rows=[eligible,row('unassessed'),{...eligible,id:'stale',expires_at:now-1},
+    {...eligible,id:'lead',lead:true},{...eligible,id:'held',verification_reasons:['Shipping unknown']},
+    {...eligible,id:'no-total',total:null},{...eligible,id:'sold',available:false},
+    {...eligible,id:'not-qualified',judgment:{eligible:false,target_hit:true}}];
+  for(const quality of ['best','target'])assert.deepEqual(B.partition(rows,[],{...B.defaults(),quality},'monitor',now).current.map(r=>r.id),['qualified']);
+  assert.equal(B.partition([{...eligible,judgment:{eligible:true,target_hit:false}}],[],{...B.defaults(),quality:'target'},'monitor',now).current.length,0);
+});
+
+test('new finds use first sighting, not a repeated check, and exclude unknown or future times',()=>{
+  const rows=[row('new',{first_seen:new Date((now-3600)*1000).toISOString()}),
+    row('old',{first_seen:new Date((now-90000)*1000).toISOString()}),
+    row('future',{first_seen:new Date((now+1)*1000).toISOString()}),row('unknown')];
+  assert.deepEqual(B.partition(rows,[],{...B.defaults(),quality:'new'},'monitor',now).current.map(r=>r.id),['new']);
+});

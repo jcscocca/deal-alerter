@@ -7,7 +7,7 @@
   const rowFresh=B.fresh, token=document.querySelector('meta[name="techscout-token"]').content;
   const categoryNames={'desktop-memory':'Desktops',tablets:'Tablets',computers:'Computers',supplies:'Tech supplies',memory:'Memory',amazon:'Amazon deals',monitor:'All deals'};
   const allLabels={kind:'All product types',gpu:'All GPUs',ram:'All RAM capacities',cpu:'All CPUs',storage:'All storage',condition:'All conditions'};
-  let category='desktop-memory',view='list',state=null,related=[],pending=false,poll=null,version=0;
+  let category='monitor',view='list',state=null,related=[],pending=false,poll=null,version=0;
   let savedViews={},prefs=B.defaults(),picks=new Set(),expanded=new Set(),expandedReports=new Set(),limits={current:12,other:12,similar:6};
   try {
     const saved=JSON.parse(localStorage.getItem('techscout-browsing') || '{}');
@@ -22,9 +22,9 @@
   function notice(message){el('notice').textContent=message;el('notice').hidden=!message;}
   function rows(){return state ? B.rowsOf(state.snapshot) : [];}
   function candidates(){return B.unique([...rows(),...related]);}
-  function activeFilters(){return prefs.source!=='all' || prefs.budget!=null || Object.values(prefs.filters).some(Boolean);}
+  function activeFilters(){return prefs.quality!=='all' || prefs.source!=='all' || prefs.budget!=null || Object.values(prefs.filters).some(Boolean);}
   function changed(){limits={current:12,other:12,similar:6};saveView();render();}
-  function resetFilters(){prefs.filters={};prefs.source='all';prefs.budget=null;changed();}
+  function resetFilters(){prefs.filters={};prefs.source='all';prefs.budget=null;prefs.quality='all';changed();}
   function renderFilters(){
     const data=rows();
     for(const key of B.keys){
@@ -45,12 +45,13 @@
       return `<option value="${escape(s.source)}" ${prefs.source===s.source ? 'selected' : ''}>${escape(s.label)} · ${count}</option>`;
     }).join('');
     if(document.activeElement!==el('budget'))el('budget').value=prefs.budget ?? '';
-    el('sort-select').value=prefs.sort;el('reuse').checked=prefs.reuse;
+    el('quality-select').value=prefs.quality;el('sort-select').value=prefs.sort;el('reuse').checked=prefs.reuse;
     el('sort-select').querySelector('[value="recommended"]').textContent=prefs.reuse ? 'RAM evidence, then price' : 'Recommended · known total';
     el('reuse-option').hidden=!['desktop-memory','computers','monitor'].includes(category);
     el('reset-filters').disabled=!activeFilters();
     const chips=Object.entries(prefs.filters).filter(([,v])=>v).map(([key,value])=>[key,`${B.labels[key]}: ${value}`]);
     if(prefs.source!=='all')chips.push(['source',sources.find(s=>s.source===prefs.source).label]);
+    if(prefs.quality!=='all')chips.push(['quality',el('quality-select').selectedOptions[0].textContent]);
     if(prefs.budget!=null)chips.push(['budget',`Up to ${dollars(prefs.budget)}`]);
     el('filter-chips').innerHTML=chips.length ? chips.map(([key,label])=>`<button class="chip" data-remove="${key}" aria-label="Remove ${escape(label)} filter">${escape(label)} <span aria-hidden="true">×</span></button>`).join('') : '<span class="small muted">All configurations</span>';
     el('filter-summary').textContent=`${data.filter(row=>B.matches(row,prefs)).length} of ${data.length} products match. Budget uses the known total, or item price / highest publisher quote when the total is unknown. Shipping may add to the cost.`;
@@ -72,7 +73,7 @@
     const short=title.length>110 ? title.slice(0,107).replace(/\s+\S*$/,'')+'…' : title;
     const preferences=B.preferenceReasons(row),checks=B.verification(row);
     const concerns=row.lead ? row.reasons : [...(prefs.reuse ? preferences : []),...checks];
-    return `<article class="deal ${status.tone}" data-product-id="${escape(row.id)}"><div class="deal-main"><div class="card-meta"><span class="badge ${status.tone}">${status.label}</span><span>${escape(row.retailer)} · ${escape(row.condition)}</span></div><h3 class="deal-title">${escape(short)}</h3><div class="spec-strip">${specStrip(row)}</div>${row.differences?.length ? `<p class="differences">${row.differences.map(escape).join(' · ')}</p>` : ''}${concerns.length ? `<p class="concern">${escape(concerns[0])}${concerns.length>1 ? ` (+${concerns.length-1} more in details)` : ''}</p>` : ''}<p class="small muted">Checked ${escape(date(row.checked_at))} · sold by ${escape(row.seller)}</p></div><div class="price">${price(row)}</div><div class="card-actions">${selectButton(row)}<a href="${escape(row.url)}" target="_blank" rel="noopener noreferrer">${row.lead ? 'Read source' : 'View listing'} ↗</a></div><details class="listing-details" data-detail="${escape(row.id)}" ${expanded.has(row.id) ? 'open' : ''}><summary>Listing details${row.why ? ' & ranking' : ''}</summary><p>${escape(row.title)}</p>${row.fit_summary ? `<p>RAM reuse: ${escape(row.fit_summary)}</p>` : ''}${[...new Set([...checks,...preferences,...(row.warnings || [])])].map(w=>`<p class="small muted">${escape(w)}</p>`).join('')}${row.why ? `<p class="small muted">Original group rank ${row.rank}: ${escape(row.why)}</p>` : ''}<p class="small muted">Item ${dollars(row.price)} · shipping ${dollars(row.shipping)} · tax excluded</p></details>${reports(row)}</article>`;
+    return `<article class="deal ${status.tone}" data-product-id="${escape(row.id)}"><div class="deal-main"><div class="card-meta"><span class="badge ${status.tone}">${status.label}</span><span>${escape(row.retailer)} · ${escape(row.condition)}</span></div><h3 class="deal-title">${escape(short)}</h3><div class="spec-strip">${specStrip(row)}</div>${row.differences?.length ? `<p class="differences">${row.differences.map(escape).join(' · ')}</p>` : ''}${window.TechScoutWorkspace.judgmentCard(row)}${concerns.length ? `<p class="concern">${escape(concerns[0])}${concerns.length>1 ? ` (+${concerns.length-1} more in details)` : ''}</p>` : ''}<p class="small muted">Checked ${escape(date(row.checked_at))} · sold by ${escape(row.seller)}</p></div><div class="price">${price(row)}</div><div class="card-actions">${selectButton(row)}<button data-watch-product="${escape(row.id)}">Watch product</button><a href="${escape(row.url)}" target="_blank" rel="noopener noreferrer">${row.lead ? 'Read source' : 'View listing'} ↗</a></div><details class="listing-details" data-detail="${escape(row.id)}" ${expanded.has(row.id) ? 'open' : ''}><summary>Listing details${row.why ? ' & ranking' : ''}</summary><p>${escape(row.title)}</p>${row.fit_summary ? `<p>RAM reuse: ${escape(row.fit_summary)}</p>` : ''}${[...new Set([...checks,...preferences,...(row.warnings || [])])].map(w=>`<p class="small muted">${escape(w)}</p>`).join('')}${row.why ? `<p class="small muted">Original group rank ${row.rank}: ${escape(row.why)}</p>` : ''}<p class="small muted">Item ${dollars(row.price)} · shipping ${dollars(row.shipping)} · tax excluded</p></details>${reports(row)}</article>`;
   }
   function sectionCards(id,list){
     const limit=limits[id];el(`${id}-cards`).innerHTML=list.slice(0,limit).map(rowCard).join('');
@@ -90,6 +91,7 @@
     const remapped=new Set([...picks].map(id=>candidates().find(r=>(r.aliases || []).includes(id))?.id || id));
     if([...picks].some(id=>!remapped.has(id))){picks=remapped;remember();}
     const data=state.snapshot,results=B.partition(rows(),related,prefs,category);
+    window.TechScoutWorkspace.update({category,prefs,rows:candidates(),snapshot:data});
     renderFilters();renderCompare();sectionCards('current',results.current);sectionCards('other',results.other);
     el('current-empty').hidden=Boolean(results.current.length);
     el('current-empty').textContent=results.other.length ? 'No current offers meet all preferences. Continue below for other matching products.' : 'No exact matches right now. Nearby alternatives appear below when available.';
@@ -109,8 +111,7 @@
     el('refresh').disabled=pending || Boolean(state.running);el('refresh').textContent=['monitor','amazon'].includes(category) ? 'Reload saved results' : state.running ? 'Checking Walmart…' : 'Check Walmart now';
     el('heading').textContent=category==='amazon' ? 'Amazon deals, sources combined' : category==='monitor' ? 'Deals across your sources' : `${categoryNames[category]} worth a closer look`;
     el('purpose').textContent=category==='amazon' ? 'Published discoveries · original quotes and requirements stay on each card' : prefs.reuse ? 'Your build preference: reuse your 64GB kit · aim for 96–128GB' : 'Browse complete products · compare the exact variant, seller and condition';
-    el('ranking-note').textContent=prefs.sort==='newest' ? 'Newest checks first within each section. A recent publisher check does not confirm retailer stock.' : prefs.sort==='recommended' && prefs.reuse ? 'Documented RAM layouts first, then known total within each section. Mixed-kit compatibility still needs verification.' : 'Lowest known totals first, then item or publisher quotes where totals are unknown. Different models can differ in performance and value.';
-    el('source-health').innerHTML=data.sources.map(s=>`<div class="source-card"><strong>${escape(s.label)}</strong><span class="badge ${s.ready ? 'current' : 'review'}">${escape(s.status || (s.ready ? 'Current' : s.jobs ? 'Check needed' : 'Not enabled'))}</span><p class="small muted">${s.ready}/${s.jobs} checks current · ${s.count} products/leads across categories<br>${escape(date(s.checked_at))}${s.truncated ? ' · Result cap reached' : ''}</p></div>`).join('');
+    el('ranking-note').textContent=prefs.sort==='best' ? 'Eligible alerter verdicts first within each section, then known total. Unassessed research stays labeled.' : prefs.sort==='newest' ? 'Newest checks first within each section. A recent publisher check does not confirm retailer stock.' : prefs.sort==='recommended' && prefs.reuse ? 'Documented RAM layouts first, then known total within each section. Mixed-kit compatibility still needs verification.' : 'Lowest known totals first, then item or publisher quotes where totals are unknown. Different models can differ in performance and value.';
     el('coverage').innerHTML='<p>Saved results update every 15 seconds. Publisher feeds update every 15 minutes while the dashboard runs. The Walmart button checks only this category’s preset searches. Browsing, filtering and alternatives do not start retailer searches or send alerts.</p>'+data.coverage.map(c=>`<p>Walmart ${escape(c.query)}: ${escape(c.returned)} of ${escape(c.total ?? 'unknown')} results inspected</p>`).join('')+data.problems.map(p=>`<p>${escape(p)}</p>`).join('');
   }
   async function load(){
@@ -141,6 +142,7 @@
   el('categories').addEventListener('click',event=>{const b=event.target.closest('[data-category]');if(b)chooseCategory(b.dataset.category);});
   el('category-select').addEventListener('change',event=>chooseCategory(event.target.value));
   for(const key of B.keys)el(`${key}-select`).addEventListener('change',event=>{prefs.filters[key]=event.target.value;changed();});
+  el('quality-select').addEventListener('change',event=>{prefs.quality=event.target.value;changed();});
   el('source-select').addEventListener('change',event=>{prefs.source=event.target.value;changed();});
   el('sort-select').addEventListener('change',event=>{prefs.sort=event.target.value;changed();});
   el('reuse').addEventListener('change',event=>{prefs.reuse=event.target.checked;changed();});
@@ -152,12 +154,14 @@
   el('status').addEventListener('click',event=>{if(event.target.closest('a')){view='list';render();}});
   el('edit-filters').addEventListener('click',()=>{el('filters').open=true;el('filters').scrollIntoView({block:'start'});});
   document.querySelector('main').addEventListener('click',event=>{
-    const chip=event.target.closest('[data-remove]');if(chip){const key=chip.dataset.remove;if(key==='source')prefs.source='all';else if(key==='budget')prefs.budget=null;else delete prefs.filters[key];changed();return;}
+    const chip=event.target.closest('[data-remove]');if(chip){const key=chip.dataset.remove;if(key==='quality')prefs.quality='all';else if(key==='source')prefs.source='all';else if(key==='budget')prefs.budget=null;else delete prefs.filters[key];changed();return;}
     const more=event.target.closest('[data-more]');if(more){limits[more.dataset.more]+=more.dataset.more==='similar' ? 6 : 12;render();return;}
     if(event.target.closest('[data-clear-picks]')){picks.clear();remember();render();return;}
     const button=event.target.closest('[data-pick]');if(!button)return;const id=button.dataset.pick;
     if(picks.has(id))picks.delete(id);else if(picks.size<3)picks.add(id);else{notice('Three finalists are saved. Remove one before adding another.');return;}remember();notice('');render();
   });
+  window.addEventListener('techscout:open-product',event=>{view='list';chooseCategory('monitor');prefs={...defaults(),reuse:false};limits={current:2500,other:2500,similar:6};window.TechScoutWorkspace.focusId=event.detail;});
+  window.addEventListener('techscout:browse-watch',event=>{const w=event.detail;view='list';chooseCategory(w.category);prefs={...defaults(),filters:{...w.filters},source:w.source,budget:w.budget,reuse:w.reuse};if(w.product_id){limits={current:2500,other:2500,similar:6};window.TechScoutWorkspace.focusId=w.product_id;}});
   // Reclassify expired offers even if the local server stops responding.
   setInterval(()=>{if(state)render();},15000);
   if(window.matchMedia('(max-width:760px)').matches)el('filters').open=false;

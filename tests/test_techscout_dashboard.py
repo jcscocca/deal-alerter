@@ -39,6 +39,28 @@ def test_rank_known_delivered_totals_within_gpu_ram_groups(tmp_path):
     assert rows[1]["total"] == 2200
 
 
+def test_all_deals_includes_latest_unique_walmart_rows_and_failure_status(tmp_path):
+    save(tmp_path, [product("1", price=2000)], at=NOW-60)
+    save(tmp_path, [product("1", price=1900), product("2")], category="computers", at=NOW)
+    result = snapshot(tmp_path, "monitor", now=NOW, failed_checks={"computers": NOW+1})
+    rows = [r for g in result["groups"] for r in g["rows"]] + result["held"]
+    assert len(rows) == 2
+    assert next(r for r in rows if r["id"] == "1")["price"] == 1900
+    assert all(r["verification_reasons"] == ["Last check failed"] for r in rows)
+    assert result["sources"][0]["source"] == "walmart"
+    assert result["sources"][0]["count"] == 2
+
+
+def test_watch_endpoint_requires_origin_and_rejects_invalid_payload(web):
+    session, base, app, calls = web
+    assert session.get(base + "/workspace.js").status_code == 200
+    assert session.get(base + "/api/workspace").json()["supported"] is False
+    assert session.post(base + "/api/watches", json={}).status_code == 403
+    headers = {"Origin": base, "X-TechScout-Token": app.token}
+    assert session.post(base + "/api/watches", json={"settings": "bad"}, headers=headers).status_code == 400
+    assert not calls
+
+
 def test_documented_layout_ranks_before_unverified_not_claiming_compatibility(tmp_path):
     fit = {"eligible": True, "installed_gb": 32, "status": "POSSIBLE REUSE", "summary": "Mixed-kit stability unverified"}
     save(tmp_path, [product("1", price=1000), product("2", price=2200, memory_fit=fit)])
