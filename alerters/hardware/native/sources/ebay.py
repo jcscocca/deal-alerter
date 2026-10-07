@@ -305,6 +305,10 @@ class EbaySource:
                     extra={
                         "seller": (item.get("seller") or {}).get("username", ""),
                         "country": (item.get("itemLocation") or {}).get("country", ""),
+                        "shopping": {"item_price": _price_of(item) if (item.get("price") or {}).get("currency", "USD") == "USD" else None,
+                                     "shipping": _shipping_of(item),
+                                     "available": (item.get("estimatedAvailabilityStatus") not in ("OUT_OF_STOCK", "TEMPORARILY_UNAVAILABLE")
+                                                   and (not item.get("itemEndDate") or (_parse_iso(item["itemEndDate"]) or now) > now))},
                     },
                 )
             )
@@ -404,6 +408,11 @@ def _delivered_price(item: dict) -> float | None:
     price = _price_of(item)
     if price is None:
         return None
+    shipping = _shipping_of(item)
+    return price + shipping if shipping is not None else price
+
+
+def _shipping_of(item: dict) -> float | None:
     currency = (item.get("price") or {}).get("currency", "USD")
     costs = []
     for option in item.get("shippingOptions") or []:
@@ -416,7 +425,7 @@ def _delivered_price(item: dict) -> float | None:
             continue
         if math.isfinite(cost) and cost >= 0:
             costs.append(cost)
-    return price + min(costs) if costs else price
+    return min(costs) if costs else None
 
 
 def _price_of(item: dict) -> float | None:

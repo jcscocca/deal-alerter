@@ -16,11 +16,13 @@ from urllib.parse import parse_qs, urlsplit
 from dealcore.state import atomic_write
 from alerters.hardware.prebuilt import gpu_model
 from .research import PRESETS, capacity_mismatch, cpu_model
+from .monitor_bridge import read_monitor
 
 FRESH_SECONDS = 15 * 60
 ASSETS = Path(__file__).with_name("web")
 CATEGORIES = {"desktop-memory": "Desktops & memory", "tablets": "Tablets",
-              "computers": "Computers", "supplies": "Tech supplies", "memory": "Memory"}
+              "computers": "Computers", "supplies": "Tech supplies", "memory": "Memory",
+              "monitor": "All monitor deals"}
 
 
 def amount(value):
@@ -35,7 +37,7 @@ def timestamp(value):
         return None
 
 
-def snapshot(directory: Path, category: str, *, now=None, failed_at=None) -> dict:
+def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None) -> dict:
     """Read only a known report file and project public shopping fields."""
     if category not in PRESETS:
         raise ValueError("Unknown category")
@@ -125,9 +127,62 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None) -> dic
     return result
 
 
+def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monitor_runtime=None) -> dict:
+    if category not in CATEGORIES:
+        raise ValueError("Unknown category")
+    now = time.time() if now is None else now
+    if category == "monitor":
+        result = {"category": category, "label": CATEGORIES[category], "checked_at": None,
+                  "expires_at": None, "fresh": False, "zip_code": None, "groups": [],
+                  "held": [], "problems": [], "coverage": [], "queries": [], "count": 0}
+    else:
+        result = walmart_snapshot(directory, category, now=now, failed_at=failed_at)
+    rows = [row for group in result["groups"] for row in group["rows"]] + result["held"]
+    for row in rows:
+        row.update(source="walmart", retailer="Walmart", checked_at=result["checked_at"],
+                   expires_at=result["expires_at"], lead=False, cost_note="price + shipping · before tax")
+    result["sources"] = ([{"source": "walmart", "label": "Walmart", "jobs": 1,
+                            "ready": int(result["fresh"]), "count": len(rows),
+                            "checked_at": result["checked_at"], "truncated": False}]
+                         if category != "monitor" else [])
+    monitor = read_monitor(monitor_runtime, category, now)
+    rows += monitor["rows"]
+    result["sources"] += monitor["sources"]
+    result["problems"] += monitor["problems"]
+    result["monitor_connected"] = bool(monitor["sources"])
+    result["groups"], result["held"], result["leads"] = [], [], []
+    groups = {}
+    for row in rows:
+        if row.get("lead"):
+            result["leads"].append(row)
+        elif row["reasons"]:
+            result["held"].append(row)
+        else:
+            name = (f"RTX {row['gpu']} · {row['ram']}GB · {row['condition']}" if category == "desktop-memory" else
+                    f"{row.get('product_group', 'Products')} · {row['condition']} · price order" if category == "monitor" else
+                    f"{row['condition']} · price order")
+            groups.setdefault(name, []).append(row)
+    for name, candidates in sorted(groups.items()):
+        candidates.sort(key=lambda row: (not row["layout_documented"] if category == "desktop-memory" else False,
+                                         row["total"], row["id"]))
+        for rank, row in enumerate(candidates, 1):
+            row["rank"] = rank
+            row["why"] = ("Documented RAM layout first, then known total within this GPU/RAM/condition group."
+                          if category == "desktop-memory" else "Known total within this group; unlike models are not equivalent in performance or value.")
+        result["groups"].append({"name": name, "rows": candidates})
+    result["count"] = len(rows)
+    if monitor["sources"]:
+        result["fresh"] = any(source["ready"] for source in result["sources"])
+        dates = [row["checked_at"] for row in rows if timestamp(row.get("checked_at")) is not None]
+        result["checked_at"] = max(dates, key=timestamp) if dates else result["checked_at"]
+        result["expires_at"] = max((row.get("expires_at") or 0 for row in rows), default=0)
+    return result
+
+
 class Dashboard:
-    def __init__(self, directory: Path, refresh, *, clock=time.time, cooldown=30):
+    def __init__(self, directory: Path, refresh, *, clock=time.time, cooldown=30, monitor_runtime=None):
         self.directory, self.refresh, self.clock, self.cooldown = directory, refresh, clock, cooldown
+        self.monitor_runtime = monitor_runtime
         self.token = secrets.token_urlsafe(32)
         self.lock = threading.Lock()
         self.running = None
@@ -151,10 +206,12 @@ class Dashboard:
             failed_at = job.get("at") if job.get("status") in ("failed", "checking") and self.running != category else None
             running = self.running
             remaining = max(0, self.cooldown - (self.clock() - self.last_start)) if self.last_start is not None else 0
-        return {"snapshot": snapshot(self.directory, category, now=self.clock(), failed_at=failed_at),
+        return {"snapshot": snapshot(self.directory, category, now=self.clock(), failed_at=failed_at, monitor_runtime=self.monitor_runtime),
                 "running": running, "last_check": job, "retry_after": math.ceil(remaining), "fresh_seconds": FRESH_SECONDS}
 
     def start(self, category):
+        if category == "monitor":
+            return 200, {"status": "Monitor results are read automatically; no extra retailer requests"}
         if category not in PRESETS:
             return 400, {"error": "Unknown category"}
         with self.lock:
@@ -220,7 +277,7 @@ def create_server(dashboard: Dashboard, port=8768):
             parsed = urlsplit(self.path)
             if parsed.path == "/api/state":
                 category = parse_qs(parsed.query).get("category", ["desktop-memory"])[0]
-                if category not in PRESETS:
+                if category not in CATEGORIES:
                     return self.send(400, {"error": "Unknown category"})
                 return self.send(200, dashboard.state(category))
             if parsed.path == "/health":
@@ -258,10 +315,10 @@ def create_server(dashboard: Dashboard, port=8768):
     return server
 
 
-def serve(directory: Path, refresh, port=8768):
+def serve(directory: Path, refresh, port=8768, *, monitor_runtime=None):
     if not 1 <= port <= 65535:
         raise ValueError("Port must be between 1 and 65535")
-    server = create_server(Dashboard(directory, refresh), port)
+    server = create_server(Dashboard(directory, refresh, monitor_runtime=monitor_runtime), port)
     print(f"TechScout is ready at http://127.0.0.1:{server.server_port}/ (Ctrl+C to stop)", flush=True)
     try:
         server.serve_forever()

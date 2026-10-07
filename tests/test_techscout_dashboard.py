@@ -202,7 +202,7 @@ def test_local_page_authorized_refresh_and_input_bounds(web):
 def test_dashboard_cli_start_does_not_load_credentials(tmp_path, monkeypatch):
     from alerters.techscout import __main__ as cli, dashboard
     called = []
-    def fake_serve(directory, callback, port):
+    def fake_serve(directory, callback, port, **kwargs):
         called.append((directory, port))
     def forbidden(*args):
         raise AssertionError("Dashboard startup must not load API credentials")
