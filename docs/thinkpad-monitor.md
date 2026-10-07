@@ -348,3 +348,20 @@ TechScout reads this file without acquiring the hardware writer lock, loading
 monitor secrets, changing schedules, or making duplicate retailer requests.
 Deploy the merged monitor update using the existing Prepare/Update procedure
 before expecting these sources in TechScout.
+
+
+The unified TechScout views also use `shopping-activity.json` (at most 500 public
+send/failure records) and first-sighting timestamps maintained in
+`shopping-seen.json` (at most 10,000 identities). Product rows carry the engine's
+existing judgment and per-channel delivery decision; no new retailer calls are
+made for those fields. These exports contain no notification endpoints or secrets.
+
+Notification watches live in the separate `ui/watches.json` preferences file.
+The monitor validates it on each job and digest. The default preserves current
+rules; watches and pause mode can only narrow delivery. Invalid settings pause
+delivery and appear in health status. The dashboard's token/origin-protected
+write endpoint accepts only the bounded watch schema and rejects stale revisions.
+Use the [TechScout Windows setup](techscout-shopping.md#windows-shortcut-and-automatic-startup)
+after upgrading to create the restricted writable settings folder and install
+per-user desktop/Start menu/startup shortcuts. Do not grant write access to the
+application, secrets, receipts or history to make the UI work.

@@ -81,6 +81,28 @@ class Domain:
 
 
 class CoreTests(unittest.TestCase):
+    def test_decisions_distinguish_success_failure_suppression_and_watch_pause(self):
+        good, bad = Mock(), Mock(side_effect=RuntimeError("offline"))
+        channels = (Channel("ntfy", "push", good), Channel("discord", "push", bad))
+        first = run(Domain([listing()]), self.state, self.options, channels, now=NOW)
+        self.assertEqual([d["status"] for d in first.decisions], ["sent", "failed"])
+        second = run(Domain([listing()]), self.state, self.options, channels, now=NOW)
+        self.assertEqual([d["status"] for d in second.decisions], ["unchanged", "failed"])
+        paused = run(Domain([listing("b")]), self.state, replace(self.options, notify_filter=lambda _: False), channels, now=NOW)
+        self.assertEqual([d["status"] for d in paused.decisions], ["watch-filtered", "watch-filtered"])
+        self.assertEqual(good.call_count, 1)
+        self.assertNotIn("test:b", self.state.records)
+
+    def test_watch_cannot_promote_ineligible_or_dry_run_into_a_send(self):
+        domain = Domain([listing()])
+        domain.judge = lambda row, evidence: replace(item(), alertable=False)
+        send = Mock()
+        result = run(domain, self.state, replace(self.options, notify_filter=lambda _: True), (Channel("ntfy", "push", send),), now=NOW)
+        self.assertEqual(result.decisions[0]["status"], "ineligible")
+        dry = run(Domain([listing()]), self.state, replace(self.options, dry_run=True), (Channel("ntfy", "push", send),), now=NOW)
+        self.assertEqual(dry.decisions[0]["status"], "dry-run")
+        send.assert_not_called()
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

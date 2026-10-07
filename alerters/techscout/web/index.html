@@ -7,11 +7,15 @@
   <title>TechScout · Your shopping shortlist</title>
   <link rel="stylesheet" href="/dashboard.css">
   <script src="/browsing.js" defer></script>
+  <script src="/workspace.js" defer></script>
   <script src="/dashboard.js" defer></script>
 </head>
 <body>
   <header class="app-header"><div class="brand-mark" aria-hidden="true">TS</div><div><strong>TechScout</strong><div class="muted small">Your shopping shortlist</div></div><span class="local-label">Private · on this computer</span></header>
   <main>
+    <nav id="workspace-nav" aria-label="TechScout views"><button data-pane="deals" aria-pressed="true">Deals</button><button data-pane="watching" aria-pressed="false">Watching</button><button data-pane="alerts" aria-pressed="false">Alerts</button><button data-pane="sources" aria-pressed="false">Sources</button></nav>
+    <div id="workspace-notice" role="status" hidden></div>
+    <section id="deals-pane">
     <label class="compact-category" for="category-select">Category
       <select id="category-select"><option value="desktop-memory">Desktops</option><option value="tablets">Tablets</option><option value="computers">Computers</option><option value="supplies">Tech supplies</option><option value="memory">Memory</option><option value="amazon">Amazon deals</option><option value="monitor">All deals</option></select>
     </label>
@@ -36,6 +40,7 @@
         <label id="cpu-filter" for="cpu-select">CPU<select id="cpu-select"><option value="">All CPUs</option></select></label>
         <label id="storage-filter" for="storage-select">Storage<select id="storage-select"><option value="">All storage</option></select></label>
         <label id="condition-filter" for="condition-select">Condition<select id="condition-select"><option value="">All conditions</option></select></label>
+        <label for="quality-select">Deal view<select id="quality-select"><option value="all">All finds</option><option value="best">Qualifying deals</option><option value="target">Target price met</option><option value="new">New monitor finds · 24 hours</option></select></label>
         <label for="source-select">Source<select id="source-select"><option value="all">All sources</option></select></label>
         <label for="budget">Maximum price ($)<input id="budget" type="number" min="0" max="999999" step="0.01" inputmode="decimal" placeholder="Any price"></label>
       </div>
@@ -43,7 +48,7 @@
       <p id="filter-summary" class="small muted">Choose any combination. All configurations are shown by default.</p>
     </details>
     <div class="active-bar"><div id="filter-chips" aria-label="Active filters"></div><button id="edit-filters">Edit filters</button></div>
-    <div class="toolbar"><div class="view-switch" aria-label="View"><button id="list-view" aria-pressed="true">Browse deals</button><button id="compare-view" aria-pressed="false">Compare <span id="compare-count">0</span>/3</button></div><label class="sort-label" for="sort-select">Sort<select id="sort-select"><option value="recommended">RAM evidence, then price</option><option value="total">Lowest known total</option><option value="newest">Newest checked</option></select></label></div>
+    <div class="toolbar"><button id="watch-search">Watch this search</button><div class="view-switch" aria-label="View"><button id="list-view" aria-pressed="true">Browse deals</button><button id="compare-view" aria-pressed="false">Compare <span id="compare-count">0</span>/3</button></div><label class="sort-label" for="sort-select">Sort<select id="sort-select"><option value="recommended">RAM evidence, then price</option><option value="total">Lowest known total</option><option value="newest">Newest checked</option><option value="best">Best deal verdict</option></select></label></div>
     <p id="ranking-note" class="small muted"></p>
     <p id="compare-note" class="small muted" hidden>Saved comparisons stay visible regardless of filters.</p>
     <div id="results">
@@ -52,9 +57,14 @@
       <section id="similar-section" class="result-section alternatives" aria-labelledby="similar-heading" hidden><div class="section-heading"><div><span class="eyebrow">OUTSIDE YOUR SELECTION</span><h2 id="similar-heading">Similar alternatives <span id="similar-count" class="count">0</span></h2><p id="similar-note" class="small muted"></p></div><button id="toggle-similar" aria-expanded="true" aria-controls="similar-cards">Hide alternatives</button></div><div id="similar-cards" class="cards"></div><button id="similar-more" class="show-more" data-more="similar" hidden>Show more alternatives</button></section>
     </div>
     <section id="comparison" aria-label="Compare finalists" hidden></section>
-    <details class="research-details"><summary>Connected sources &amp; check status</summary><div id="source-health"></div></details>
+    </section>
+    <section id="watching-pane" hidden><h1>Watching</h1><p>Save exact searches or products from Deals. Watches use the monitor’s existing coverage and deal-quality rules.</p><label for="notification-mode">Hardware notifications<select id="notification-mode"><option value="all">All qualifying deals · existing rules</option><option value="watches">Only enabled watches</option><option value="paused">Pause deal notifications</option></select></label><p id="watch-status" class="small muted"></p><p class="small muted">Source health warnings stay separate. Changes apply on the next monitor job. Walmart research and publisher feeds are browse-only here; saving a watch does not start new searches.</p><div id="watch-list" class="cards"></div></section>
+    <section id="alerts-pane" hidden><h1>Alerts</h1><p>Successful sends, failed attempts, and the latest decisions from the hardware alerter.</p><label for="alert-filter">Show<select id="alert-filter"><option value="history">Sent &amp; failed</option><option value="decisions">Why didn’t this alert?</option></select></label><p class="small muted">Sent means the transport accepted the notification. Old prices are labeled with their event time; they are not current offers. Up to 500 recent events are retained.</p><div id="alert-list" class="cards"></div></section>
+    <section id="sources-pane" hidden><h1>Sources</h1><details class="research-details" open><summary>Connected sources &amp; check status</summary><div id="source-health"></div></details>
     <details class="research-details"><summary>Search scope &amp; coverage</summary><div id="coverage"></div></details>
+    </section>
     <footer>Prices include published shipping and exclude tax. Check times and freshness are specific to each source; checkout can differ. Rankings use RAM-layout evidence and known totals, not a performance score or a historical discount claim. Mixed-kit stability remains unverified.</footer>
+    <dialog id="watch-dialog"><form id="watch-form"><h2 id="watch-dialog-title">Watch this search</h2><label for="watch-name">Name<input id="watch-name" maxlength="80" required></label><label for="watch-budget">Maximum total ($)<input id="watch-budget" type="number" min="0" max="999999" step="0.01" placeholder="Use existing deal rules"></label><label><input id="watch-enabled" type="checkbox" checked> Enabled</label><div id="watch-criteria" class="filter-grid"></div><label id="watch-reuse-label"><input id="watch-reuse" type="checkbox"> Prefer RAM reuse for desktops</label><p id="watch-description" class="small muted"></p><p id="watch-error" role="alert"></p><div class="card-actions"><button type="submit" class="primary">Save watch</button><button type="button" id="watch-cancel">Cancel</button></div></form></dialog>
   </main>
 </body>
 </html>

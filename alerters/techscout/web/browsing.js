@@ -4,7 +4,7 @@
   const unknown = 'Not established';
   const keys = ['kind','gpu','ram','cpu','storage','condition'];
   const labels = {kind:'Product type',gpu:'GPU',ram:'RAM',cpu:'CPU',storage:'Storage',condition:'Condition'};
-  const defaults = () => ({filters:{},source:'all',budget:null,sort:'recommended',reuse:true,similar:true});
+  const defaults = () => ({filters:{},source:'all',budget:null,sort:'recommended',reuse:true,similar:true,quality:'all'});
   const value = (row,key) => row.facets?.[key] || unknown;
   const hasSource = (row,source) => row.source === source || (row.sources || []).includes(source);
   const fresh = (row,now=Date.now()/1000) => Number.isFinite(row.expires_at) && now <= row.expires_at;
@@ -19,8 +19,13 @@
     return (except==='source' || prefs.source==='all' || hasSource(row,prefs.source)) &&
       (except==='budget' || prefs.budget==null || price!=null && price<=prefs.budget);
   }
-  function matches(row,prefs,except='') {
-    return hardMatch(row,prefs,except) && keys.every(key=>key===except || !prefs.filters[key] || value(row,key)===prefs.filters[key]);
+  function matches(row,prefs,except='',now=Date.now()/1000) {
+    return qualityMatch(row,prefs,now) && hardMatch(row,prefs,except) && keys.every(key=>key===except || !prefs.filters[key] || value(row,key)===prefs.filters[key]);
+  }
+  function qualityMatch(row,prefs,now=Date.now()/1000) {
+    if(prefs.quality==='new')return now*1000-Date.parse(row.first_seen)<86400000 && now*1000>=Date.parse(row.first_seen);
+    if(['best','target'].includes(prefs.quality))return fresh(row,now) && row.available && numericPrice(row.total) && row.total>0 && !row.lead && !verification(row).length && row.judgment?.eligible===true && (prefs.quality!=='target' || row.judgment.target_hit===true);
+    return true;
   }
   function verification(row) { return row.verification_reasons || row.reasons || []; }
   function preferenceReasons(row) {
@@ -38,6 +43,7 @@
     const total = row => numericPrice(row.total) ? row.total : Infinity;
     const checked = row => Date.parse(row.checked_at) || 0;
     return [...rows].sort((a,b)=> {
+      if(prefs.sort==='best'){const diff=(b.judgment?.eligible ? b.judgment.level+1 : 0)-(a.judgment?.eligible ? a.judgment.level+1 : 0);if(diff)return diff;}
       if (prefs.sort==='newest') return checked(b)-checked(a) || a.id.localeCompare(b.id);
       if (prefs.sort==='recommended' && prefs.reuse) {
         const evidence = Number(Boolean(b.layout_documented))-Number(Boolean(a.layout_documented));
@@ -56,7 +62,7 @@
     });
   }
   function partition(rows,related,prefs,category,now=Date.now()/1000) {
-    const matching = rows.filter(row=>matches(row,prefs));
+    const matching = rows.filter(row=>matches(row,prefs,'',now));
     const current = matching.filter(row=>status(row,prefs,now).tone==='current');
     const other = matching.filter(row=>status(row,prefs,now).tone!=='current');
     const ids = new Set(rows.map(row=>row.id));
@@ -65,7 +71,7 @@
     const exactIds = new Set(matching.map(row=>row.id));
     const similar = [];
     for (const row of unique([...rows,...related])) {
-      if (exactIds.has(row.id) || !hardMatch(row,prefs) || !kinds.has(value(row,'kind')) || value(row,'kind')==='Other tech') continue;
+      if (exactIds.has(row.id) || !qualityMatch(row,prefs,now) || !hardMatch(row,prefs) || !kinds.has(value(row,'kind')) || value(row,'kind')==='Other tech') continue;
       const differences = keys.filter(key=>prefs.filters[key] && value(row,key)!==prefs.filters[key]);
       // Never broaden product type, budget, or source. Relax at most one known
       // specification and keep unestablished variants out of recommendations.
@@ -85,7 +91,8 @@
     for (const key of keys) if (typeof raw.filters?.[key]==='string' && raw.filters[key].length<=100) prefs.filters[key]=raw.filters[key];
     if (typeof raw.source==='string' && /^[a-z-]{1,40}$/.test(raw.source)) prefs.source=raw.source;
     if (numericPrice(raw.budget) && raw.budget<=999999) prefs.budget=raw.budget;
-    if (['recommended','total','newest'].includes(raw.sort)) prefs.sort=raw.sort;
+    if (['recommended','total','newest','best'].includes(raw.sort)) prefs.sort=raw.sort;
+    if (['all','best','target','new'].includes(raw.quality)) prefs.quality=raw.quality;
     if (typeof raw.reuse==='boolean') prefs.reuse=raw.reuse;
     if (typeof raw.similar==='boolean') prefs.similar=raw.similar;
     return prefs;

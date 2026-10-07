@@ -389,6 +389,38 @@ def test_restart_preserves_server_backoff(tmp_path, monkeypatch):
     assert restarted.jobs[next(iter(mon.jobs))]["next"] == 9999999999
 
 
+def test_monitor_exports_real_decisions_and_watch_pause_preserves_receipts(tmp_path, monkeypatch, offer):
+    from alerters.hardware import monitor as module
+    from alerters.hardware.monitor_sources import Batch
+    from alerters.hardware.shopping_controls import defaults
+    from alerters.hardware.shopping_export import ShoppingExport
+    from alerters.techscout.integration import activity
+    sent = []
+    monkeypatch.setattr(module, "channels", lambda **_: (Channel("ntfy", "push", sent.append),))
+    runtime = tmp_path / "runtime"
+    mon = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", runtime, dry_run=False)
+    key = mon.add_product(URL)
+    mon.process(key, Batch(offers=[offer]))
+    row = mon.shopping.batches[key]["rows"][0]
+    assert len(sent) == 1 and row["judgment"]["eligible"]
+    assert row["judgment"]["decisions"][0]["status"] == "sent"
+    assert len(activity(runtime)) == 1
+    first_seen = row["first_seen"]
+    mon.write_health()
+    mon.shopping = ShoppingExport(runtime)
+    mon.process(key, Batch(offers=[offer]))
+    row = mon.shopping.batches[key]["rows"][0]
+    assert row["first_seen"] == first_seen
+    assert row["judgment"]["decisions"][0]["status"] == "unchanged"
+    (runtime / "ui").mkdir()
+    mon.controls_path.write_text(json.dumps({**defaults(), "mode": "paused"}))
+    mon.process(key, Batch(offers=[replace(offer, base_price=3500)]))
+    row = mon.shopping.batches[key]["rows"][0]
+    assert row["judgment"]["decisions"][0]["status"] == "watch-filtered"
+    assert len(sent) == 1 and len(activity(runtime)) == 1
+    assert row["judgment"]["deliveries"][0]["price"] == offer.base_price
+
+
 def test_start_recheck_preserves_backoff(tmp_path):
     from alerters.hardware.monitor import job_id
     from alerters.hardware.retailers import canonical_product

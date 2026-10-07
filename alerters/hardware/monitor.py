@@ -36,6 +36,8 @@ from .prebuilt_plugin import MonitorHardwarePlugin, community_offer, offer_listi
 from .retailers import canonical_product
 from .retail_http import Deferred, PublicClient, public_url
 from .shopping_export import ShoppingExport
+from .shopping_activity import judgments
+from .shopping_controls import read_controls, delivery_filter
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUNTIME = Path(os.environ.get("PROGRAMDATA", ROOT / ".local")) / "DealAlerter"
@@ -119,6 +121,7 @@ class Monitor:
         self.problems = [SLICKDEALS_COVERAGE]
         self.results = []
         self.shopping = ShoppingExport(runtime)
+        self.controls_path = runtime / "ui" / "watches.json"
         first_shopping_export = not self.shopping.path.exists()
         self.last_digest = ""
         self.stopping = False
@@ -211,13 +214,22 @@ class Monitor:
         plugin.promote = promote
         state = AlertState(plugin.state_dir / "alerts.json", plugin.normalise_key)
         preview = self.runtime / "previews" / f"{key}.html"
-        options = replace(plugin.options, dry_run=self.dry_run, quiet_when_empty=True, preview=preview)
+        controls, control_error = read_controls(self.controls_path)
+        options = replace(plugin.options, dry_run=self.dry_run, quiet_when_empty=True, preview=preview,
+                          notify_filter=delivery_filter(controls, plugin))
         result = run(plugin, state, options, self.delivery, now=now)
         try:
-            self.shopping.record(key, batch, result.assessments, now)
-        except (ValueError, TypeError, AttributeError):
+            decisions = judgments(plugin, result, options, state, now)
+            self.shopping.record(key, batch, result.assessments, now, decisions)
+        except (OSError, ValueError, TypeError, AttributeError):
             self.shopping.batches.pop(key, None)
             LOG.warning("Shopping batch could not be exported")
+        else:
+            if not self.dry_run:
+                try:
+                    self.shopping.record_activity(decisions)
+                except (OSError, ValueError, TypeError):
+                    LOG.warning("Shopping activity could not be exported")
         for item in result.assessments:
             if item.loggable and not item.detail.is_system and not item.detail.is_bundle:
                 self.benchmarks = [(stamp, old) for stamp, old in self.benchmarks if old.key != item.key and time.time() - stamp <= 1200]
@@ -284,13 +296,22 @@ class Monitor:
         plugin = MonitorHardwarePlugin(ROOT / "config/hardware.toml", self.state_root, daily=True, now=now)
         plugin.sources = (type("Cached", (), {"name": "digest-cache", "fetch": lambda _: FetchResult(rows)})(),)
         state = AlertState(plugin.state_dir / "alerts.json", plugin.normalise_key)
-        result = run(plugin, state, replace(plugin.options, quiet_when_empty=True), email, now=now)
+        controls, control_error = read_controls(self.controls_path)
+        options = replace(plugin.options, quiet_when_empty=True, notify_filter=delivery_filter(controls, plugin))
+        result = run(plugin, state, options, email, now=now)
+        try:
+            self.shopping.record_activity(judgments(plugin, result, options, state, now))
+        except (OSError, ValueError, TypeError, AttributeError):
+            LOG.warning("Shopping digest activity unavailable")
         if not result.problems:
             self.last_digest = day
 
     def write_health(self):
         value = {"version": 1, "pid": os.getpid(), "started": self.started, "heartbeat": time.time(),
                  "dry_run": self.dry_run, "jobs": self.jobs, "problems": self.problems, "results": self.results}
+        _, control_error = read_controls(self.controls_path)
+        if control_error:
+            value["problems"] = [*value["problems"], control_error]
         atomic_write(self.runtime / "health.json", json.dumps(value, indent=2) + "\n")
         try:
             self.shopping.write(self.jobs, value["heartbeat"], dry_run=self.dry_run)

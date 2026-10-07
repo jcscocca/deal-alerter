@@ -1,11 +1,12 @@
 """Fetch, judge, deduplicate, report, notify, persist. No shopping rules."""
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import IntEnum
 from math import isfinite
 from pathlib import Path
+from typing import Callable
 
 from .notify import Channel
 from .report import render_html
@@ -25,12 +26,15 @@ class RunOptions:
     include_others: bool = False
     quiet_when_empty: bool = False
     preview: Path = Path("report.html")
+    # Optional user subscription filter. It can only narrow eligible deliveries.
+    notify_filter: Callable[[Assessment], bool] | None = None
 
 
 @dataclass
 class RunResult:
     assessments: list[Assessment]
     problems: list[str]
+    decisions: list[dict] = field(default_factory=list)
 
     @property
     def exit_code(self) -> int:
@@ -58,6 +62,7 @@ def run(domain: Domain, state: AlertState, options: RunOptions,
     now = now or datetime.now(timezone.utc)
     problems: list[str] = []
     assessments: list[Assessment] = []
+    decisions = []
     live, complete = set(), set()
     fetched, succeeded = [], 0
     try:
@@ -123,9 +128,19 @@ def run(domain: Domain, state: AlertState, options: RunOptions,
             floor = options.email_floor if channel.kind == "email" else options.push_floor
             if floor is None:
                 continue
-            selected = [item for item in assessments if qualifies(item, floor)
-                        and (options.force or state.is_new(item, channel.name, options.improvement,
-                                                         options.remind_after_days, now))]
+            selected = []
+            pending_decisions = {}
+            for item in assessments:
+                qualified = qualifies(item, floor)
+                allowed = not qualified or options.notify_filter is None or options.notify_filter(item)
+                fresh = options.force or state.is_new(item, channel.name, options.improvement,
+                                                      options.remind_after_days, now)
+                status = "ineligible" if not qualified else "watch-filtered" if not allowed else "unchanged" if not fresh else "pending"
+                decision = {"key": item.key, "channel": channel.name, "status": status, "at": now.isoformat()}
+                decisions.append(decision)
+                if status == "pending":
+                    selected.append(item)
+                    pending_decisions[item.key] = decision
             groups = [selected] if channel.kind == "email" else [[item] for item in selected]
             for group in groups:
                 if not group and (options.quiet_when_empty or problems):
@@ -134,17 +149,25 @@ def run(domain: Domain, state: AlertState, options: RunOptions,
                     report = domain.report(group, others if channel.kind == "email" else [], problems)
                     if not options.dry_run:
                         channel.send(report)
+                        for item in group:
+                            pending_decisions[item.key]["status"] = "sent"
                         state.record(group, channel.name, now)
                         # Persist successful deliveries before trying another channel.
                         state.save(now)
+                    else:
+                        for item in group:
+                            pending_decisions[item.key]["status"] = "dry-run"
                 except Exception as exc:
+                    for item in group:
+                        if pending_decisions[item.key]["status"] == "pending":
+                            pending_decisions[item.key]["status"] = "failed"
                     problems.append(f"{channel.name}: delivery failed ({type(exc).__name__})")
 
         preview_buys = [item for item in worthy if options.force or state.is_new(
             item, "email", options.improvement, options.remind_after_days, now)]
         if options.dry_run:
             atomic_write(options.preview, render_html(domain.report(preview_buys, others, problems)))
-        return RunResult(assessments, problems)
+        return RunResult(assessments, problems, decisions)
     finally:
         try:
             if not options.dry_run and succeeded:
