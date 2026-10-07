@@ -219,6 +219,9 @@ Back in ordinary PowerShell, install the per-user shortcuts:
 
 The desktop and Start menu **TechScout** shortcuts start the local dashboard if
 needed and open it. The Startup shortcut starts it silently at sign-in. Use
+`-DataDirectory` to retain an existing TechScout data folder at a different physical
+path, including one redirected by a packaged desktop app. No settings or keys
+are copied. Use
 `-NoStartup` when installing if you only want launch shortcuts. To turn automatic
 startup off later, remove TechScout from the Windows Startup folder. Repeated
 launches reuse the same listening dashboard. Logs are under
