@@ -1,7 +1,7 @@
 [CmdletBinding()]
-param([switch]$NoStartup)
+param([switch]$NoStartup,[string]$DataDirectory='')
 $ErrorActionPreference='Stop'
-$local=Join-Path $env:LOCALAPPDATA 'TechScout'
+$local=if ($DataDirectory) { [IO.Path]::GetFullPath($DataDirectory) } else { Join-Path $env:LOCALAPPDATA 'TechScout' }
 New-Item -ItemType Directory -Force -Path $local | Out-Null
 $app='C:\ProgramData\DealAlerter\app'
 $basePython='C:\ProgramData\DealAlerter\venv\Scripts\python.exe'
