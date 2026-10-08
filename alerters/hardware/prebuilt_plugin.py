@@ -143,10 +143,23 @@ class MonitorHardwarePlugin(HardwarePlugin):
         offer, event, history = self.pc_details[assessment.key]
         total = offer.total(self.now)
         confirmed = offer.confirmed and not offer.announcement and offer.sale_status(self.now) == "live"
-        badge = f"{event.upper()} · {'CONFIRMED OFFER' if confirmed else 'UNVERIFIED ANNOUNCEMENT'}"
+        if offer.announcement:
+            badge = f"{event.upper()} · UNVERIFIED ANNOUNCEMENT"
+        elif offer.stock == "out_of_stock":
+            badge = "OUT OF STOCK · SAVED PRICE"
+        elif confirmed:
+            badge = f"{event.upper()} · CONFIRMED OFFER"
+        elif offer.stock == "preorder":
+            badge = "PREORDER · AVAILABILITY UNCONFIRMED"
+        elif offer.sale_status(self.now) == "upcoming":
+            badge = "UPCOMING-SALE · OFFER UNCONFIRMED"
+        else:
+            badge = "OFFER UNCONFIRMED"
         fit = self.memory_fits[offer.key]
         badge += " · RAM: " + fit.status
         facts = [offer.title, f"Seller: {offer.seller}; condition: {offer.condition}; stock: {offer.stock}"]
+        if not offer.announcement:
+            facts.append("Price and stock checked: " + pacific_time(offer.observed_at))
         facts.extend(f"{key}: {value}" for key, value in offer.specs.items() if value)
         cost = lambda amount: f"${amount:,.2f}" if amount is not None else "unknown"
         facts += [f"PC: {cost(offer.base_price)}; shipping: {cost(offer.shipping)}; required accessories: {cost(offer.required_accessories)}",

@@ -119,6 +119,11 @@ shutdown also leaves its previous snapshot outside the current ranking.
   and unverified publisher reports. Each card labels its status; the header
   counts jump to their sections. Cards keep compact specs visible and move full
   titles, original group ranks and detailed evidence into **Listing details**.
+  Explicit retailer unavailability is labeled **Out of stock** (or **Out of stock
+  at last check** for an older result), with a **Saved price** note. Unknown
+  availability stays unconfirmed. Price and stock check times, including the time
+  zone, appear beside prices in both browsing and comparison cards. Walmart cards
+  explain that checks run on demand; reloading saved results does not refresh stock.
 - **Prioritize reusing my existing 64GB RAM kit** is enabled by default for
   Desktops and separate from the category. Turning it off can promote a fresh,
   otherwise verified off-plan build; it never promotes failed or stale checks,

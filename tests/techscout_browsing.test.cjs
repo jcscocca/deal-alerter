@@ -3,6 +3,21 @@ const assert=require('node:assert/strict');
 const B=require('../alerters/techscout/web/browsing.js');
 const now=2000000000;
 const row=(id,changes={})=>({id,title:'Desktop RTX 5090 64GB DDR5',facets:{kind:'Desktops',gpu:'RTX 5090',ram:'64GB',condition:'New'},source:'newegg',total:4000,price:4000,available:true,expires_at:now+60,checked_at:'2026-10-07T00:00:00Z',verification_reasons:[],preference_reasons:[],reasons:[],fit:'NEEDS SPECS',...changes});
+
+test('explicit sold-out stock stays prominent after a quote becomes stale',()=>{
+  const sold=row('sold',{stock:'out_of_stock',available:false});
+  const stale={...sold,id:'stale',expires_at:now-1};
+  assert.equal(B.status(sold,B.defaults(),now).label,'Out of stock');
+  assert.equal(B.status(stale,B.defaults(),now).label,'Out of stock at last check');
+  assert.equal(B.priceContext(stale,now),'Saved price · out of stock at last check');
+  assert.deepEqual(B.partition([sold,stale],[],B.defaults(),'monitor',now).current,[]);
+  const unknown=row('unknown',{available:false,stock:'unknown'});
+  assert.equal(B.status(unknown,B.defaults(),now).label,'Availability unconfirmed');
+  assert.doesNotMatch(B.priceContext(unknown,now),/out of stock/);
+  assert.equal(B.priceContext(row('old',{expires_at:now-1}),now),'Saved price · needs a new stock check');
+  assert.equal(B.priceContext(row('current'),now),'');
+  assert.equal(B.status({...sold,lead:true},B.defaults(),now).label,'Publisher report');
+});
 test('matching outside-plan offers remain visible, independently of stale and publisher evidence',()=>{
   const pref=row('outside',{preference_reasons:['96GB is outside reuse plan']});
   const stale=row('stale',{expires_at:now-1});

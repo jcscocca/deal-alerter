@@ -25,6 +25,20 @@ def number(value):
     return value if type(value) in (int, float) and math.isfinite(value) and value >= 0 else None
 
 
+def stock_state(value):
+    """Keep explicit retailer stock separate from incomplete purchase evidence."""
+    if not isinstance(value, str):
+        return "unknown"
+    value = value.strip().lower().replace("_", " ").replace("-", " ")
+    if value in ("not available", "unavailable", "out of stock", "sold out"):
+        return "out_of_stock"
+    if value in ("available", "in stock"):
+        return "in_stock"
+    if value in ("preorder", "pre order"):
+        return "preorder"
+    return "unknown"
+
+
 def stamp(value):
     try:
         parsed = datetime.fromisoformat(value)
@@ -77,7 +91,7 @@ def public_row(raw, source, checked, expires, problems, now, profile):
     seller = data.get("seller") or ("Apple" if source == "apple-refurb" else "Not published")
     raw_condition = data.get("condition") if isinstance(data.get("condition"), str) else ""
     condition = {"new": "New", "used": "Used", "open_box": "Open box", "refurbished": "Refurbished"}.get(raw_condition, "Not published")
-    available = False
+    available, stock = False, "unknown"
     cost_note = "price + shipping · before tax"
     if is_offer:
         try:
@@ -88,6 +102,7 @@ def public_row(raw, source, checked, expires, problems, now, profile):
             price, shipping = number(offer.base_price), number(offer.shipping)
             total = number(offer.total(datetime.fromtimestamp(now, timezone.utc)))
             available = offer.confirmed is True and offer.sale_status(datetime.fromtimestamp(now, timezone.utc)) == "live"
+            stock = stock_state(offer.stock)
             if offer.coupon and offer.coupon.active(datetime.fromtimestamp(now, timezone.utc)):
                 cost_note = "with confirmed coupon + shipping · before tax"
                 warnings.append("Coupon: " + offer.coupon.instructions)
@@ -122,7 +137,7 @@ def public_row(raw, source, checked, expires, problems, now, profile):
         cost_note = "community-quoted price · total unverified"
     else:
         if not available:
-            reasons.append("Unavailable or unconfirmed at last check")
+            reasons.append("Out of stock at last check" if stock == "out_of_stock" else "Unavailable or unconfirmed at last check")
         if price is None or price <= 0 or total is not None and total >= 1_000_000:
             reasons.append("Price unknown")
         if shipping is None or total is None:
@@ -137,7 +152,7 @@ def public_row(raw, source, checked, expires, problems, now, profile):
             "first_seen": raw.get("first_seen") if stamp(raw.get("first_seen")) is not None else None,
             "title": title, "url": url, "source": source, "retailer": LABELS[source],
             "seller": str(seller)[:250], "condition": condition, "price": price, "shipping": shipping,
-            "total": total, "cost_note": cost_note, "available": available, "gpu": gpu_model(title),
+            "total": total, "cost_note": cost_note, "available": available, "stock": stock, "gpu": gpu_model(title),
             "cpu": cpu_model(title) or "Not established", "storage": storage[0] if len(storage) == 1 else "Not established",
             "ram": fit.get("installed_gb"), "potential": fit.get("potential_gb"), "eligible": fit.get("eligible", False),
             "fit": fit.get("status", "Not assessed"), "fit_summary": fit.get("summary", ""),
