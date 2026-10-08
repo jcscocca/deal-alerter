@@ -13,7 +13,8 @@ import requests
 from dealcore.types import SourceError
 
 USER_AGENT = "DealAlerter/1.0 (+https://github.com/jcscocca/deal-alerter)"
-ALLOWED_HOSTS = {"www.hp.com", "www.newegg.com", "slickdeals.net", "www.reddit.com"}
+ALLOWED_HOSTS = {"www.hp.com", "www.newegg.com", "slickdeals.net", "www.reddit.com",
+                 "www.cyberpowerpc.com", "skytechgaming.com", "www.ibuypower.com"}
 
 
 class Deferred(SourceError):

@@ -117,6 +117,19 @@ def fetch_job(job: dict, client: PublicClient, coupons: list[dict]) -> Batch:
         finally:
             session.close()
     body = client.get(job["url"])
+    if kind in ("discover-cyberpowerpc", "discover-skytech", "cyberpowerpc", "skytech", "ibuypower"):
+        from .builders import discover_cyberpowerpc, discover_skytech, parse_cyberpowerpc, parse_skytech, parse_ibuypower_catalog
+        if kind.startswith("discover-"):
+            parser = discover_cyberpowerpc if kind == "discover-cyberpowerpc" else discover_skytech
+            return Batch(discovered=parser(body))
+        if kind == "ibuypower":
+            offers = parse_ibuypower_catalog(body, now)
+            limit = job.get("limit", 48)
+            return Batch(offers=offers[:limit], notes=["iBUYPOWER catalog only; individual product access unverified"] +
+                         (["iBUYPOWER catalog cap reached"] if len(offers) > limit else []))
+        parser = parse_cyberpowerpc if kind == "cyberpowerpc" else parse_skytech
+        offer = parser(body, job["url"], now)
+        return Batch(offers=[offer] if offer else [])
     if kind == "discover-newegg":
         return Batch(discovered=discover_newegg(body))
     if kind == "discover-hp":
@@ -124,6 +137,8 @@ def fetch_job(job: dict, client: PublicClient, coupons: list[dict]) -> Batch:
             from .hp_browser import discover_hp_rendered
             return Batch(discovered=discover_hp_rendered(body))
         return Batch(discovered=discover_hp(body))
+    if kind not in ("hp", "newegg"):
+        raise ValueError("Unknown retailer job")
     parser = parse_hp if kind == "hp" else parse_newegg
     if kind == "hp" and getattr(client, "hp_reader", None) is not None:
         from .hp_browser import parse_hp_rendered

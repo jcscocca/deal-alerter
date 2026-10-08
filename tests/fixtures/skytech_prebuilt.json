@@ -1,0 +1,198 @@
+{
+  "url": "https://skytechgaming.com/prebuilt-gaming-pc/st-prism5-3545-w-al/prism-5/r9-9950x3d-rtx-5090-32gb-64gb-4tb-2",
+  "product": {
+    "@type": "Product",
+    "@id": "https://skytechgaming.com/prebuilt-gaming-pc/st-prism5-3545-w-al/prism-5/r9-9950x3d-rtx-5090-32gb-64gb-4tb-2#product",
+    "name": "Prism 5 RTX 5090 32GB · R9 9950X3D #3545-W",
+    "description": "Skytech Prism 5 prebuilt gaming PC: AMD R9 9950X3D, Nvidia RTX 5090 32GB, 64GB DDR5 6000MHZ RGB, 4 TB NVMe Gen4. Assembled in the USA with free shipping and lifetime technical support. From $8999.99.",
+    "sku": "ST-PRISM5-3545-W-AL",
+    "mpn": "ST-PRISM5-3545-W-AL",
+    "offers": {
+      "@type": "Offer",
+      "@id": "https://skytechgaming.com/prebuilt-gaming-pc/st-prism5-3545-w-al/prism-5/r9-9950x3d-rtx-5090-32gb-64gb-4tb-2#offer",
+      "price": "8999.99",
+      "priceValidUntil": "2027-12-31",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock",
+      "itemCondition": "https://schema.org/NewCondition",
+      "url": "https://skytechgaming.com/prebuilt-gaming-pc/st-prism5-3545-w-al/prism-5/r9-9950x3d-rtx-5090-32gb-64gb-4tb-2",
+      "seller": {
+        "@type": "Organization",
+        "@id": "https://skytechgaming.com",
+        "name": "Skytech Gaming",
+        "url": "https://skytechgaming.com",
+        "logo": "https://skytechai.s3.us-west-002.backblazeb2.com/c6fu54fjvjuu5l2y78s1ry46y0r7_NewSkytechLogoBlackpngpng.png"
+      },
+      "priceSpecification": {
+        "price": "8999.99",
+        "priceCurrency": "USD",
+        "valueAddedTaxIncluded": false
+      }
+    },
+    "additionalProperty": [
+      {
+        "@type": "PropertyValue",
+        "name": "SKU",
+        "value": "ST-PRISM5-3545-W-AL"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "CPU",
+        "value": "AMD R9 9950X3D"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Case",
+        "value": "PRISM 5 White (Montech King95 3D)"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "CPU Cooler",
+        "value": "360mm AIO"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Fans",
+        "value": 10
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Motherboard",
+        "value": "X870"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "RAM",
+        "value": "64GB DDR5 6000MHZ RGB"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "GPU",
+        "value": "Nvidia RTX 5090 32GB"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Storage",
+        "value": "4 TB NVMe Gen4"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Power Supply",
+        "value": "1000W GOLD ATX 3.0"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Operating System",
+        "value": "Windows 11 Home"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Warranty",
+        "value": "1-Year Parts, Labor & Shipping Support, Lifetime Technical Support"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Dimensions",
+        "value": "18.9\" x 11.81\" x 21.02\""
+      }
+    ],
+    "height": {
+      "@type": "QuantitativeValue",
+      "unitCode": "INH",
+      "value": 18.9
+    },
+    "width": {
+      "@type": "QuantitativeValue",
+      "unitCode": "INH",
+      "value": 11.81
+    },
+    "depth": {
+      "@type": "QuantitativeValue",
+      "unitCode": "INH",
+      "value": 21.02
+    }
+  },
+  "state": {
+    "sku": "ST-PRISM5-3545-W-AL",
+    "source": "Complete",
+    "published": true,
+    "is_deleted": false,
+    "price": "8999.99",
+    "in_stock": true,
+    "stock": 40,
+    "quantity_available": 0,
+    "product_option_mark": true,
+    "product_options": {
+      "warranty": [
+        {
+          "id": "d7cdc83c-bba0-485b-ae44-2aaedf618841",
+          "open_mark": true,
+          "product_id": "0068deba-7d5d-4d19-aea2-15c0c4f4ae0f",
+          "option_type": "warranty",
+          "name": "1-Year Standard Warranty",
+          "description": "<p><strong>(Parts, Labor and Shipping), Lifetime Tech Support</strong></p>",
+          "sku": "WTY1STAND",
+          "price": 0,
+          "was_price": 0,
+          "images": [
+            {
+              "id": "6446337a-9e9c-47cc-bad3-bc105ed3b77e",
+              "url": "",
+              "imgurl": "https://skytechai.s3.us-west-002.backblazeb2.com/i1nj6p6k68hnfo34p4i4ti1sil0x_1-year-700x700pngpng.png",
+              "doctype": "png"
+            }
+          ],
+          "sub_product_id": "c8d3b61c-6a7a-4bab-86b9-e486d50afa19",
+          "external_item_id": null,
+          "location_id": null
+        },
+        {
+          "id": "19c6ea21-3acc-4d6f-92bb-9f76e31d34ff",
+          "open_mark": true,
+          "product_id": "0068deba-7d5d-4d19-aea2-15c0c4f4ae0f",
+          "option_type": "warranty",
+          "name": "2-Year Refundable Protection Program",
+          "description": "<p><strong>(Parts, Labor and Shipping), Lifetime Tech Support</strong></p>\r\n<p><strong>Refundable Protection Program</strong><br>Optionally, you can upgrade your warranty to 2 or 3 years if you are within 1 year of your purchase date. If you don&rsquo;t end up making use of your warranty with us we&rsquo;ll give you a coupon for the full amount to use on your next purchase!</p>",
+          "sku": "WTY2STAND",
+          "price": 300,
+          "was_price": 300,
+          "images": [
+            {
+              "id": "da4838d0-61cf-47d3-9018-5beeb269041a",
+              "url": "",
+              "imgurl": "https://skytechai.s3.us-west-002.backblazeb2.com/0lw3rjde783w1gp6759jsko8uuuq_2-year-700x700pngpng.png",
+              "doctype": "png"
+            }
+          ],
+          "sub_product_id": "c3226ea8-da2c-4a31-9fb4-e5dbf789d94f",
+          "external_item_id": null,
+          "location_id": null
+        },
+        {
+          "id": "3ae3cbc5-b01c-430b-99cf-bf0dd0a37a95",
+          "open_mark": true,
+          "product_id": "0068deba-7d5d-4d19-aea2-15c0c4f4ae0f",
+          "option_type": "warranty",
+          "name": "3-Year Refundable Protection Program",
+          "description": "<p><strong>(Parts, Labor and Shipping), Lifetime Tech Support</strong></p>\r\n<p><strong>Refundable Protection Program</strong><br>Optionally, you can upgrade your warranty to 2 or 3 years if you are within 1 year of your purchase date. If you don&rsquo;t end up making use of your warranty with us we&rsquo;ll give you a coupon for the full amount to use on your next purchase!</p>\r\n<div class=\"component_wrap\">&nbsp;</div>",
+          "sku": "WTY3STAND",
+          "price": 400,
+          "was_price": 400,
+          "images": [
+            {
+              "id": "9e6ad546-8881-4574-a4b7-755afed24191",
+              "url": "",
+              "imgurl": "https://skytechai.s3.us-west-002.backblazeb2.com/cewbluwxou91mlaz08bpw8m48u6a_3-year-700x700pngpng.png",
+              "doctype": "png"
+            }
+          ],
+          "sub_product_id": "c614fed0-bf59-4171-b5b4-3d06a215a87c",
+          "external_item_id": null,
+          "location_id": null
+        }
+      ]
+    }
+  },
+  "heading": "Prism 5 RTX 5090 32GB · R9 9950X3D #3545-W",
+  "panel": "<section aria-labelledby=\"product-overview-heading\"><h1>Prism 5 RTX 5090 32GB · R9 9950X3D #3545-W</h1><p>Ships within 3 business days</p><button>ADD TO CART</button></section>"
+}

@@ -28,7 +28,7 @@ def history_view(raw, row, now):
     baseline = stats["median"] if stats["prior_days"] >= 3 else None
     stats["median"] = baseline
     stats["difference_pct"] = round(100 * (row["total"] / baseline - 1), 1) if baseline and current(row, now) else None
-    tracked = row.get("source") in ("walmart", "newegg", "hp")
+    tracked = row.get("source") in ("walmart", "newegg", "hp", "cyberpowerpc", "skytech")
     label = "Collecting exact-build history" if tracked else "History not tracked for this source"
     delta = stats["difference_pct"]
     if delta is not None:
