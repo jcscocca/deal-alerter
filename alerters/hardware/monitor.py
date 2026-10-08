@@ -38,6 +38,8 @@ from .retail_http import Deferred, PublicClient, public_url
 from .shopping_export import ShoppingExport
 from .shopping_activity import judgments
 from .shopping_controls import read_controls, delivery_filter
+from .monitor_health import (HEALTH_GRACE_SECONDS, LISTING_UNVERIFIED, incidents,
+                             eligible_incidents, problem_key as health_problem_key, migrate_key)
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUNTIME = Path(os.environ.get("PROGRAMDATA", ROOT / ".local")) / "DealAlerter"
@@ -84,16 +86,6 @@ def health_problems(status: dict, now: float, stale: int = 600) -> list[str]:
             problems.append(f"{key}: {job['error']}")
     problems.extend(status.get("problems", []))
     return problems
-
-
-def health_problem_key(problem: str, status: dict) -> str:
-    if problem == "Monitor heartbeat is stale":
-        return "monitor:heartbeat"
-    prefix = problem.partition(":")[0]
-    if prefix in status.get("jobs", {}):
-        # Backoff, missing success and stale checks describe the same job outage.
-        return "job:" + prefix
-    return "coverage:" + problem
 
 
 class Monitor:
@@ -153,7 +145,8 @@ class Monitor:
             if key not in self.jobs and old.get("kind") in ("hp", "newegg", "cyberpowerpc", "skytech"):
                 self.add_product(old["url"])
             if key in self.jobs:
-                for field in ("created_at", "last_success", "next", "failures", "error"):
+                for field in ("created_at", "last_success", "last_fetch_success", "last_error_at",
+                              "next", "failures", "error", "listing_notes"):
                     if field in old:
                         self.jobs[key][field] = old[field]
         # First rollout needs one snapshot of the hourly/15-minute legacy jobs.
@@ -257,19 +250,18 @@ class Monitor:
                         row["confirmed_offer_key"] = offer.key
                 if not self.dry_run:
                     plugin.offers.save()
-        notes = batch.notes + result.problems
+        notes = list(batch.notes)
         for offer in batch.offers:
             if not offer.confirmed or offer.total(now) is None:
-                notes.append("Offer found but seller/configuration/landed total cannot be confirmed")
+                notes.append(LISTING_UNVERIFIED)
+        self.jobs[key]["listing_notes"] = list(dict.fromkeys(notes))
         self.results.append({"job": key, "offers": len(batch.offers), "listings": len(listings),
-                             "assessed": len(result.assessments), "notes": notes})
+                             "assessed": len(result.assessments), "notes": notes + result.problems})
         self.results = self.results[-100:]
         if result.problems:
             raise Deferred("Assessment/delivery failed: " + "; ".join(result.problems), 120)
-        # A successful discovery-only catalog can contain useful quotes without
-        # proving purchase availability. Each offer remains explicitly unconfirmed.
-        if notes and batch.offers and self.jobs[key]["kind"] != "ibuypower":
-            raise Deferred("; ".join(notes), 300)
+        # Reading an unverified offer is a successful source check. Its notes and
+        # original confirmation/stock fields still prevent inventory/deal alerts.
 
     def recheck_starts(self):
         store = OfferState(self.state_root / "hardware/US")
@@ -351,14 +343,16 @@ class Monitor:
                     del self.pending[future]
                     job = self.jobs[key]
                     try:
-                        self.process(key, future.result())
+                        batch = future.result()
+                        job["last_fetch_success"] = time.time()
+                        self.process(key, batch)
                         job.update(last_success=time.time(), failures=0, error="")
                         delay = job["interval"]
                         LOG.info("%s checked", key)
                     except Exception as exc:
                         # Never log raw network exceptions or credential-bearing URLs.
                         reason = str(exc) if isinstance(exc, Deferred) else type(exc).__name__
-                        job.update(failures=job["failures"] + 1, error=reason)
+                        job.update(failures=job["failures"] + 1, error=reason, last_error_at=time.time())
                         delay = failure_delay(job["failures"], job["interval"], getattr(exc, "seconds", 0), self.cfg["max_backoff_seconds"])
                         LOG.warning("%s %s; retry in %.0fs", key, reason, delay)
                     job["next"] = time.time() + delay + random.uniform(0, min(5, delay * .05))
@@ -398,7 +392,10 @@ def watchdog(runtime: Path, *, dry_run: bool):
     now = time.time()
     issues = health_problems(status, now)
     prior_health = read_json(runtime / "watchdog.json", {})
-    result = {"checked_at": datetime.now(timezone.utc).isoformat(), "problems": issues}
+    current = incidents(status, issues, prior_health, now)
+    eligible = eligible_incidents(current, now)
+    result = {"checked_at": datetime.now(timezone.utc).isoformat(), "problems": issues,
+              "incidents": current, "alertable": sorted(eligible)}
     atomic_write(runtime / "watchdog.json", json.dumps(result, indent=2) + "\n")
     if dry_run:
         print(json.dumps(result, indent=2))
@@ -415,7 +412,7 @@ def watchdog(runtime: Path, *, dry_run: bool):
     receipt_path = runtime / "watchdog-receipt.json"
     previous = read_json(receipt_path, {})
     original = json.dumps(previous, sort_keys=True)
-    keys = sorted({health_problem_key(problem, status) for problem in issues})
+    keys = sorted(current)
     # Migrate delivered legacy fingerprints without sending the same warning
     # again just because the receipt format changed.
     prior_issues = prior_health.get("problems", [])
@@ -429,29 +426,33 @@ def watchdog(runtime: Path, *, dry_run: bool):
         if isinstance(record, dict):
             # Remember recovery even while other coverage warnings remain. A
             # later lost heartbeat must be able to alert immediately again.
-            record["problem_keys"] = sorted(set(record.get("problem_keys", [])) & set(keys))
+            record["problem_keys"] = sorted({migrate_key(key, status) for key in record.get("problem_keys", [])} & set(keys))
             previous[name] = record
     # Persist recovery before attempting delivery: an offline second transport
     # must not prevent the successful transport from recognizing a new outage.
     if previous and json.dumps(previous, sort_keys=True) != original:
         atomic_write(receipt_path, json.dumps(previous) + "\n")
     fingerprint = hashlib.sha256(json.dumps(sorted(issues)).encode()).hexdigest()
-    if issues:
-        stale = "monitor:heartbeat" in keys
-        report = Report("Hardware monitor heartbeat is stale" if stale else "Hardware monitor coverage needs attention",
-                        "Monitoring health", "", "",
-                        (Card("ThinkPad hardware monitor", "", "", "MONITOR STALE" if stale else "COVERAGE DEGRADED",
-                              "Heartbeat needs attention" if stale else "Monitor running; some checks need attention",
-                              "; ".join(issues), priority=4 if stale else 2),))
+    if eligible:
         for channel in channels(email=False, push=True, dry_run=False):
             record = previous.get(channel.name, {})
-            new = set(keys) - set(record.get("problem_keys", []))
+            new = set(eligible) - set(record.get("problem_keys", []))
             elapsed = now - record.get("sent_at", 0)
             changed_due = bool(new) and elapsed >= HEALTH_CHANGE_SECONDS
             if (not record or "monitor:heartbeat" in new or changed_due or elapsed >= HEALTH_REMINDER_SECONDS):
+                reported = new or set(eligible)
+                if "monitor:heartbeat" in eligible:
+                    reported = reported | {"monitor:heartbeat"}
+                stale = "monitor:heartbeat" in reported
+                reason = "; ".join(current[key]["summary"] for key in sorted(reported))
+                headline = "Heartbeat needs attention" if stale else "Monitor running; source failures persisted for at least 10 minutes"
+                report = Report("Hardware monitor heartbeat is stale" if stale else "Hardware monitor coverage needs attention",
+                                "Monitoring health", "", "",
+                                (Card("ThinkPad hardware monitor", "", "", "MONITOR STALE" if stale else "COVERAGE DEGRADED",
+                                      headline, reason, priority=4 if stale else 2),))
                 channel.send(report)
-                previous[channel.name] = {"problem_keys": keys, "sent_at": now}
-                previous.update(version=2, fingerprint=fingerprint, sent_at=now)
+                previous[channel.name] = {"problem_keys": sorted(set(record.get("problem_keys", [])) | reported), "sent_at": now}
+                previous.update(version=3, fingerprint=fingerprint, sent_at=now)
                 atomic_write(receipt_path, json.dumps(previous) + "\n")
     # Delivery times survive recovery; coverage flapping cannot reset the limit.
     # The diagnostics above still update on every watchdog check.

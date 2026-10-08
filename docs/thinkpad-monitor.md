@@ -184,13 +184,29 @@ login. Task Scheduler restarts failures every minute. `DealAlerter-Watchdog`
 runs at boot and every minute, detects a heartbeat older than 90 seconds,
 restarts a stopped/hung monitor after 120 seconds, and reports stale source
 checks (max(10 minutes, three intervals)). It records transport receipts for
-health warnings as well. Coverage warnings use low-priority pushes, stable job
-identities and a per-transport 30-minute interval for additional problems;
-unchanged degradation gets at most one reminder per day. Recovery removes the
-resolved identities without resetting the interval. A newly stale heartbeat
-alerts immediately at high priority, regardless of the coverage interval.
+health warnings as well. Source failures must persist for ten minutes before
+they can produce low-priority coverage pushes. Product and discovery failures
+are grouped under one retailer identity, with eBay and Apple kept separate.
+A successful request clears earlier connection/backoff errors for that retailer,
+even while affected product jobs wait for their next retry. Parser, assessment,
+delivery and overdue-check failures remain actionable independently.
+
+Unconfirmed inventory, missing shipping and incomplete configurations stay as
+listing notes and cannot produce an outage push. Successfully reading them does
+not establish stock or deal eligibility. Known robots restrictions, published
+crawl delays, the Slickdeals feed limitation and discovery caps remain visible in
+diagnostics without recurring pushes. Raw per-job diagnostics remain in
+`health.json` and `watchdog.json`; the latter also retains incident onset times
+and the currently alertable groups.
+
+Additional failures use a per-transport 30-minute interval. These messages list
+only newly affected sources; unchanged degradation gets at most one full reminder
+per day. Recovery removes resolved identities without resetting the interval.
+A newly stale heartbeat alerts immediately at high priority, regardless of the
+source grace period or coverage interval.
 Failed transports retry without repeating a successful delivery. Legacy health
-receipts are migrated using the prior diagnostic snapshot and delivery time.
+receipts are migrated to source identities using the prior diagnostic snapshot
+and delivery time, without replaying already-delivered warnings.
 Restart is independent of ntfy connectivity. Both
 tasks allow battery operation and request wake timers; neither changes the
 machine's power plan. The process uses an OS lock, released on crashes, and the
