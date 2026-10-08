@@ -26,7 +26,8 @@ another runtime. The monitor must be upgraded to the version that publishes this
 file. No API credentials, notification settings, history files, or raw API bodies
 are exposed to the browser. The dashboard only writes the bounded, non-secret
 `ui/watches.json` preferences through the Watching view; delivery receipts and
-price history remain owned by the monitor.
+monitor price history remain owned by the monitor. Explicit Walmart research
+runs also maintain a separate local complete-PC history, described below.
 
 **All deals** combines saved Walmart research across categories with the existing
 watchlist's eBay/Apple hardware results, Newegg desktops, and publisher/community
@@ -94,6 +95,21 @@ make an older snapshot look newly available. A check interrupted by server
 shutdown also leaves its previous snapshot outside the current ranking.
 
 ## How the dashboard ranks
+
+Exact-build price evidence is separate from notification qualification and budget
+targets. Confirmed available complete-PC totals are retained for 90 days in
+`prebuilt-observations.json` beside the monitor's existing price history, and in
+`reports/walmart-prebuilt-observations.json` for explicit Walmart checks. Seller,
+condition, published configuration and (for Walmart) ZIP changes start separate
+evidence. Browser reads never add observations or make extra retailer requests.
+
+Each UTC day contributes its last available total to the historical median;
+today is excluded and at least three prior days are required. Each day's observed
+range is also retained. Older monitor records captured only distinct prices, so
+they contribute to the recorded range, never to the daily median. A first sighting
+is labeled **Collecting exact-build history**. These are observed quotes with
+gaps, not a continuous stock log or proof of an all-time low. Stale/sold-out cards
+show saved evidence without claiming a current discount.
 
 - Use independent **Product type**, **GPU**, **RAM**, **CPU**, **Storage**, **Condition**, and
   **Source** filters. For example, GPU **RTX 5090** includes every matching RAM

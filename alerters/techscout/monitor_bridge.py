@@ -149,6 +149,7 @@ def public_row(raw, source, checked, expires, problems, now, profile):
     product_group = (f"Desktops · RTX {gpu_model(title)} · {fit.get('installed_gb') or '?'}GB" if fit else
                      ("Computers" if "computers" in kinds else "Components") + " · " + str(data.get("product_group") or "Other tech")[:150])
     return {"id": source + ":" + hashlib.sha256(identity.encode()).hexdigest()[:24], "judgment": judgment(raw.get("judgment")),
+            "price_history": raw.get("judgment", {}).get("price_history") if isinstance(raw.get("judgment"), dict) else None,
             "first_seen": raw.get("first_seen") if stamp(raw.get("first_seen")) is not None else None,
             "title": title, "url": url, "source": source, "retailer": LABELS[source],
             "seller": str(seller)[:250], "condition": condition, "price": price, "shipping": shipping,

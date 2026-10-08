@@ -21,6 +21,8 @@ from .monitor_bridge import read_monitor, stock_state
 from .deal_overlap import combine_leads
 from .facets import attributes
 from .integration import Workspace
+from .price_history import PriceEvidence, walmart_key
+from .prebuilt_value import attach_values
 
 FRESH_SECONDS = 15 * 60
 ASSETS = Path(__file__).with_name("web")
@@ -74,6 +76,7 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
                            "total": c.get("total") if type(c.get("total")) is int else None}
                           for c in data.get("coverage", []) if isinstance(c, dict)][:4] if isinstance(data.get("coverage"), list) else []
     groups, seen = {}, set()
+    history = PriceEvidence(directory / "walmart-prebuilt-observations.json")
     for raw in data["products"]:
         if not isinstance(raw, dict):
             continue
@@ -95,6 +98,7 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
         key = raw.get("comparison_key")
         desktop_key = isinstance(key, list) and len(key) == 6 and key[0] == "desktop"
         row = {"id": item_id, "title": title, "url": f"https://www.walmart.com/ip/{item_id}",
+               "price_history": history.summary(walmart_key(raw, data.get("zip_code")), datetime.fromtimestamp(now, timezone.utc).isoformat()),
                "seller": seller, "condition": condition, "price": price, "shipping": shipping,
                "total": total, "available": raw.get("available") is True and stock not in ("out_of_stock", "preorder"),
                "stock": stock, "gpu": model_gpu,
@@ -183,6 +187,7 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
         rows += feeds["rows"]
         result["sources"] += feeds["sources"]
     result["problems"] += monitor["problems"]
+    attach_values(rows, now)
     result["monitor_connected"] = bool(monitor["sources"])
     result["groups"], result["held"], result["leads"] = [], [], []
     groups = {}

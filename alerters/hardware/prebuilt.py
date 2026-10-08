@@ -11,6 +11,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dealcore.state import atomic_write, parse_time
+from .price_evidence import PriceEvidence, offer_key
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
 GPU = re.compile(r"\b(?:geforce\s+)?rtx\s*[™®]?\s*(5080|5090)\b", re.I)
@@ -130,6 +131,7 @@ class PrebuiltHistory:
     """One observation per offer/price, with independent condition/configuration keys."""
     def __init__(self, directory: Path):
         self.path = directory / "prebuilt-prices.jsonl"
+        self.observations = PriceEvidence(directory / "prebuilt-observations.json")
         self.rows = []
         if self.path.exists():
             self.rows = [json.loads(line) for line in self.path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -139,6 +141,8 @@ class PrebuiltHistory:
         total = offer.total(now)
         if not offer.confirmed or offer.announcement or total is None or offer.sale_status(now) != "live":
             return
+        if offer.condition in ("new", "refurbished", "open_box", "used") and offer.seller.strip():
+            self.observations.record(offer_key(offer), total, offer.observed_at)
         identity = (offer.key, total)
         if identity not in self.identities:
             self.rows.append({"key": offer.key, "total": total, "seen_at": now.isoformat(),
@@ -152,6 +156,15 @@ class PrebuiltHistory:
 
     def save(self):
         atomic_write(self.path, "".join(json.dumps(r, sort_keys=True) + "\n" for r in self.rows))
+        self.observations.save()
+
+    def evidence(self, offer: Offer, now: datetime) -> dict:
+        legacy = [r for r in self.rows if r["key"] == offer.key
+                  and r.get("offer", {}).get("title") == offer.title
+                  and r.get("offer", {}).get("confirmed") is True
+                  and r.get("offer", {}).get("stock") == "in_stock"
+                  and not r.get("offer", {}).get("announcement")]
+        return self.observations.summary(offer_key(offer), now.isoformat(), legacy)
 
 
 class OfferState:
