@@ -43,10 +43,20 @@
   }
   function status(row,prefs,now) {
     if (row.lead) return {label:fresh(row,now) ? 'Publisher report' : 'Publisher report · needs recheck',tone:'review'};
+    if (row.stock==='out_of_stock') return {label:fresh(row,now) ? 'Out of stock' : 'Out of stock at last check',tone:'unavailable'};
+    if (row.stock==='preorder') return {label:fresh(row,now) ? 'Preorder' : 'Preorder at last check',tone:'review'};
     if (!fresh(row,now)) return {label:'Needs recheck',tone:'review'};
-    if (!row.available || !numericPrice(row.total) || row.total<=0 || verification(row).length) return {label:'Needs verification',tone:'review'};
+    if (!row.available) return {label:'Availability unconfirmed',tone:'review'};
+    if (!numericPrice(row.total) || row.total<=0 || verification(row).length) return {label:'Needs verification',tone:'review'};
     if (prefs.reuse && preferenceReasons(row).length) return {label:'Outside build preferences',tone:'preference'};
     return {label:'Recently checked',tone:'current'};
+  }
+  function priceContext(row,now) {
+    if (row.lead) return '';
+    if (row.stock==='out_of_stock') return 'Saved price · out of stock at last check';
+    if (!fresh(row,now)) return 'Saved price · needs a new stock check';
+    if (!row.available) return 'Quoted price · availability unconfirmed';
+    return '';
   }
   function sortRows(rows,prefs) {
     const total = row => numericPrice(row.total) ? row.total : Infinity;
@@ -106,7 +116,7 @@
     if (typeof raw.similar==='boolean') prefs.similar=raw.similar;
     return prefs;
   }
-  const api = {unknown,keys,labels,defaults,value,hasSource,fresh,budgetPrice,matches,verification,preferenceReasons,ramReuse,status,sortRows,rowsOf,unique,partition,restore};
+  const api = {unknown,keys,labels,defaults,value,hasSource,fresh,budgetPrice,matches,verification,preferenceReasons,ramReuse,status,priceContext,sortRows,rowsOf,unique,partition,restore};
   if (typeof module==='object' && module.exports) module.exports=api;
   else root.TechScoutBrowsing=api;
 })(typeof globalThis==='object' ? globalThis : this);

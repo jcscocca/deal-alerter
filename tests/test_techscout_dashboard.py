@@ -104,6 +104,30 @@ def test_walmart_source_status_distinguishes_stale_missing_and_failure(tmp_path)
     assert snapshot(tmp_path,"desktop-memory",now=NOW,failed_at=NOW)["sources"][0]["status"] == "Last check failed"
 
 
+def test_walmart_sold_out_quote_keeps_stock_and_original_check_time(tmp_path):
+    save(tmp_path, [product(stock="Not available", available=False, price=4828.81)], at=NOW-86400)
+    result = snapshot(tmp_path, "monitor", now=NOW)
+    row = result["held"][0]
+    assert not result["groups"] and row["stock"] == "out_of_stock"
+    assert row["checked_at"] == datetime.fromtimestamp(NOW-86400, timezone.utc).isoformat()
+    assert "Out of stock at last check" in row["verification_reasons"]
+    assert row["price"] == 4828.81
+
+
+@pytest.mark.parametrize("stock,expected", [(None, "unknown"), ("Not published", "unknown"),
+                                           ("Not available", "out_of_stock"), ("Pre-order", "preorder")])
+def test_walmart_unknown_stock_is_not_invented_as_sold_out(tmp_path, stock, expected):
+    save(tmp_path, [product(stock=stock, available=False)])
+    row = snapshot(tmp_path, "desktop-memory", now=NOW)["held"][0]
+    assert row["stock"] == expected and not row["available"]
+
+
+def test_explicit_walmart_sold_out_wins_over_conflicting_available_flag(tmp_path):
+    save(tmp_path, [product(stock="Not available", available=True)])
+    result = snapshot(tmp_path, "desktop-memory", now=NOW)
+    assert not result["groups"] and not result["held"][0]["available"]
+
+
 def test_cpu_display_reparses_old_truncated_comparison_keys(tmp_path):
     save(tmp_path,[product(title="Gaming PC RTX 5080 Ultra 5 250KF Plus 32GB DDR5 1TB SSD")])
     row = snapshot(tmp_path,"desktop-memory",now=NOW)["groups"][0]["rows"][0]

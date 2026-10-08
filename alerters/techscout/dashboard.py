@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, urlsplit
 from dealcore.state import atomic_write
 from alerters.hardware.prebuilt import gpu_model
 from .research import PRESETS, capacity_mismatch, cpu_model
-from .monitor_bridge import read_monitor
+from .monitor_bridge import read_monitor, stock_state
 from .deal_overlap import combine_leads
 from .facets import attributes
 from .integration import Workspace
@@ -89,13 +89,15 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
         condition = raw.get("condition") if isinstance(raw.get("condition"), str) else "Not published"
         seller = raw.get("seller") if isinstance(raw.get("seller"), str) else "Not published"
         layout = fit.get("status") == "POSSIBLE REUSE"
+        stock = stock_state(raw.get("stock"))
         warnings = [w for w in raw.get("warnings", []) if isinstance(w, str)] if isinstance(raw.get("warnings"), list) else []
         queries = [q for q in raw.get("queries", []) if isinstance(q, str)] if isinstance(raw.get("queries"), list) else []
         key = raw.get("comparison_key")
         desktop_key = isinstance(key, list) and len(key) == 6 and key[0] == "desktop"
         row = {"id": item_id, "title": title, "url": f"https://www.walmart.com/ip/{item_id}",
                "seller": seller, "condition": condition, "price": price, "shipping": shipping,
-               "total": total, "available": raw.get("available") is True, "gpu": model_gpu,
+               "total": total, "available": raw.get("available") is True and stock not in ("out_of_stock", "preorder"),
+               "stock": stock, "gpu": model_gpu,
                "ram": ram, "potential": fit.get("potential_gb") if fit.get("potential_gb") in (96, 128) else None,
                "fit": fit.get("status") if isinstance(fit.get("status"), str) else "Not assessed",
                "fit_summary": fit.get("summary") if isinstance(fit.get("summary"), str) else "",
@@ -105,7 +107,7 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
         if not fresh:
             row["reasons"].append("Last check failed" if failed_at is not None and checked is not None and checked <= failed_at else "Availability needs a new check")
         if not row["available"]:
-            row["reasons"].append("Unavailable or unconfirmed at last check")
+            row["reasons"].append("Out of stock at last check" if stock == "out_of_stock" else "Unavailable or unconfirmed at last check")
         if price is None or price <= 0:
             row["reasons"].append("Price unknown")
         if shipping is None:

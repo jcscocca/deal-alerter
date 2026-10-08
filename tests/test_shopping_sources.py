@@ -56,6 +56,15 @@ def test_direct_source_ranks_without_any_walmart_report(tmp_path):
     assert row["layout_documented"] and "unverified" in row["fit_summary"]
 
 
+@pytest.mark.parametrize("stock", ["out_of_stock", "unknown", "preorder"])
+def test_monitor_preserves_explicit_stock_without_promoting_unavailable_offer(tmp_path, stock):
+    publish(tmp_path, Batch(offers=[offer(stock=stock)]))
+    result = state(tmp_path)
+    row = result["held"][0]
+    assert not result["groups"] and row["stock"] == stock and not row["available"]
+    assert ("Out of stock at last check" in row["verification_reasons"]) == (stock == "out_of_stock")
+
+
 def test_independent_walmart_failure_does_not_hold_monitor(tmp_path):
     publish(tmp_path)
     app = Dashboard(tmp_path / "walmart", lambda _: 2, monitor_runtime=tmp_path, clock=lambda: NOW.timestamp())

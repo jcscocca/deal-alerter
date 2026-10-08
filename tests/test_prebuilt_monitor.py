@@ -85,6 +85,20 @@ def test_stock_cycle_and_sale_status_generate_one_new_receipt(tmp_path, offer):
     assert len(sent) == 1
 
 
+def test_sold_out_card_is_saved_price_never_live_deal_or_announcement(tmp_path, offer):
+    plugin = MonitorHardwarePlugin(ROOT / "config/hardware.toml", tmp_path, now=NOW)
+    try:
+        candidate = plugin.prepare(offer_listing(replace(offer, stock="out_of_stock")))
+        assessment = plugin.judge(candidate, plugin.read_history(candidate))
+        card = plugin.card(assessment)
+    finally:
+        plugin.close()
+    assert not assessment.alertable
+    assert card.badge.startswith("OUT OF STOCK · SAVED PRICE")
+    assert "LIVE-DEAL" not in card.badge and "ANNOUNCEMENT" not in card.badge
+    assert any("Price and stock checked: Oct 04, 2026 10:00 AM PDT" == fact for fact in card.facts)
+
+
 def test_minor_price_changes_do_not_repeat_but_cumulative_change_does(tmp_path, offer):
     evaluate(tmp_path, [offer])
     assert not evaluate(tmp_path, [replace(offer, base_price=4498)])[1]
