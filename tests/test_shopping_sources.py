@@ -141,6 +141,18 @@ def test_ebay_shipping_is_not_counted_twice_and_missing_is_held(tmp_path):
     assert _shipping_of(item) == 20 and _delivered_price(item) == 120
 
 
+def test_legacy_whole_pc_retains_system_identity_for_facets_and_value_labels(tmp_path):
+    title = "Alienware Aurora R16 i9-12900 8GB DDR5 RTX 3090 1TB M.2 SSD Win 11 Pro"
+    publish(tmp_path, Batch(listings=[listing(title=title)]), source="ebay")
+    result = state(tmp_path, "monitor")
+    rows = [r for group in result["groups"] for r in group["rows"]] + result["held"]
+    assert len(rows) == 1
+    assert rows[0]["is_system"] is True
+    assert rows[0]["facets"]["kind"] == "Desktops"
+    assert rows[0]["facets"]["gpu"] == "RTX 3090"
+    assert not rows[0].get("prebuilt_value")
+
+
 @pytest.mark.parametrize("changes", [{"multi_variant": True}, {"seller_risk": "high"}])
 def test_ebay_variant_and_seller_guards(tmp_path, changes):
     publish(tmp_path, Batch(listings=[listing(**changes)]), source="ebay")

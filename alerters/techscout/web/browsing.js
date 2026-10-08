@@ -58,6 +58,31 @@
     if (!row.available) return 'Quoted price · availability unconfirmed';
     return '';
   }
+  function recommendation(row,now=Date.now()/1000) {
+    const result=(tone,label,note='')=>({tone,label,note});
+    const j=row.judgment,v=row.prebuilt_value;
+    if(row.lead)return result('unassessed','Value unassessed','Publisher reports have not been independently rated.');
+    // A component verdict cannot rate the complete computer containing it.
+    if(row.is_system && !v)return result('unassessed','Value unassessed','Whole-PC comparison unavailable. Bare-GPU prices cannot rate this build.');
+    if(!j && !v)return result('unassessed','Value unassessed','No supported price comparison is available.');
+    const current=fresh(row,now) && row.available && numericPrice(row.total) && row.total>0 && !verification(row).length && !['out_of_stock','preorder'].includes(row.stock);
+    if(!current)return result('watch','Review — needs a new check','Recheck price, stock and listing details before relying on the saved assessment.');
+    if(v) {
+      if(row.stock!=='in_stock')return result('watch','Review — stock unconfirmed');
+      const peer=v.peers?.difference_pct,history=v.history?.difference_pct;
+      if(Number.isFinite(peer)) {
+        if(peer>=5)return result('skip','Skip — above comparable prices','At least 5% above the median of comparable available builds.');
+        if(peer<=-5)return result('deal','Below comparable prices','At least 5% below the matched-build median; component quality and suitability still need review.');
+        return result('watch','Typical price — no clear deal','Within 5% of the matched-build median.');
+      }
+      if(Number.isFinite(history))return result('watch','Watch — history only','Exact-build price history is available, but there are not enough comparable builds to establish value.');
+      return result('unassessed','Value unassessed','Not enough whole-build price evidence. A budget target alone does not establish a deal.');
+    }
+    if(j.verdict==='PASS')return result('skip','Skip — not recommended');
+    if(j.eligible===true && ['GOOD','STRONG','EXCEPTIONAL','GRAIL'].includes(j.verdict))return result('deal',`Deal — ${j.verdict==='STRONG' ? 'Strong buy' : j.verdict[0]+j.verdict.slice(1).toLowerCase()}`);
+    if(['FAIR','GOOD','STRONG','EXCEPTIONAL','GRAIL'].includes(j.verdict))return result('watch','Watch — no qualifying deal');
+    return result('unassessed','Value unassessed');
+  }
   function sortRows(rows,prefs) {
     const total = row => numericPrice(row.total) ? row.total : Infinity;
     const checked = row => Date.parse(row.checked_at) || 0;
@@ -116,7 +141,7 @@
     if (typeof raw.similar==='boolean') prefs.similar=raw.similar;
     return prefs;
   }
-  const api = {unknown,keys,labels,defaults,value,hasSource,fresh,budgetPrice,matches,verification,preferenceReasons,ramReuse,status,priceContext,sortRows,rowsOf,unique,partition,restore};
+  const api = {unknown,keys,labels,defaults,value,hasSource,fresh,budgetPrice,matches,verification,preferenceReasons,ramReuse,status,priceContext,recommendation,sortRows,rowsOf,unique,partition,restore};
   if (typeof module==='object' && module.exports) module.exports=api;
   else root.TechScoutBrowsing=api;
 })(typeof globalThis==='object' ? globalThis : this);

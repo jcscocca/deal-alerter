@@ -167,6 +167,7 @@ def public_row(raw, source, checked, expires, problems, now, profile):
             "layout_documented": fit.get("status") == "POSSIBLE REUSE", "warnings": warnings,
             "rank": None, "reasons": reasons, "checked_at": checked, "expires_at": expires,
             "lead": community, "categories": sorted(kinds), "product_group": product_group,
+            "is_system": data.get("is_system") is True or bool(exact_desktop(title)),
             "merchant": "Amazon" if community and re.search(r"\bat Amazon\b|\[Amazon\]|\(Amazon\)", title, re.I) else None}
 
 

@@ -88,8 +88,11 @@ def attributes(row):
     condition = {"new": "New", "used": "Used", "open box": "Open box", "refurbished": "Refurbished"}.get(condition, condition.capitalize())
     if condition in ("", "Not published", "Unknown", "Not established"):
         condition = UNKNOWN
+    kind = product_type(row.get("product_name") or row["title"])
+    if row.get("is_system") is True and kind not in ("Laptops", "Tablets"):
+        kind = "Desktops"
     return {
-        "kind": product_type(row.get("product_name") or row["title"]),
+        "kind": kind,
         "gpu": one(gpu(title) for title in titles) or UNKNOWN,
         "ram": f"{row['ram']}GB" if type(row.get("ram")) is int and row["ram"] > 0 else one(ram(title) for title in titles) or UNKNOWN,
         "cpu": one(cpu_model(title) for title in titles) or UNKNOWN,

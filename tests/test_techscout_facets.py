@@ -40,6 +40,11 @@ def test_structured_ram_and_normalized_condition():
     assert actual["condition"] == "Open box"
 
 
+def test_system_identity_does_not_turn_laptops_or_bare_cards_into_desktops():
+    assert attributes({"title": "Alienware laptop RTX 3090", "is_system": True})["kind"] == "Laptops"
+    assert attributes({"title": "Dell Alienware RTX 3090 24GB GDDR6X graphics card", "is_system": False})["kind"] == "Graphics cards"
+
+
 def test_combined_publishers_supply_agreeing_details_without_splitting_card():
     row = {"title": "Gaming desktop", "reports": [
         {"title": "Gaming desktop RTX 5090 32GB DDR5 1000GB SSD"},
