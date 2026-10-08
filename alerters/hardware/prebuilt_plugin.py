@@ -158,7 +158,8 @@ class MonitorHardwarePlugin(HardwarePlugin):
         fit = self.memory_fits[offer.key]
         badge += " · RAM: " + fit.status
         facts = [offer.title, f"Seller: {offer.seller}; condition: {offer.condition}; stock: {offer.stock}"]
-        facts.append("Price and stock checked: " + pacific_time(offer.observed_at))
+        if not offer.announcement:
+            facts.append("Price and stock checked: " + pacific_time(offer.observed_at))
         facts.extend(f"{key}: {value}" for key, value in offer.specs.items() if value)
         cost = lambda amount: f"${amount:,.2f}" if amount is not None else "unknown"
         facts += [f"PC: {cost(offer.base_price)}; shipping: {cost(offer.shipping)}; required accessories: {cost(offer.required_accessories)}",
