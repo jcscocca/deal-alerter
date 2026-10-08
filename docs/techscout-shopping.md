@@ -191,6 +191,16 @@ these price labels do not change notification thresholds or delivery receipts.
   left open; only a manual check retrieves new Walmart data. Each source expires
   independently, so a failed Walmart request cannot invalidate fresh Newegg results.
 - **Current offers** shows exact filter matches with recent retailer evidence.
+  It includes ordinary listings, not just recommended deals. Browse and compare
+  cards put a prominent text-and-color assessment above the title: red **Skip**,
+  amber **Watch / review**, gray **Value unassessed**, or green favorable evidence.
+  Green requires a current qualifying component verdict or a whole-build price
+  at least 5% below its matched-peer median; the latter is labeled **Below
+  comparable prices**, not a build-quality recommendation. Whole-build history
+  alone stays amber and a budget target alone cannot turn a card green. Stale or
+  unverified rated offers require a new check. Availability remains a separate
+  badge. Legacy complete PCs retain their system identity, use desktop facets,
+  and show **Value unassessed** instead of a GPU-only verdict or price baseline.
   **Other matching products** follows automatically, including builds outside
   your RAM-reuse preference, missing details, unavailable items, stale offers,
   and unverified publisher reports. Each card labels its status; the header

@@ -54,13 +54,21 @@
   }
   function render(){renderWatches();if(pane==='alerts')renderAlerts();if(allSnapshot){el('source-health').innerHTML=allSnapshot.sources.map(s=>`<div class="source-card"><strong>${esc(s.label)}</strong><span class="badge ${s.ready ? 'current' : 'review'}">${esc(s.status)}</span><p class="small muted">${s.ready}/${s.jobs} checks current · ${s.count} products/leads<br>${esc(date(s.checked_at))}</p></div>`).join('');}}
 
-  function judgmentCard(row){
-    const j=row.judgment;if(!j)return row.prebuilt_value ? '' : '<p class="small muted">Deal value not assessed by the alerter</p>';
-    const prebuilt=Boolean(row.prebuilt_value), current=B.fresh(row) && row.available && row.stock==='in_stock' && !B.verification(row).length;
-    const verdict=prebuilt ? (j.target==null ? 'No configured budget target' : !current ? 'Budget check needs current quote' : row.total<=j.target ? 'Within configured budget' : 'Above configured budget') : `Deal: ${j.verdict}`;
-    return `<div class="deal-judgment"><span class="badge">${esc(verdict)}</span> <span class="small">${j.eligible ? 'Meets deal notification rules' : 'Does not meet deal notification rules'}${j.target_hit && !prebuilt ? ' · Target price met' : ''}</span>${prebuilt ? '' : `<p class="small">${esc(j.headline || j.reason)}</p>`}<details data-judgment="${esc(row.id)}" ${openJudgments.has(row.id) ? 'open' : ''}><summary>${prebuilt ? 'Notification rules & budget target' : 'Why this verdict?'}</summary><p>${esc(j.reason)}</p>${j.target!=null ? `<p>Engine target: ${dollars(j.target)}</p>` : ''}${[...j.facts,...j.warnings].map(v=>`<p class="small muted">${esc(v)}</p>`).join('')}${j.decisions.map(d=>`<p class="small">${esc(d.channel)}: ${esc(d.label)} · ${esc(date(d.at))}</p>`).join('')}</details></div>`;
+  function recommendationBadge(row){
+    const r=B.recommendation(row),symbol={deal:'✓',skip:'×',watch:'!',unassessed:'?'}[r.tone];
+    return `<span class="recommendation verdict-${r.tone}"><span aria-hidden="true">${symbol}</span> ${esc(r.label)}</span>`;
   }
-  window.TechScoutWorkspace={judgmentCard,focusId:null,update(value){openJudgments=new Set([...document.querySelectorAll('[data-judgment][open]')].map(e=>e.dataset.judgment));context=value;render();if(this.focusId){const id=this.focusId;this.focusId=null;setTimeout(()=>{const card=document.querySelector(`[data-product-id="${CSS.escape(id)}"]`);if(card){card.scrollIntoView({block:'center'});card.classList.add('focused-deal');}else notice('This product is no longer in current results. The alert retains its original source link.');},0);}}};
+  function judgmentCard(row){
+    const j=row.judgment,r=B.recommendation(row),note=r.note ? `<p class="small verdict-note">${esc(r.note)}</p>` : '';
+    if(!j)return note;
+    // Preserve notification status, but do not display a GPU-only baseline as
+    // evidence about a complete PC, including in the expandable explanation.
+    if(row.is_system && !row.prebuilt_value)return `${note}<p class="small muted">${j.eligible ? 'Meets deal notification rules' : 'Does not meet deal notification rules'}</p>`;
+    const prebuilt=Boolean(row.prebuilt_value), current=B.fresh(row) && row.available && row.stock==='in_stock' && !B.verification(row).length;
+    const budget=prebuilt ? (j.target==null ? 'No configured budget target' : !current ? 'Budget check needs current quote' : row.total<=j.target ? 'Within configured budget' : 'Above configured budget') : '';
+    return `<div class="deal-judgment">${note}${budget ? `<p class="small">${esc(budget)}</p>` : ''}<p class="small muted">${j.eligible ? 'Meets deal notification rules' : 'Does not meet deal notification rules'}${j.target_hit && !prebuilt ? ' · Target price met' : ''}</p>${prebuilt ? '' : `<p class="small">${esc(j.headline || j.reason)}</p>`}<details data-judgment="${esc(row.id)}" ${openJudgments.has(row.id) ? 'open' : ''}><summary>${prebuilt ? 'Notification rules & budget target' : 'Why this verdict?'}</summary><p>${esc(j.reason)}</p>${j.target!=null ? `<p>Engine target: ${dollars(j.target)}</p>` : ''}${[...j.facts,...j.warnings].map(v=>`<p class="small muted">${esc(v)}</p>`).join('')}${j.decisions.map(d=>`<p class="small">${esc(d.channel)}: ${esc(d.label)} · ${esc(date(d.at))}</p>`).join('')}</details></div>`;
+  }
+  window.TechScoutWorkspace={judgmentCard,recommendationBadge,focusId:null,update(value){openJudgments=new Set([...document.querySelectorAll('[data-judgment][open]')].map(e=>e.dataset.judgment));context=value;render();if(this.focusId){const id=this.focusId;this.focusId=null;setTimeout(()=>{const card=document.querySelector(`[data-product-id="${CSS.escape(id)}"]`);if(card){card.scrollIntoView({block:'center'});card.classList.add('focused-deal');}else notice('This product is no longer in current results. The alert retains its original source link.');},0);}}};
   el('workspace-nav').addEventListener('click',event=>{const b=event.target.closest('[data-pane]');if(b)show(b.dataset.pane);});
   el('watch-search').addEventListener('click',()=>newWatch());
   el('watch-cancel').addEventListener('click',()=>el('watch-dialog').close());

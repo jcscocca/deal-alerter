@@ -65,7 +65,16 @@ input[type=checkbox] { accent-color:var(--accent);width:17px;height:17px;flex-sh
 .badge.current,.badge.preference { background:var(--soft);color:var(--accent); }
 .badge.review,.badge.warning { background:var(--warn-bg);color:var(--warn);border-color:transparent; }
 .badge.unavailable { background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn);font-weight:650; }
-.deal.unavailable { border-left:4px solid var(--warn); }
+.verdict-deal { --verdict-text:light-dark(#166534,#86efac);--verdict-bg:light-dark(#dcfce7,#173524); }
+.verdict-skip { --verdict-text:light-dark(#991b1b,#fca5a5);--verdict-bg:light-dark(#fee2e2,#431c24); }
+.verdict-watch { --verdict-text:light-dark(#854d0e,#fde68a);--verdict-bg:light-dark(#fef3c7,#3b2c17); }
+.verdict-unassessed { --verdict-text:light-dark(#475569,#cbd5e1);--verdict-bg:light-dark(#e2e8f0,#2c3648); }
+.deal[class*="verdict-"],.compare-card[class*="verdict-"] { border-left:4px solid var(--verdict-text); }
+.recommendation { display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid var(--verdict-text);border-radius:6px;font-size:13px;font-weight:700;line-height:1.4;color:var(--verdict-text);background:var(--verdict-bg); }
+.recommendation>span { font-size:16px;line-height:1; }
+.verdict-legend { display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0;color:var(--muted);font-size:12px; }
+.verdict-legend .recommendation { font-size:11px;padding:3px 7px; }
+.verdict-note { color:var(--text); }
 .price .price-context { color:var(--warn);font-weight:650;margin-top:8px; }
 .price .checked-time { margin-top:8px; }
 .deal-title { overflow-wrap:anywhere; }

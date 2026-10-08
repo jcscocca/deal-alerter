@@ -4,6 +4,40 @@ const B=require('../alerters/techscout/web/browsing.js');
 const now=2000000000;
 const row=(id,changes={})=>({id,title:'Desktop RTX 5090 64GB DDR5',facets:{kind:'Desktops',gpu:'RTX 5090',ram:'64GB',condition:'New'},source:'newegg',total:4000,price:4000,available:true,expires_at:now+60,checked_at:'2026-10-07T00:00:00Z',verification_reasons:[],preference_reasons:[],reasons:[],fit:'NEEDS SPECS',...changes});
 
+test('visible recommendation separates negative verdicts, qualifying deals and unassessed builds',()=>{
+  const pass=row('card',{judgment:{verdict:'PASS',eligible:false}});
+  assert.deepEqual(B.recommendation(pass,now),{tone:'skip',label:'Skip — not recommended',note:''});
+  const pc={...pass,is_system:true,title:'Alienware Aurora R16 i9-12900 8GB DDR5 RTX 3090 1TB M.2 SSD'};
+  assert.equal(B.recommendation(pc,now).tone,'unassessed');
+  assert.match(B.recommendation(pc,now).note,/Bare-GPU prices cannot rate this build/);
+  assert.equal(B.recommendation({...pc,judgment:{verdict:'GRAIL',eligible:true}},now).tone,'unassessed');
+  assert.equal(B.recommendation({...pass,judgment:{verdict:'STRONG',eligible:true}},now).tone,'deal');
+  assert.equal(B.recommendation({...pass,judgment:{verdict:'GOOD',eligible:false}},now).tone,'watch');
+  assert.equal(B.recommendation({...pass,judgment:null},now).tone,'unassessed');
+  assert.equal(B.recommendation({...pass,lead:true},now).tone,'unassessed');
+});
+
+test('favorable verdicts never remain green on stale, unavailable or unverified listings',()=>{
+  const deal=row('deal',{judgment:{verdict:'GRAIL',eligible:true}});
+  for(const changes of [{expires_at:now-1},{available:false},{total:null},{total:0},
+    {stock:'out_of_stock'},{stock:'preorder'},{verification_reasons:['Variant unverified']}]) {
+    assert.equal(B.recommendation({...deal,...changes},now).tone,'watch');
+  }
+});
+
+test('prebuilt colors use whole-build evidence, never a budget target or GPU verdict',()=>{
+  const pc=row('pc',{is_system:true,stock:'in_stock',judgment:{verdict:'GRAIL',eligible:true,target_hit:true},prebuilt_value:{peers:{difference_pct:null},history:{difference_pct:null}}});
+  assert.equal(B.recommendation(pc,now).tone,'unassessed');
+  const compare=delta=>({...pc,prebuilt_value:{peers:{difference_pct:delta}}});
+  assert.equal(B.recommendation(compare(-5),now).label,'Below comparable prices');
+  assert.equal(B.recommendation(compare(5),now).label,'Skip — above comparable prices');
+  assert.equal(B.recommendation(compare(4.9),now).tone,'watch');
+  assert.equal(B.recommendation(compare(-4.9),now).tone,'watch');
+  assert.equal(B.recommendation({...compare(-20),expires_at:now-1},now).tone,'watch');
+  assert.equal(B.recommendation({...compare(-20),stock:'unknown'},now).tone,'watch');
+  assert.equal(B.recommendation({...pc,prebuilt_value:{history:{difference_pct:-50}}},now).label,'Watch — history only');
+});
+
 test('explicit sold-out stock stays prominent after a quote becomes stale',()=>{
   const sold=row('sold',{stock:'out_of_stock',available:false});
   const stale={...sold,id:'stale',expires_at:now-1};
