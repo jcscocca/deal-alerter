@@ -203,14 +203,42 @@ def test_new_source_jobs_preserve_config_limits_and_restart(tmp_path, monkeypatc
     key = mon.add_product(CP_URL)
     mon.jobs[key]["next"] = 9999999999
     mon.jobs[key]["error"] = "Backoff"
+    mon.jobs[key].update(last_fetch_success=1234, last_error_at=1500, listing_notes=["Unverified shipping"])
     mon.client.host("www.cyberpowerpc.com")["blocked_until"] = 9999999999
     mon.write_health()
     again = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", tmp_path / "runtime", dry_run=False)
     assert again.jobs[key]["next"] == 9999999999 and again.jobs[key]["interval"] >= 600
+    assert again.jobs[key]["last_fetch_success"] == 1234 and again.jobs[key]["last_error_at"] == 1500
+    assert again.jobs[key]["listing_notes"] == ["Unverified shipping"]
     assert again.client.host("www.cyberpowerpc.com")["blocked_until"] == 9999999999
     assert any(j["kind"] == "ibuypower" and j["limit"] == 48 for j in again.jobs.values())
     assert any(j["kind"] == "discover-skytech" and j["interval"] >= 21600 for j in again.jobs.values())
     assert mon.add_product("https://www.ibuypower.com/store/rdy-y50-r02") is None
+
+
+def test_unverified_offer_is_a_successful_check_without_inventory_or_deal_promotion(tmp_path, monkeypatch):
+    from alerters.hardware import monitor as module
+    from alerters.hardware.monitor_sources import Batch
+    from dealcore.notify import Channel
+    f = sky_fixture()
+    f["state"]["quantity_available"] = 0
+    offer = parse_skytech(sky_page(f), f["url"], NOW)
+    assert not offer.confirmed and offer.stock == "unknown"
+    sent = []
+    monkeypatch.setattr(module, "channels", lambda **_: (Channel("ntfy", "push", sent.append),))
+    mon = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", tmp_path / "runtime", dry_run=False)
+    mon.jobs.clear()
+    key = mon.add_product(offer.url)
+    monkeypatch.setattr(module, "fetch_job", lambda *_: Batch(offers=[offer]))
+    assert mon.loop(once=True) == 0
+    job = mon.jobs[key]
+    assert job["last_success"] > 0 and job["last_fetch_success"] > 0
+    assert job["error"] == "" and job["failures"] == 0
+    assert job["listing_notes"] == [module.LISTING_UNVERIFIED]
+    assert not sent
+    raw = mon.shopping.batches[key]["rows"][0]
+    assert raw["offer"]["confirmed"] is False and raw["offer"]["stock"] == "unknown"
+    assert raw["judgment"]["eligible"] is False
 
 
 def test_fetch_and_dashboard_include_new_sources_without_promoting_catalog_quotes(tmp_path, monkeypatch):

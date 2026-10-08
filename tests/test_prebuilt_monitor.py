@@ -496,6 +496,8 @@ def test_watchdog_retries_failed_transport_without_repeating_success(tmp_path, m
     monkeypatch.setattr(module,"check_owner",lambda *_:None)
     status={"heartbeat":__import__('time').time(),"jobs":{},"problems":["Coverage degraded"]}
     (tmp_path/'health.json').write_text(json.dumps(status))
+    (tmp_path/'watchdog.json').write_text(json.dumps({"incidents": {
+        "coverage:Coverage degraded": {"since":status["heartbeat"]-module.HEALTH_GRACE_SECONDS-1}}}))
     success=[]
     failed=[]
     def fail(_):
