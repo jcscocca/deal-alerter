@@ -39,6 +39,30 @@ TECH = re.compile(r"\b(?:DDR[345]|RAM|SSD|NVMe|DIMM|CPU|GPU|Ryzen|GeForce|Radeon
                   r"smart ?home|smart ?plug|smart ?bulb|security camera|SD card|microSD|flash drive|"
                   r"Ethernet|NAS|power supply|PC case|gaming PC)\b", re.I)
 ROUNDUP = re.compile(r"\b(?:roundup|deals|lineup|collection|sale|up to|starting (?:at|from))\b", re.I)
+MERCHANTS = {"Amazon": r"amazon(?:\.com)?", "Walmart": r"walmart(?:\.com)?",
+             "Newegg": r"newegg(?:\.com)?", "Best Buy": r"best\s*buy",
+             "B&H": r"b\s*&\s*h(?:\s+photo(?:\s+video)?)?", "Adorama": r"adorama",
+             "iBUYPOWER": r"ibuypower", "CyberPowerPC": r"cyberpowerpc", "Skytech": r"skytech(?:\s+gaming)?",
+             "Dell": r"dell", "Lenovo": r"lenovo", "HP": r"hp", "Costco": r"costco",
+             "Micro Center": r"micro\s*center", "Target": r"target", "Woot": r"woot!?"}
+
+
+def merchant_name(value):
+    if not isinstance(value, str):
+        return None
+    return next((name for name, pattern in MERCHANTS.items() if re.fullmatch(pattern, value.strip(), re.I)), None)
+
+
+def reported_merchant(fields, title, description):
+    # Structured publisher attribution takes precedence over comparison prose.
+    if fields.get("retailer"):
+        return merchant_name(plain(fields["retailer"]))
+    for content in (title, description):
+        matches = {name for name, pattern in MERCHANTS.items()
+                   if re.search(r"\b(?:at|from|via)\s+" + pattern + r"\b|\b" + pattern + r"\s+(?:offers|has|is offering)\b", content, re.I)}
+        if matches:
+            return matches.pop() if len(matches) == 1 else None
+    return None
 
 
 def public_link(value, hosts=None):
@@ -67,7 +91,7 @@ def iso(seconds):
 
 
 def fingerprint(row):
-    return hashlib.sha256((row["title"]+"\n"+row["description"]).encode()).hexdigest()
+    return hashlib.sha256((row["title"]+"\n"+row["description"]+"\n"+(row.get("merchant") or "")).encode()).hexdigest()
 
 
 def cached_row(raw, source):
@@ -84,15 +108,16 @@ def cached_row(raw, source):
     if stamp(raw.get("published_at")) is None or stamp(raw.get("checked_at")) is None:
         return None
     row = {key: raw[key] for key in ("id", "source", "url", "title", "description", "published_at", "checked_at")}
-    asin, name = raw.get("asin"), raw.get("product_name")
+    merchant = merchant_name(raw.get("merchant"))
+    asin, name = raw.get("asin") if merchant == "Amazon" else None, raw.get("product_name")
     row.update(asin=asin if isinstance(asin, str) and re.fullmatch(r"[A-Z0-9]{10}", asin) else None,
                product_name=name if isinstance(name, str) and len(name) <= 1500 else None,
                expires_at=number(raw.get("expires_at")) or 0, price=number(raw.get("price")),
-               source=source, retailer=SOURCES[source]["label"], merchant="Amazon", lead=True,
+               source=source, retailer=SOURCES[source]["label"], merchant=merchant, lead=True,
                total=None, shipping=None, available=False, seller="Not established", condition="Not published",
                gpu=None, ram=None, potential=None, cpu="Not established", storage="Not established",
                fit="Not assessed", fit_summary="", layout_documented=False, warnings=[], rank=None,
-               categories=sorted(categories(raw["title"])), reasons=["Publisher quote; Amazon availability unverified"])
+               categories=sorted(categories(raw["title"])), reasons=["Publisher quote; retailer price and availability unverified"])
     row["terms"] = [term for term in raw.get("terms", []) if isinstance(term, str) and len(term) <= 150][:10] if isinstance(raw.get("terms"), list) else []
     return row
 
@@ -121,10 +146,10 @@ def parse_feed(body, source, now):
             published = None
         if not url or not title or len(title) > 1500 or len(description) > 24000 or published is None or not 0 <= now-published <= MAX_AGE:
             continue
-        # All feeds are discovery. Keep Amazon tech only; no site-wide lifestyle noise.
-        merchant = fields.get("retailer", "")
-        amazon = merchant.casefold() == "amazon" or (not merchant and bool(re.search(r"\bAmazon\b", title + " " + description, re.I)))
-        if not amazon or not TECH.search(title):
+        # All feeds are discovery. Keep tech from any retailer; unknown merchant
+        # attribution stays unknown instead of guessing from comparison prices.
+        merchant = reported_merchant(fields, title, description)
+        if not TECH.search(title):
             continue
         price = None
         if fields.get("price"):
@@ -145,13 +170,13 @@ def parse_feed(body, source, now):
             continue
         identity = source + ":" + hashlib.sha256(url.split("#")[0].encode()).hexdigest()[:24]
         links = [a.get("href") for a in BeautifulSoup(fields.get("description", ""), "html.parser").select("a[href]")]
-        asins = {amazon_asin(link) for link in links} - {None}
+        asins = ({amazon_asin(link) for link in links} - {None}) if merchant == "Amazon" else set()
         terms = [label for pattern, label in [(r"\bPrime\b", "Prime terms mentioned"),
                  (r"coupon|promo code|clip|check.{0,15}box", "Coupon or code mentioned"),
                  (r"Subscribe|S&S", "Subscription terms mentioned")]
                  if re.search(pattern, title + " " + description, re.I)]
         rows.append({"id": identity, "source": source, "retailer": SOURCES[source]["label"],
-                     "merchant": "Amazon", "title": title, "description": description, "url": url,
+                     "merchant": merchant, "title": title, "description": description, "url": url,
                      "price": price, "published_at": iso(published), "checked_at": iso(now),
                      "expires_at": min(now + INTERVAL * 2, published + MAX_AGE, expires or float("inf")),
                      "asin": next(iter(asins)) if len(asins) == 1 and not ROUNDUP.search(title) else None,
@@ -160,7 +185,7 @@ def parse_feed(body, source, now):
                      "seller": "Not established", "condition": "Not published", "gpu": None,
                      "ram": None, "potential": None, "cpu": "Not established", "storage": "Not established",
                      "fit_summary": "", "fit": "Not assessed", "layout_documented": False,
-                     "rank": None, "warnings": [], "reasons": ["Publisher quote; Amazon availability unverified"]})
+                     "rank": None, "warnings": [], "reasons": ["Publisher quote; retailer price and availability unverified"]})
     return rows
 
 
@@ -230,7 +255,7 @@ class FeedClient:
             result["product_name"] = products[0]["name"][:1500]
         # Read only the article body, excluding sidebar recommendations and related posts.
         scope = soup.select_one(".entry-content") if row["source"] == "nine-to-five-toys" else None
-        if scope:
+        if scope and row.get("merchant") == "Amazon":
             paragraph = next((p for p in scope.select("p") if p.select_one('a[href*="amzn.to/"], a[href*="amazon.com/"]')), None)
             if paragraph:
                 links = list(dict.fromkeys(a["href"] for a in paragraph.select("a[href]")
@@ -324,7 +349,7 @@ class DealFeeds:
                         metadata["fingerprint"] = fingerprint(row)
                         self.data["metadata"][row["id"]] = metadata
                     if isinstance(metadata, dict):
-                        row.update({k: v for k, v in metadata.items() if k in {"asin", "product_name"}})
+                        row.update({k: v for k, v in metadata.items() if k == "product_name" or k == "asin" and row.get("merchant") == "Amazon"})
                 with self.lock:
                     self.data["sources"][source] = {"rows": previous.get("rows", []) if error else rows,
                         "checked_at": previous.get("checked_at") if error else iso(now), "failed": error,
@@ -359,7 +384,7 @@ class DealFeeds:
                     if not fresh:
                         row["reasons"] = ["Publisher feed needs a successful check"]
                     rows.append(row)
-                    if category in ("monitor", "amazon") or category in categories(row["title"]):
+                    if category == "monitor" or category == "amazon" and row.get("merchant") == "Amazon" or category in categories(row["title"]):
                         result["rows"].append(row)
                 result["sources"].append({"source": source, "label": config["label"], "jobs": 1,
                     "status": "Current" if fresh else "Last feed check failed" if batch.get("failed") else "Feed check overdue" if checked else "Not checked yet",

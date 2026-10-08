@@ -119,12 +119,12 @@ them against sold data now and then. Your machines live in `rig.py`.
 
 ### Where listings come from
 
-eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales. Retailers
-reach it second-hand: Best Buy, Walmart, Newegg and Amazon deals arrive as
-r/buildapcsales and Slickdeals posts.
+eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales. Publisher
+feeds add tech deal reports across retailers; those reports are unverified leads.
 
 The optional [ThinkPad monitor](docs/thinkpad-monitor.md) adds direct HP OMEN
-and Newegg ABS/Skytech product checks, with exact configuration validation,
+and Newegg product checks, plus fixed CyberPowerPC/Skytech direct prebuilts,
+with exact configuration validation,
 separate PC history and stock/sale events. See its dry-run coverage report before
 cutover: dynamic HP configurations and blocked feeds cannot be treated as
 confirmed offers. It preserves the $5,000 RTX 5090 target.
@@ -140,6 +140,13 @@ Other direct retailers were investigated on 2026-09-28:
 - **Best Buy.** The developer API refuses sign-ups from free email and `.edu`
   addresses, so there is no key to be had. Worth revisiting only with an
   address on your own domain.
+- **CyberPowerPC / Skytech.** Fixed 5080/5090 prebuilt product checks are available
+  through the local monitor. Conflicting stock signals remain unconfirmed.
+- **iBUYPOWER.** RDY catalog quotes are discovery only; individual product access
+  returned HTTP 403 during the October 7 check. No inventory alerts or price
+  averages use those unconfirmed quotes.
+- **B&H / Adorama.** Direct access returned HTTP 403 during the October 7 check;
+  coverage remains through publisher reports. Costco is not enabled.
 - **Walmart.** Signed affiliate API lookup was verified on October 6, 2026.
   [TechScout shopping research](docs/techscout-shopping.md) now provides on-demand
   desktop/memory, tablet, computer and tech-supply reports. It uses localized

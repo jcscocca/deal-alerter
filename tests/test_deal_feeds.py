@@ -100,14 +100,49 @@ def test_reports_cannot_turn_stale_quotes_into_confirmed_inventory():
     assert card["available"] is False and card["reasons"] and card["total"] is None
 
 
-def test_only_amazon_tech_and_recent_usd_quotes_are_accepted():
+def test_only_tech_and_recent_usd_quotes_are_accepted():
     assert not parse_feed(feed(title="Dog food for $10"), "dealnews", NOW)
-    assert not parse_feed(feed(description="Walmart offers this SSD"), "dealnews", NOW)
+    row = parse_feed(feed(description="Walmart offers this SSD"), "dealnews", NOW)[0]
+    assert row["merchant"] == "Walmart" and row["lead"] and not row["available"] and row["total"] is None
     assert not parse_feed(feed(), "dealnews", NOW+73*3600)
     assert not parse_feed(feed(), "dealnews", NOW-3600)
     row = parse_feed(feed(extra='<dn:price currency="USD">145.99</dn:price>'), "dealnews", NOW)[0]
     assert row["price"] == 145.99 and "Coupon or code mentioned" in row["terms"]
     assert parse_feed(feed(title="Save $50 on Samsung 990 PRO 2TB SSD"), "dealnews", NOW)[0]["price"] is None
+
+
+def test_merchant_attribution_does_not_use_comparison_amazon_links():
+    description = f'Adorama has this SSD. Compare with <a href="https://www.amazon.com/dp/{ASIN}">Amazon</a>.'
+    row = parse_feed(feed(description=description), "dealnews", NOW)[0]
+    assert row["merchant"] == "Adorama" and row["asin"] is None
+    row = parse_feed(feed(description=description, extra='<dn:retailer>Newegg</dn:retailer>'), "dealnews", NOW)[0]
+    assert row["merchant"] == "Newegg"
+    unknown = parse_feed(feed(description="This SSD costs less than Amazon's previous price."), "dealnews", NOW)[0]
+    assert unknown["merchant"] is None and unknown["asin"] is None
+    ambiguous = parse_feed(feed(description="Amazon has this SSD. Walmart has it too."), "dealnews", NOW)[0]
+    assert ambiguous["merchant"] is None
+
+
+def test_non_amazon_reports_survive_restart_without_leaking_into_amazon_tab(tmp_path):
+    from alerters.techscout.deal_feeds import cached_row
+    row = parse_feed(feed(description="CyberPowerPC offers this SSD"), "dealnews", NOW)[0]
+    row.update(asin=ASIN, available=True, total=100)
+    clean = cached_row(row, "dealnews")
+    assert clean["merchant"] == "CyberPowerPC" and clean["asin"] is None
+    assert not clean["available"] and clean["total"] is None
+    data = {"sources": {"dealnews": {"rows": [row], "checked_at": row["checked_at"], "failed": False}}, "metadata": {}}
+    (tmp_path/'deal-feeds.json').write_text(json.dumps(data))
+    collector = DealFeeds(tmp_path)
+    assert collector.snapshot("monitor", NOW)["rows"][0]["merchant"] == "CyberPowerPC"
+    assert collector.snapshot("supplies", NOW)["rows"]
+    assert not collector.snapshot("amazon", NOW)["rows"]
+
+
+def test_multiple_publishers_combine_only_same_merchant():
+    a, b = report(merchant="Newegg"), report("bensbargains", merchant="Newegg")
+    assert len(combine_leads([a, b])) == 1
+    b["merchant"] = "Adorama"
+    assert len(combine_leads([a, b])) == 2
 
 
 @pytest.mark.parametrize("body", [b"<html>challenge</html>", b"<rss><channel>", b'<!DOCTYPE rss [<!ENTITY e "test">]><rss><channel/></rss>', b'x'*2_000_001], ids=["html", "malformed", "entity", "large"])

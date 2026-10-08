@@ -42,7 +42,8 @@ def canonical_product(url: str) -> str:
         # Preserve configuration selectors; never reduce a customized URL to a base SKU.
         query = {k: v for k, v in parse_qs(p.query).items() if not k.lower().startswith(("utm_", "jumpid", "msockid"))}
         return urlunsplit(("https", p.netloc, p.path, urlencode(query, doseq=True), ""))
-    raise ValueError("Not a supported retailer product URL")
+    from .builders import builder_product
+    return builder_product(url)[1]
 
 
 def discover_newegg(body: str) -> list[str]:

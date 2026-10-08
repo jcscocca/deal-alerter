@@ -101,6 +101,11 @@ configuration. Newegg discovery supports ABS, Skytech, CyberPowerPC, iBUYPOWER,
 MSI, Gigabyte, Stormcraft and HP. The seller trust rules remain Newegg itself
 and the verified Skytech store; merely listing a brand does not trust every seller.
 HP remains fixed-SKU OMEN only. Dynamic/cart-dependent prices remain unconfirmed.
+The October 7 source expansion adds fixed CyberPowerPC and Skytech direct
+products at ten-minute intervals. Skytech's public SKU sitemap refreshes every
+six hours. iBUYPOWER's fifteen-minute RDY catalog check provides unverified
+quotes only. Missing or contradictory stock, shipping or condition evidence
+cannot trigger inventory alerts or enter current-price comparisons.
 
 Added the HP 35L and Skytech Azure 3 fixed offers, general price-sorted Newegg
 5080 discovery and a separate 64GB discovery page. The total
@@ -116,6 +121,11 @@ search and ZIP-specific lookups; it does not feed the live monitor or alerts.
 Its desktop mode applies this same RAM reuse profile. This does not cover the
 entire market. Native store restock alerts and manual searches remain useful
 complements.
+Best Buy remains deferred because the earlier API signup required an eligible
+email domain and no key was obtained. B&H and Adorama returned HTTP 403 during
+the October 7 access checks; Costco is omitted by preference. The dashboard's
+existing publisher feeds now accept tech reports across retailers, separately
+from confirmed direct inventory.
 
 ## Preview, tests and release
 

@@ -130,7 +130,13 @@ class Monitor:
             self.add_product(seed["url"])
         for discovery in self.config.get("discovery", []):
             public_url(discovery["url"])
-            self.add_job(discovery["kind"], self.cfg["discovery_seconds"], discovery["url"])
+            interval = max(21600, self.cfg["discovery_seconds"]) if discovery["kind"] == "discover-skytech" else self.cfg["discovery_seconds"]
+            self.add_job(discovery["kind"], interval, discovery["url"])
+        for catalog in self.config.get("catalog", []):
+            if catalog.get("kind") != "ibuypower" or catalog.get("url") != "https://www.ibuypower.com/gaming-pcs/prebuilt-gaming-pcs":
+                raise ValueError("Unsupported builder catalog")
+            key = self.add_job("ibuypower", max(900, self.cfg["discovery_seconds"]), catalog["url"])
+            self.jobs[key]["limit"] = self.cfg["max_products_per_retailer"]
         for name in ("reddit", "slickdeals"):
             self.add_job(name, self.cfg["feed_seconds"], SLICKDEALS_COMPUTERS if name == "slickdeals" else "")
         for name, interval in (("ebay", self.cfg["legacy_seconds"]), ("apple-refurb", 3600)):
@@ -144,7 +150,7 @@ class Monitor:
         for name, deadline in saved.get("host_backoff", {}).items():
             self.client.host(name)["blocked_until"] = deadline
         for key, old in saved["jobs"].items():
-            if key not in self.jobs and old.get("kind") in ("hp", "newegg"):
+            if key not in self.jobs and old.get("kind") in ("hp", "newegg", "cyberpowerpc", "skytech"):
                 self.add_product(old["url"])
             if key in self.jobs:
                 for field in ("created_at", "last_success", "next", "failures", "error"):
@@ -166,7 +172,12 @@ class Monitor:
 
     def add_product(self, url):
         url = canonical_product(url)
-        kind = "hp" if "www.hp.com/" in url else "newegg"
+        from urllib.parse import urlsplit
+        kind = {"www.hp.com": "hp", "www.newegg.com": "newegg", "www.cyberpowerpc.com": "cyberpowerpc",
+                "skytechgaming.com": "skytech"}.get(urlsplit(url).hostname)
+        if kind is None:
+            # iBUYPOWER remains one bounded catalog job; product-page access failed.
+            return None
         if kind == "hp" and self.client.hp_reader:
             from .hp_browser import hp_page_url
             try:
@@ -184,6 +195,8 @@ class Monitor:
                 self.problems.append(message)
             return None
         interval = max(300, self.cfg["retailer_seconds"]) if kind == "hp" and self.client.hp_reader else self.cfg["retailer_seconds"]
+        if kind in ("cyberpowerpc", "skytech"):
+            interval = max(600, interval)
         return self.add_job(kind, interval, url)
 
     def process(self, key: str, batch: Batch):
@@ -253,7 +266,9 @@ class Monitor:
         self.results = self.results[-100:]
         if result.problems:
             raise Deferred("Assessment/delivery failed: " + "; ".join(result.problems), 120)
-        if notes and batch.offers:
+        # A successful discovery-only catalog can contain useful quotes without
+        # proving purchase availability. Each offer remains explicitly unconfirmed.
+        if notes and batch.offers and self.jobs[key]["kind"] != "ibuypower":
             raise Deferred("; ".join(notes), 300)
 
     def recheck_starts(self):

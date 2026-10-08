@@ -66,3 +66,19 @@ url = "https://www.newegg.com/p/pl?N=100897483+601468633+601399480&Order=1"
 # discount (dollars), required_accessories (dollars), eligibility_confirmed,
 # starts_at/ends_at (ISO with offset). The code must still appear on that page.
 # Membership/student/card offers are never presumed eligible.
+
+[[catalog]]
+# RDY catalog discovery only: product-page access failed, so no confirmed stock,
+# delivered totals, historical observations or stock alerts from these quotes.
+kind = "ibuypower"
+url = "https://www.ibuypower.com/gaming-pcs/prebuilt-gaming-pcs"
+
+[[discovery]]
+kind = "discover-cyberpowerpc"
+url = "https://www.cyberpowerpc.com/gaming-pcs/prebuilt/"
+
+[[discovery]]
+# Public exact-SKU sitemap, refreshed every six hours. Each discovered product
+# receives its own ten-minute check with the normal per-host throttle/backoff.
+kind = "discover-skytech"
+url = "https://skytechgaming.com/sitemap.xml"

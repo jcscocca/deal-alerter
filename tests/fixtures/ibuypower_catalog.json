@@ -1,0 +1,146 @@
+{
+  "models": [
+    {
+      "ModelId": 12218,
+      "stock": 34,
+      "CreatedTime": "2026-08-19T11:43:00",
+      "TodayOnly": false,
+      "Timestamp": "2026-10-07T17:41:02.1774864-07:00",
+      "FullContent": {
+        "ModelId": 12218,
+        "Link": "rdy-y50-r02",
+        "Name": "RDY Y50 R02",
+        "ShortDescription": "Windows 11 Home, AMD Ryzen 7 9800X3D CPU, ASUS X870 WiFi MB, GeForce RTX 5080 16GB GPU, 32GB DDR5-6000MHz RGB RAM, 2TB M.2 NVMe Gen4 SSD, iBUYPOWER 360mm RGB Liquid Cooling",
+        "Price": 3399,
+        "IsDesktop": true,
+        "Prebuild": true,
+        "Skus": {
+          "1": {
+            "Option": "Case",
+            "Name": "iBUYPOWER HYTE Y50 - Black"
+          },
+          "2": {
+            "Option": "Processor",
+            "Name": "AMD Ryzen™ 7 9800X3D CPU"
+          },
+          "3": {
+            "Option": "Motherboard",
+            "Name": "ASUS X870 MAX GAMING WIFI"
+          },
+          "4": {
+            "Option": "Memory",
+            "Name": "32GB DDR5-6000MHz RGB RAM"
+          },
+          "5": {
+            "Option": "Video Card",
+            "Name": "GeForce RTX 5080 - 16GB"
+          },
+          "7": {
+            "Option": "Power Supply",
+            "Name": "850 Watt - High Power PSU"
+          },
+          "8": {
+            "Option": "Processor Cooling",
+            "Name": "iBUYPOWER 360mm Addressable RGB Liquid Cooling System"
+          },
+          "11": {
+            "Option": "Primary Storage",
+            "Name": "2TB M.2 NVMe Gen4 SSD"
+          },
+          "28": {
+            "Option": "Operating System",
+            "Name": "Windows 11 Home"
+          },
+          "29": {
+            "Option": "Warranty",
+            "Name": "3 Year Standard Warranty (3 Year Labor + 3 Year Parts)"
+          },
+          "30": {
+            "Option": "Rush Service",
+            "Name": "2-Day"
+          },
+          "122": {
+            "Option": "Storage",
+            "Name": "2TB M.2 NVMe Gen4 SSD"
+          },
+          "146": {
+            "Option": "Wireless Network",
+            "Name": "On-Board Wireless Network"
+          }
+        }
+      }
+    }
+  ],
+  "soldOutModels": [
+    {
+      "ModelId": 12220,
+      "stock": 0,
+      "CreatedTime": "2026-08-19T16:13:00",
+      "TodayOnly": false,
+      "Timestamp": "2026-10-07T17:41:02.1774864-07:00",
+      "FullContent": {
+        "ModelId": 12220,
+        "Link": "rdy-y50-r04",
+        "Name": "RDY Y50 R04",
+        "ShortDescription": "Windows 11 Home, AMD Ryzen 9 9950X3D CPU, ASUS X870 WiFi MB, GeForce RTX 5090 32GB GPU, 32GB DDR5-6000MHz RGB RAM, 4TB M.2 NVMe Gen4 SSD, iBUYPOWER 360mm RGB Liquid Cooling",
+        "Price": 6899,
+        "IsDesktop": true,
+        "Prebuild": true,
+        "Skus": {
+          "1": {
+            "Option": "Case",
+            "Name": "iBUYPOWER HYTE Y50 - Black"
+          },
+          "2": {
+            "Option": "Processor",
+            "Name": "AMD Ryzen™ 9 9950X3D CPU"
+          },
+          "3": {
+            "Option": "Motherboard",
+            "Name": "ASUS X870 MAX GAMING WIFI"
+          },
+          "4": {
+            "Option": "Memory",
+            "Name": "32GB DDR5-6000MHz RGB RAM"
+          },
+          "5": {
+            "Option": "Video Card",
+            "Name": "GeForce RTX 5090 - 32GB"
+          },
+          "7": {
+            "Option": "Power Supply",
+            "Name": "1000 Watt - High Power PCIe GEN 5 PSU"
+          },
+          "8": {
+            "Option": "Processor Cooling",
+            "Name": "iBUYPOWER 360mm Addressable RGB Liquid Cooling System"
+          },
+          "11": {
+            "Option": "Primary Storage",
+            "Name": "4TB (1x4TB) M.2 NVMe Gen4 SSD"
+          },
+          "28": {
+            "Option": "Operating System",
+            "Name": "Windows 11 Home"
+          },
+          "29": {
+            "Option": "Warranty",
+            "Name": "3 Year Standard Warranty (3 Year Labor + 3 Year Parts)"
+          },
+          "30": {
+            "Option": "Rush Service",
+            "Name": "2-Day"
+          },
+          "122": {
+            "Option": "Storage",
+            "Name": "4TB (1x4TB) M.2 NVMe Gen4 SSD"
+          },
+          "146": {
+            "Option": "Wireless Network",
+            "Name": "On-Board Wireless Network"
+          }
+        }
+      }
+    }
+  ]
+}

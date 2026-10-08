@@ -16,10 +16,13 @@ from .research import cpu_model
 from alerters.hardware.prebuilt_specs import public_specs
 
 LABELS = {"newegg": "Newegg", "ebay": "eBay", "apple-refurb": "Apple Refurbished",
-          "slickdeals": "Slickdeals", "hp": "HP", "reddit": "Reddit"}
+          "slickdeals": "Slickdeals", "hp": "HP", "reddit": "Reddit",
+          "cyberpowerpc": "CyberPowerPC", "skytech": "Skytech", "ibuypower": "iBUYPOWER"}
 HOSTS = {"newegg": {"www.newegg.com", "newegg.com"}, "ebay": {"www.ebay.com", "ebay.com"},
          "apple-refurb": {"www.apple.com"}, "slickdeals": {"slickdeals.net"},
-         "hp": {"www.hp.com"}, "reddit": {"www.reddit.com", "reddit.com"}}
+         "hp": {"www.hp.com"}, "reddit": {"www.reddit.com", "reddit.com"},
+         "cyberpowerpc": {"www.cyberpowerpc.com"}, "skytech": {"skytechgaming.com"},
+         "ibuypower": {"www.ibuypower.com"}}
 
 
 def number(value):
@@ -104,6 +107,8 @@ def public_row(raw, source, checked, expires, problems, now, profile):
             total = number(offer.total(datetime.fromtimestamp(now, timezone.utc)))
             available = offer.confirmed is True and offer.sale_status(datetime.fromtimestamp(now, timezone.utc)) == "live"
             stock = stock_state(offer.stock)
+            if not offer.confirmed and source in ("ibuypower", "skytech", "cyberpowerpc") and offer.evidence:
+                reasons.append(offer.evidence[:500])
             if offer.coupon and offer.coupon.active(datetime.fromtimestamp(now, timezone.utc)):
                 cost_note = "with confirmed coupon + shipping · before tax"
                 warnings.append("Coupon: " + offer.coupon.instructions)

@@ -30,7 +30,8 @@ monitor price history remain owned by the monitor. Explicit Walmart research
 runs also maintain a separate local complete-PC history, described below.
 
 **All deals** combines saved Walmart research across categories with the existing
-watchlist's eBay/Apple hardware results, Newegg desktops, and publisher/community
+watchlist's eBay/Apple hardware results, Newegg/CyberPowerPC/Skytech desktops,
+iBUYPOWER catalog quotes, and publisher/community
 leads. Duplicate Walmart IDs use the latest saved lookup. Other category views include matching
 monitor products alongside Walmart. Use **Source** to narrow the list; retailer,
 seller, condition and check time appear on every card. Complete desktops and loose
@@ -46,14 +47,55 @@ never as confirmed inventory. eBay variants, risky sellers, multi-item lots, and
 missing shipping quotes remain held. Apple's current collector does not establish
 shipping, so its finds remain visible outside the delivered-price ranking.
 
-## Amazon deal reports and overlap
+## Builder coverage
 
-**Amazon deals** collects recent Amazon tech reports from the publishers' public
+CyberPowerPC discovery reads the public prebuilt catalog; Skytech discovery reads
+its published exact-SKU sitemap every six hours. Fixed RTX 5080/5090 products are
+checked every ten minutes, subject to the existing host throttles, robots rules,
+backoff and 48-product-per-retailer cap. Configurator/family URLs and configuration
+query parameters are rejected. Only matching selected SKU, specifications, USD
+price, condition and stock evidence can produce a current offer. Confirmed offers
+use the existing alert preferences, exact-build history and comparable-price rules.
+Unknown shipping or conflicting availability stays outside price comparisons.
+
+iBUYPOWER's public RDY catalog is checked every fifteen minutes. On October 7,
+2026, that catalog was readable but the tested individual product page returned
+HTTP 403. These catalog quotes retain unknown condition/shipping and unconfirmed
+availability; the sold-out list can establish an out-of-stock label. They cannot
+produce stock alerts, delivered-price averages or historical price observations.
+
+Live access checks on October 7, 2026 found B&H and Adorama denied requests with
+HTTP 403. They have no enabled direct collectors. Best Buy remains deferred:
+the earlier signup investigation found free-email/.edu restrictions and no API
+key, and its published API terms separately restrict cached content to 72 hours.
+Costco is omitted by user preference. Publisher reports may still mention any
+of these retailers without establishing inventory.
+
+Skytech can publish `InStock` and `in_stock=true` alongside zero
+`quantity_available`. This disagreement stays unconfirmed, even with an enabled
+Add to Cart button. Optional paid warranties and engraving are excluded from the
+base configuration; hardware options require separate configuration review.
+
+The October 7 live validation parsed all 31 discovered Skytech models: three had
+consistent in-stock evidence, nine were out of stock and nineteen had incomplete
+or conflicting stock signals. CyberPowerPC discovery found one qualifying 5080
+prebuilt with agreeing price/specification/stock evidence. The saved iBUYPOWER
+catalog supplied twelve 5080/5090 quotes, all kept unconfirmed. Publisher parsing
+accepted 37 recent tech reports, including two explicitly attributed to Best Buy.
+These counts are a dated integration check, not current purchase availability.
+
+## Publisher deal reports and overlap
+
+TechScout collects recent tech reports across retailers from the publishers' public
 RSS feeds: Ben's Bargains (Amazon, desktops and memory), DealNews (computers and
 recent deals), and 9to5Toys. A background worker checks the six feed URLs every
 15 minutes while the dashboard server runs. Restarting respects the saved check
 schedule. Browser polling and **Reload results** only read the local cache.
 This uses no Amazon credentials or paid service and sends no alerts.
+All reports appear in **All deals** and matching product categories. **Amazon
+deals** remains restricted to reports explicitly attributed to Amazon. Structured
+publisher retailer fields take precedence; ambiguous or missing attribution stays
+unknown. Amazon links used for comparison cannot identify another retailer's offer.
 
 Each source can inspect up to eight new or changed publisher articles per check,
 respecting its robots rules. Structured product names and an unambiguous Amazon
@@ -76,7 +118,7 @@ terms. Differing quotes display a range, with each quote still visible in
 **Source reports**. Filtering by a publisher retains the complete combined card.
 Saving the card uses one comparison slot; previous individual report selections
 can resolve to that card. Extra reports do not create market averages or verify
-Amazon stock, seller, shipping, final price or a historical discount.
+retailer stock, seller, shipping, final price or a historical discount.
 
 Feed entries expire from discovery after 72 hours. A feed check older than 30
 minutes or a failed check labels its reports as needing another check. A current
@@ -379,6 +421,7 @@ that the entire catalog has been searched.
 ```powershell
 python -m pytest -q tests/test_techscout.py tests/test_techscout_dashboard.py
 python -m pytest -q tests/test_deal_feeds.py tests/test_shopping_sources.py tests/test_shopping_integration.py
+python -m pytest -q tests/test_builder_sources.py
 python -m pytest -q tests/test_techscout_facets.py tests/test_techscout_browsing.py
 node --test tests/techscout_browsing.test.cjs
 ```
