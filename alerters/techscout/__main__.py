@@ -11,6 +11,7 @@ from pathlib import Path
 from dealcore.state import atomic_write
 from .research import PRESETS, research
 from .walmart import Credentials, WalmartClient, validate_zip
+from .price_history import record_research
 
 
 def local_directory() -> Path:
@@ -19,7 +20,7 @@ def local_directory() -> Path:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="TechScout: one on-demand Walmart shopping report; no alerts or history.")
+    parser = argparse.ArgumentParser(description="TechScout: on-demand Walmart research with local prebuilt price history; no alerts.")
     parser.add_argument("--category", choices=PRESETS, default="desktop-memory")
     parser.add_argument("--query", action="append", help="Replace preset searches; repeat up to four times")
     parser.add_argument("--item-id", action="append", help="Replace saved candidate IDs; repeat up to 20 times")
@@ -67,7 +68,8 @@ def main(argv=None) -> int:
         stem = args.output / ("latest-" + args.category)
         atomic_write(stem.with_suffix(".html"), result.html())
         atomic_write(stem.with_suffix(".json"), json.dumps(result.document(), indent=2, ensure_ascii=False))
-        # Overwrite a session receipt, never append prices or request history.
+        record_research(args.output, result)
+        # Request receipts remain per-session; price evidence is stored separately.
         atomic_write(stem.with_suffix(".requests.json"), json.dumps(events, indent=2))
         print(f"{len(result.products)} product cards; {client.requests} API calls. Report: {stem.with_suffix('.html')}")
         if result.problems or not result.products:

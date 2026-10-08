@@ -56,6 +56,22 @@ def test_direct_source_ranks_without_any_walmart_report(tmp_path):
     assert row["layout_documented"] and "unverified" in row["fit_summary"]
 
 
+def test_public_snapshot_exposes_strict_peer_evidence_and_preserves_history(tmp_path):
+    offers = [offer(sku=str(i), seller="Store"+str(i), base_price=price,
+                    specs={"Memory":"32GB DDR5", "SSD":"2TB", "Power Supply":"1000W"})
+              for i,price in enumerate((2000,2400,2600,2800))]
+    exporter = publish(tmp_path, Batch(offers=offers))
+    summary = {"median":2500, "low":2400, "high":2700, "prior_days":3}
+    exporter.batches["job"]["rows"][0]["judgment"] = {"price_history":summary}
+    exporter.write({"job":{"kind":"newegg", "interval":120, "error":"", "last_success":NOW.timestamp()}}, NOW.timestamp())
+    result = state(tmp_path)
+    row = next(r for g in result["groups"] for r in g["rows"] if r["seller"] == "Store0")
+    value = row["prebuilt_value"]
+    assert value["peers"]["median"] == 2620 and value["peers"]["count"] == 3
+    assert value["history"]["median"] == 2500
+    assert value["build_details"]["Power supply"] == "1000W"
+
+
 @pytest.mark.parametrize("stock", ["out_of_stock", "unknown", "preorder"])
 def test_monitor_preserves_explicit_stock_without_promoting_unavailable_offer(tmp_path, stock):
     publish(tmp_path, Batch(offers=[offer(stock=stock)]))

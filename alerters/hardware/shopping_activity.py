@@ -23,4 +23,7 @@ def judgments(plugin, result, options, receipts, now):
                              "checked_at": now.isoformat(), "deliveries": deliveries,
                              "decisions": [{k: d[k] for k in ("channel", "status", "at")}
                                            for d in result.decisions if d["key"] == item.key]}
+        if item.key in getattr(plugin, "pc_details", {}):
+            offer = plugin.pc_details[item.key][0]
+            records[item.key]["price_history"] = plugin.pc_history.evidence(offer, now)
     return records

@@ -129,6 +129,10 @@ footer { color:var(--muted);font-size:11px;margin-top:24px; }
 .watch-card h2 {font-size:18px;}
 .deal-judgment {margin:10px 0;padding-top:10px;border-top:1px solid var(--line);}
 .deal-judgment p {margin:6px 0;}
+.price-evidence {margin:10px 0;padding-top:10px;border-top:1px solid var(--line);}
+.price-evidence p {margin:6px 0;}
+.price-evidence h4 {margin:16px 0 8px;}
+.peer-offer {padding:10px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere;}
 .focused-deal {outline:3px solid var(--accent);outline-offset:3px;}
 dialog {color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:12px;width:min(480px,90vw);padding:24px;}
 dialog::backdrop {background:#10274c80;}

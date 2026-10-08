@@ -306,14 +306,14 @@ def test_invalid_plans_make_no_calls(kwargs):
 def test_cli_creates_local_snapshot_without_notifications(tmp_path, monkeypatch, credentials):
     settings = tmp_path / "settings.json"
     settings.write_text(json.dumps({"walmart": {"zip_code": "94105", "credential_file": "fake.json"}}))
-    session = Session([Response({"items": [product()]}), Response({"items": [product()]})])
+    session = Session([Response({"items": [product(standardShipRate=0)]}), Response({"items": [product(standardShipRate=0)]})])
     monkeypatch.setattr(cli.Credentials, "load", lambda _: credentials)
     monkeypatch.setattr(cli, "WalmartClient", lambda cred, zipcode, audit: WalmartClient(cred, zipcode, audit=audit, session=session))
     output = tmp_path / "reports"
     args = ["--settings", str(settings), "--output", str(output), "--query", "desktop", "--item-id", "123"]
     assert cli.main(args) == 0
     assert session.closed
-    assert {p.name for p in output.iterdir()} == {"latest-desktop-memory.html", "latest-desktop-memory.json", "latest-desktop-memory.requests.json"}
+    assert {p.name for p in output.iterdir()} == {"latest-desktop-memory.html", "latest-desktop-memory.json", "latest-desktop-memory.requests.json", "walmart-prebuilt-observations.json"}
     receipt = (output / "latest-desktop-memory.requests.json").read_text()
     assert "WM_" not in receipt and credentials.consumer_id not in receipt
     assert json.loads((output / "latest-desktop-memory.json").read_text())["products"][0]["price"] == 2000
