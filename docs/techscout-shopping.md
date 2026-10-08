@@ -111,6 +111,25 @@ is labeled **Collecting exact-build history**. These are observed quotes with
 gaps, not a continuous stock log or proof of an all-time low. Stale/sold-out cards
 show saved evidence without claiming a current discount.
 
+The separate peer rating matches exact GPU and CPU, RAM capacity and DDR type,
+single SSD capacity, and condition. Only fresh, available offers with known totals
+and no source-verification failures qualify. The target offer is excluded from
+its own sample. Duplicate seller/model/configuration listings use their cheapest
+available quote; missing model IDs collapse by seller and core configuration.
+Ratings need at least three other offers from two sellers. Until then, matching
+offers remain inspectable under **Price evidence & build details**, labeled
+**Insufficient comparable offers**. This is the loaded source sample, not the
+whole market; browser filters do not recalculate it.
+
+**Below peer median** and **Above peer median** require at least a 5% difference;
+otherwise the offer is **Near peer median**. The median, range, sample size,
+sellers, timestamps and source links are disclosed. Confidence is moderate when
+core specs match: PSU, motherboard, cooling, warranty and variable component
+brands remain visible evidence, without guessed price premiums or a performance
+score. Conflicting selected configurations, missing core specs and multiple-drive
+configurations produce no peer rating. Budget targets and RAM reuse stay separate;
+these price labels do not change notification thresholds or delivery receipts.
+
 - Use independent **Product type**, **GPU**, **RAM**, **CPU**, **Storage**, **Condition**, and
   **Source** filters. For example, GPU **RTX 5090** includes every matching RAM
   capacity and condition; adding **64GB** narrows that selection. Filters without
@@ -317,7 +336,9 @@ default run. Each category overwrites three files: the latest HTML report, JSON
 product snapshot, and request receipt (`.requests.json`). Receipts record the
 actual purpose, queries, IDs, ZIP and HTTP status, without authorization headers,
 signatures, consumer ID, response bodies or private keys. Reports and receipts
-are local personal data; they are not committed or appended into history.
+are local personal data and are not committed. Confirmed available complete-PC
+totals also update the separate bounded history described above; request receipts
+are not appended to it.
 
 Exit codes: `0` means a nonempty report with no request/lookup gaps; `1` means an
 empty or partial report (inspect it); `2` means settings, arguments or output
@@ -339,13 +360,14 @@ that the entire catalog has been searched.
   memberships, coupons and checkout charges are not inferred. A tablet search
   can match a parent listing while lookup selects a different storage variant;
   explicit capacity mismatches are flagged and excluded from averages.
-- Averages need at least two distinct, available offers with identified sellers,
+- The standalone HTML research report's older item-price averages need at least two distinct, available offers with identified sellers,
   conditions and positive prices. Desktop cohorts match CPU, GPU, installed DDR5
   RAM capacity and SSD capacity; other components can differ. Other products require
   matching model, title, condition and returned attributes. These are selected
   sample means of current item prices before shipping/tax, not market averages
   or historical price baselines. Sparse or ambiguous specifications produce no
-  average. Search coverage is shown explicitly.
+  average. Search coverage is shown explicitly. The dashboard uses the stricter
+  delivered-total peer medians described above, separately from these report means.
 - Desktop RAM checks reuse `config/desktop-profile.toml`: factory 32GB or 64GB,
   owned 2×32GB DDR5, four slots and a possible 96GB/128GB total. Off-plan systems
   are labeled. Missing layout evidence stays **NEEDS SPECS**. Even a documented

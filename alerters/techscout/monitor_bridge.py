@@ -13,6 +13,7 @@ from alerters.hardware.desktop_profile import DEFAULT_PROFILE, DesktopProfile
 from alerters.hardware.prebuilt import Offer, exact_desktop, gpu_model
 from alerters.hardware.native.match import extract_price
 from .research import cpu_model
+from alerters.hardware.prebuilt_specs import public_specs
 
 LABELS = {"newegg": "Newegg", "ebay": "eBay", "apple-refurb": "Apple Refurbished",
           "slickdeals": "Slickdeals", "hp": "HP", "reddit": "Reddit"}
@@ -150,6 +151,7 @@ def public_row(raw, source, checked, expires, problems, now, profile):
                      ("Computers" if "computers" in kinds else "Components") + " · " + str(data.get("product_group") or "Other tech")[:150])
     return {"id": source + ":" + hashlib.sha256(identity.encode()).hexdigest()[:24], "judgment": judgment(raw.get("judgment")),
             "price_history": raw.get("judgment", {}).get("price_history") if isinstance(raw.get("judgment"), dict) else None,
+            "build_specs": public_specs(data.get("specs")) if is_offer else {},
             "first_seen": raw.get("first_seen") if stamp(raw.get("first_seen")) is not None else None,
             "title": title, "url": url, "source": source, "retailer": LABELS[source],
             "seller": str(seller)[:250], "condition": condition, "price": price, "shipping": shipping,

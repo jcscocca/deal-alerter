@@ -418,6 +418,7 @@ def test_monitor_exports_real_decisions_and_watch_pause_preserves_receipts(tmp_p
     row = mon.shopping.batches[key]["rows"][0]
     assert len(sent) == 1 and row["judgment"]["eligible"]
     assert row["judgment"]["decisions"][0]["status"] == "sent"
+    assert row["judgment"]["price_history"]["observed_days"] == 1
     assert len(activity(runtime)) == 1
     first_seen = row["first_seen"]
     mon.write_health()

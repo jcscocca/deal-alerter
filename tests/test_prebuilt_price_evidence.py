@@ -21,8 +21,9 @@ def pc(**changes):
 
 
 def row(**changes):
-    return dict(title=pc().title, available=True, stock="in_stock", total=4000, lead=False,
-                checked_at=NOW.isoformat(), expires_at=NOW.timestamp()+900, verification_reasons=[], **changes)
+    return {"id": "self", "title": pc().title, "available": True, "stock": "in_stock", "total": 4000, "lead": False,
+            "condition": "New", "seller": "Builder", "source": "newegg", "retailer": "Newegg", "url": pc().url,
+            "checked_at": NOW.isoformat(), "expires_at": NOW.timestamp()+900, "verification_reasons": [], **changes}
 
 
 def test_daily_samples_returning_prices_and_legacy_range(tmp_path):
@@ -93,6 +94,13 @@ def test_stale_history_never_claims_current_discount():
     attach_values([live, stale], NOW.timestamp())
     assert live["prebuilt_value"]["history"]["difference_pct"] == -20
     assert stale["prebuilt_value"]["history"]["difference_pct"] is None
+
+
+def test_untracked_source_does_not_claim_to_be_collecting_history():
+    item = row(source="ebay", stock="unknown")
+    attach_values([item], NOW.timestamp())
+    assert not item["prebuilt_value"]["history"]["tracked"]
+    assert item["prebuilt_value"]["history"]["label"] == "History not tracked for this source"
 
 
 def test_walmart_capture_is_available_only_and_dashboard_get_is_read_only(tmp_path):

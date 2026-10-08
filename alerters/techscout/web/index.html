@@ -40,7 +40,7 @@
         <label id="cpu-filter" for="cpu-select">CPU<select id="cpu-select"><option value="">All CPUs</option></select></label>
         <label id="storage-filter" for="storage-select">Storage<select id="storage-select"><option value="">All storage</option></select></label>
         <label id="condition-filter" for="condition-select">Condition<select id="condition-select"><option value="">All conditions</option></select></label>
-        <label for="quality-select">Deal view<select id="quality-select"><option value="all">All finds</option><option value="best">Qualifying deals</option><option value="target">Target price met</option><option value="new">New monitor finds · 24 hours</option></select></label>
+        <label for="quality-select">Deal view<select id="quality-select"><option value="all">All finds</option><option value="best">Meets notification rules</option><option value="target">Target price met</option><option value="new">New monitor finds · 24 hours</option></select></label>
         <label for="source-select">Source<select id="source-select"><option value="all">All sources</option></select></label>
         <label for="budget">Maximum price ($)<input id="budget" type="number" min="0" max="999999" step="0.01" inputmode="decimal" placeholder="Any price"></label>
       </div>
@@ -48,7 +48,7 @@
       <p id="filter-summary" class="small muted">Included RAM is what comes with the product. Your existing 64GB kit is assessed separately.</p>
     </details>
     <div class="active-bar"><div id="filter-chips" aria-label="Active filters"></div><button id="edit-filters">Edit filters</button></div>
-    <div class="toolbar"><button id="watch-search">Watch this search</button><div class="view-switch" aria-label="View"><button id="list-view" aria-pressed="true">Browse deals</button><button id="compare-view" aria-pressed="false">Compare <span id="compare-count">0</span>/3</button></div><label class="sort-label" for="sort-select">Sort<select id="sort-select"><option value="recommended">RAM evidence, then price</option><option value="total">Lowest known total</option><option value="newest">Newest checked</option><option value="best">Best deal verdict</option></select></label></div>
+    <div class="toolbar"><button id="watch-search">Watch this search</button><div class="view-switch" aria-label="View"><button id="list-view" aria-pressed="true">Browse deals</button><button id="compare-view" aria-pressed="false">Compare <span id="compare-count">0</span>/3</button></div><label class="sort-label" for="sort-select">Sort<select id="sort-select"><option value="recommended">RAM evidence, then price</option><option value="total">Lowest known total</option><option value="newest">Newest checked</option><option value="best">Notification priority</option></select></label></div>
     <p id="ranking-note" class="small muted"></p>
     <p id="compare-note" class="small muted" hidden>Saved comparisons stay visible regardless of filters.</p>
     <div id="results">
@@ -63,7 +63,7 @@
     <section id="sources-pane" hidden><h1>Sources</h1><details class="research-details" open><summary>Connected sources &amp; check status</summary><div id="source-health"></div></details>
     <details class="research-details"><summary>Search scope &amp; coverage</summary><div id="coverage"></div></details>
     </section>
-    <footer>Prices include published shipping and exclude tax. Check times and freshness are specific to each source; checkout can differ. Rankings use RAM-layout evidence and known totals, not a performance score or a historical discount claim. Mixed-kit stability remains unverified.</footer>
+    <footer>Prices include published shipping and exclude tax. Check times and freshness are specific to each source; checkout can differ. Prebuilt price evidence shows exact-build history and comparable available offers when enough data exists. Build quality, RAM reuse and budget targets are separate; mixed-kit stability remains unverified.</footer>
     <dialog id="watch-dialog"><form id="watch-form"><h2 id="watch-dialog-title">Watch this search</h2><label for="watch-name">Name<input id="watch-name" maxlength="80" required></label><label for="watch-budget">Maximum total ($)<input id="watch-budget" type="number" min="0" max="999999" step="0.01" placeholder="Use existing deal rules"></label><label><input id="watch-enabled" type="checkbox" checked> Enabled</label><div id="watch-criteria" class="filter-grid"></div><label id="watch-reuse-label"><input id="watch-reuse" type="checkbox"> Prefer RAM reuse for desktops</label><p id="watch-description" class="small muted"></p><p id="watch-error" role="alert"></p><div class="card-actions"><button type="submit" class="primary">Save watch</button><button type="button" id="watch-cancel">Cancel</button></div></form></dialog>
   </main>
 </body>

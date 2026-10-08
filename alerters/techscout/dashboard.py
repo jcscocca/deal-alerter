@@ -23,6 +23,7 @@ from .facets import attributes
 from .integration import Workspace
 from .price_history import PriceEvidence, walmart_key
 from .prebuilt_value import attach_values
+from alerters.hardware.prebuilt_specs import public_specs
 
 FRESH_SECONDS = 15 * 60
 ASSETS = Path(__file__).with_name("web")
@@ -99,6 +100,7 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
         desktop_key = isinstance(key, list) and len(key) == 6 and key[0] == "desktop"
         row = {"id": item_id, "title": title, "url": f"https://www.walmart.com/ip/{item_id}",
                "price_history": history.summary(walmart_key(raw, data.get("zip_code")), datetime.fromtimestamp(now, timezone.utc).isoformat()),
+               "build_specs": {**public_specs(raw.get("specs")), "Model": raw.get("model") if isinstance(raw.get("model"), str) else ""},
                "seller": seller, "condition": condition, "price": price, "shipping": shipping,
                "total": total, "available": raw.get("available") is True and stock not in ("out_of_stock", "preorder"),
                "stock": stock, "gpu": model_gpu,
