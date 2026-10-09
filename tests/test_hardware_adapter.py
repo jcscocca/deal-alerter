@@ -48,12 +48,30 @@ class HardwareAdapterTests(unittest.TestCase):
         plugin.log = Mock()
         return plugin
 
-    def candidate(self, condition="refurbished"):
+    def candidate(self, condition="refurbished", *, product=False):
         row = Listing("v1|123|456", "ebay", "A card", "https://example.test",
                       datetime.now(timezone.utc), price=600, condition_hint=condition)
-        matched = NS(part=NS(key="a6000"), unit_price=600, quantity=1, mining_risk="low",
+        matched = NS(part=NS(key="a6000", is_product=product), unit_price=600, quantity=1, mining_risk="low",
                      is_system=False, is_bundle=False)
         return Candidate(row, matched, NS(target=700, name="upgrade"), condition)
+
+    def test_a_product_is_not_capped_for_growing_no_vram(self):
+        # A laptop hunted for itself adds nothing to the pool by design, so
+        # the no-upgrade cap would silence every product hunt.
+        plugin = self.plugin()
+        plugin.verdict = NS(assess=Mock(return_value=NativeAssessment(
+            verdict=Bands.EXCEPTIONAL, vram_before=0, vram_after=0)))
+        assessment = plugin.judge(self.candidate("new", product=True), NS())
+        self.assertEqual(assessment.verdict, Bands.EXCEPTIONAL)
+        self.assertTrue(qualifies(assessment, Bands.EXCEPTIONAL))
+        self.assertEqual(dict(assessment.axes)["value"],
+                         "Price only: judged against its own log and list price")
+
+    def test_a_product_with_an_untrusted_anchor_still_cannot_alert(self):
+        plugin = self.plugin()
+        plugin.verdict = NS(assess=Mock(return_value=NativeAssessment(
+            verdict=Bands.GOOD, vram_before=0, vram_after=0, reference_trusted=False)))
+        self.assertFalse(plugin.judge(self.candidate("used", product=True), NS()).alertable)
 
     def test_target_cannot_undo_cap_or_bypass_a_lower_configured_floor(self):
         plugin = self.plugin()

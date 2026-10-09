@@ -10,7 +10,8 @@
 # -- the equivalent of config/steam-targets.json. `queries` adds searches beyond
 # the parts' own names, which is how whole PCs to part out get found at all.
 #
-# Everything here is for the Z790 desktop. An M5 Ultra 512GB is on order
+# The GPU hunts are for the Z790 desktop; the products section at the end is
+# the exception, judged on price alone. An M5 Ultra 512GB is on order
 # (2026-09-28) and outclasses every Mac, GB10 and Strix Halo box on both
 # capacity and bandwidth, so unified-memory machines are not hunted.
 #
@@ -98,3 +99,21 @@ name = "Anything with lots of VRAM, cheap"
 class = ["consumer", "pro", "datacenter"]
 min_vram_gb = 32
 max_dollars_per_gb = 25.0
+
+# -------------------------------------------------------------------- products
+# Things bought for themselves rather than for the memory they add. A product
+# part (kind PRODUCT in catalog.py) is judged on price alone: its own log, and
+# a retail list price until the log can rank. No $/GB, no model ladder, no
+# upgrade cap. Only a new or open-box unit can alert against a list price; used
+# and refurbished ones are shown as WATCH until their own history builds up.
+#
+# Coverage is whatever the monitor already reads: eBay (the part's name is its
+# search), the Slickdeals Computers page and r/buildapcsales. Amazon and Best
+# Buy prices reach it only when someone posts them there.
+[[hunt]]
+name = "Zenbook Duo 2026 (X9 388H)"
+parts = ["zenbook_duo_2026_x9_388h"]
+# Set 2026-10-08 just above the lowest price seen, $2,487.91 at Amazon on a
+# June pre-order. List is $2,699.99.
+target = 2500.0
+note = "UX8407AA-PSXT. The 386H base model has a third of the graphics and is not hunted."
