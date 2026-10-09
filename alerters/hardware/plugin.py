@@ -133,7 +133,10 @@ class HardwarePlugin:
             target_price=hunt.target, hunt_name=hunt.name, psu_headroom_w=self.cfg.psu_headroom_w)
         if item is None:
             return None
-        upgrade = item.vram_after > item.vram_before + 1
+        # A product is bought for itself, so growing the VRAM pool is not the
+        # question. Its trust still comes from the anchor, like everything else.
+        product = result.part.is_product
+        upgrade = product or item.vram_after > item.vram_before + 1
         if not upgrade:
             # The original target promotion ran AFTER this cap and could undo it.
             # Keep the claimed invariant independent of configurable alert floors.
@@ -149,7 +152,8 @@ class HardwarePlugin:
                              and item.promotion_ceiling == self.bands.GRAIL
                              and not item.multi_variant),
             loggable=item.loggable, axes=(("cheapness", item.reason),
-                ("value", f"{money(item.dollars_per_gb, whole_above=100)}/GB, "
+                ("value", "Price only: judged against its own log and list price" if product else
+                          f"{money(item.dollars_per_gb, whole_above=100)}/GB, "
                           f"{money(item.dollars_per_gb_bandwidth, whole_above=100)}/GB-TB/s"),
                 ("capability", item.unlock)))
 
@@ -263,10 +267,14 @@ class HardwarePlugin:
 
     def card(self, assessment: Assessment, signal: str | None = None) -> Card:
         item = assessment.detail
+        product = item.part.is_product
         facts = [item.title, f"via {item.source}; {item.condition}",
-                 f"{money(item.dollars_per_gb, decimals=0)}/GB; "
-                 f"{money(item.dollars_per_gb_bandwidth, decimals=0)}/GB-TB/s; "
-                 f"{item.part.vram_gb}GB; {item.part.bandwidth_gb_s:,} GB/s", item.unlock]
+                 (f"List price {money(item.part.reference_price)}"
+                  + (f"; your target {money(item.target_price, decimals=0)}" if item.target_price else "")
+                  if product else
+                  f"{money(item.dollars_per_gb, decimals=0)}/GB; "
+                  f"{money(item.dollars_per_gb_bandwidth, decimals=0)}/GB-TB/s; "
+                  f"{item.part.vram_gb}GB; {item.part.bandwidth_gb_s:,} GB/s"), item.unlock]
         if item.quantity > 1:
             facts.append(f"Quantity {item.quantity}; lot total {money(item.total_price, decimals=0)}")
         warnings = []
@@ -283,11 +291,17 @@ class HardwarePlugin:
             warnings.append("Confirm which option this price buys; not recorded in price history.")
         if signal:
             warnings.append(signal)
-        models = sorted(self.rig.LADDER, key=lambda model: model.params_b)
-        before, after = self.rig.largest_model_at(item.vram_before), self.rig.largest_model_at(item.vram_after)
-        rung = lambda model: models.index(model) + 1 if model else 0
-        left = round(rung(before) / len(models) * 100)
-        gain = max(0, round(rung(after) / len(models) * 100) - left)
+        # The VRAM bar is the model ladder before and after; a product has none.
+        bar, bar_labels = (), ("", "")
+        if not product:
+            models = sorted(self.rig.LADDER, key=lambda model: model.params_b)
+            before, after = self.rig.largest_model_at(item.vram_before), self.rig.largest_model_at(item.vram_after)
+            rung = lambda model: models.index(model) + 1 if model else 0
+            left = round(rung(before) / len(models) * 100)
+            gain = max(0, round(rung(after) / len(models) * 100) - left)
+            bar = ((left, "#9aa0a6"), (gain, "#2f6f4e"), (100-left-gain, "#e3e6ea"))
+            bar_labels = (f"now {item.vram_before:.0f}GB ({before.name if before else 'below ladder'})",
+                          f"after {item.vram_after:.0f}GB ({after.name if after else 'below ladder'})")
         colours = {
             self.bands.GRAIL: ("#5b2d8e", "#ece0f8"),
             self.bands.EXCEPTIONAL: ("#0b6b3a", "#d7f2e3"),
@@ -301,9 +315,7 @@ class HardwarePlugin:
         return Card(item.part.name, item.url, money(item.unit_price, decimals=0),
                     badge + (" · HITS YOUR TARGET" if item.target_hit else ""),
                     item.headline, item.reason, tuple(facts), tuple(warnings),
-                    bar=((left, "#9aa0a6"), (gain, "#2f6f4e"), (100-left-gain, "#e3e6ea")),
-                    bar_labels=(f"now {item.vram_before:.0f}GB ({before.name if before else 'below ladder'})",
-                                f"after {item.vram_after:.0f}GB ({after.name if after else 'below ladder'})"),
+                    bar=bar, bar_labels=bar_labels,
                     foreground=fg, background=bg,
                     priority=5 if item.verdict >= self.bands.EXCEPTIONAL else
                              4 if item.verdict >= self.bands.STRONG else

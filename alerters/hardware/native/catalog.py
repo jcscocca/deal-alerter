@@ -41,6 +41,10 @@ class Kind(str, Enum):
     PRO_GPU = "pro"
     DATACENTER = "datacenter"
     UNIFIED = "unified"  # Mac / Strix Halo / GB10 -- CPU and GPU share one pool
+    # Something bought for itself -- a laptop, say -- rather than for the
+    # memory it adds to the cluster. Judged on price alone: its own log and a
+    # retail list price, with no $/GB, model ladder, fit check or upgrade cap.
+    PRODUCT = "product"
 
 
 @dataclass(frozen=True)
@@ -67,6 +71,11 @@ class Part:
     # median but 1.69x an estimated one, with a low tail 15 points closer to
     # the alert line -- so a single set of thresholds cannot mean the same
     # thing for both. Estimates are watch-only until they are verified.
+    #
+    # "list" is the third value, and only a PRODUCT may carry it: the price a
+    # new unit sells for at retail, read off the manufacturer's store. It is the
+    # right anchor for a new unit and says nothing about a used one, so
+    # verdict.py trusts it for new listings only.
     reference_basis: str = "estimate"
     # PCIe slots physically occupied. None for things that aren't cards.
     slots: float | None = None
@@ -98,12 +107,18 @@ class Part:
     note: str = ""
 
     @property
+    def is_product(self) -> bool:
+        """Judged on price alone. See Kind.PRODUCT."""
+        return self.kind is Kind.PRODUCT
+
+    @property
     def usable_vram_gb(self) -> float:
         return self.vram_gb * self.usable_fraction
 
     @property
     def dollars_per_gb(self) -> float:
-        return self.reference_price / self.vram_gb
+        # A product carries no VRAM, and has no $/GB to report.
+        return self.reference_price / self.vram_gb if self.vram_gb else 0.0
 
     @property
     def capacity_bandwidth(self) -> float:
@@ -117,7 +132,8 @@ class Part:
 
     @property
     def dollars_per_gb_bandwidth(self) -> float:
-        return self.reference_price / self.capacity_bandwidth
+        capacity_bandwidth = self.capacity_bandwidth
+        return self.reference_price / capacity_bandwidth if capacity_bandwidth else 0.0
 
 
 # Ordered roughly by how interesting each is for local inference, not by price.
@@ -707,6 +723,52 @@ PARTS: tuple[Part, ...] = (
             "strix halo",
         ),
     ),
+    # ------------------------------------------------------------ products
+    # Bought for themselves, not for what they add to the cluster. The memory
+    # fields are zero on purpose: verdict.py judges a PRODUCT on price alone,
+    # against its own log and a retail list price, and skips every $/GB,
+    # model-ladder, fit and upgrade-cap sentence. Being a laptop is the point,
+    # so the matcher's laptop and whole-system vetoes do not apply either.
+    Part(
+        key="zenbook_duo_2026_x9_388h",
+        # The text before the parenthesis is the eBay query, so it carries the
+        # CPU: "Zenbook Duo" alone returns two years of older models.
+        name="Zenbook Duo 388H (2026, Core Ultra X9, 32GB/1TB)",
+        kind=Kind.PRODUCT,
+        vram_gb=0,
+        bandwidth_gb_s=0,
+        tdp_w=0,
+        # ASUS US store list price for UX8407AA-PSXT, as reported at launch
+        # (WhatPSU, TweakTown), checked 2026-10-08. The lowest price seen is
+        # $2,487.91 at Amazon on a June pre-order (Slickdeals 19615146).
+        reference_price=2699.99,
+        reference_basis="list",
+        year=2026,
+        arch="Panther Lake",
+        # The X9 388H only ships in the 2026 Duo, so the CPU names the model.
+        # The 386H base model and the 2025 285H share the name and not the
+        # graphics: 4 and 8 Xe cores against the 388H's 12.
+        require_all=("zenbook duo", "388h"),
+        aliases=("ux8407aa-psxt", "ux8407aa psxt"),
+        excludes=(
+            "386h",
+            "285h",
+            "358h",
+            "ultra 7",
+            # Accessories name the laptop they fit. eBay's price floor keeps
+            # most away, but Reddit and Slickdeals have no floor.
+            "for asus",
+            "screen protector",
+            "replacement",
+            "case for",
+            "cover for",
+            "skin for",
+            "sleeve for",
+            "keyboard for",
+        ),
+        note="Dual 14in 3K 144Hz OLED, Core Ultra X9 388H with Arc B390 "
+        "(12 Xe cores), 32GB, 1TB, 99Wh. Price-only hunt.",
+    ),
 )
 
 BY_KEY: dict[str, Part] = {part.key: part for part in PARTS}
@@ -717,9 +779,14 @@ def get(key: str) -> Part | None:
 
 
 def in_class(kind: str) -> list[Part]:
-    """Parts matching a watchlist `class` filter. "any" means everything."""
+    """Parts matching a watchlist `class` filter.
+
+    "any" means every memory part. A class filter hunts hardware by what its
+    memory can do and a product has none, so products are named by key (or by
+    `class = "product"`) and never swept up by a catch-all.
+    """
     if kind == "any":
-        return list(PARTS)
+        return [part for part in PARTS if not part.is_product]
     return [part for part in PARTS if part.kind.value == kind]
 
 

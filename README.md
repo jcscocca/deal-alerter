@@ -7,7 +7,7 @@ It watches two very different markets:
 
 | | Steam | Hardware |
 |---|---|---|
-| **Watches** | Games on your Steam wishlist | GPUs and unified-memory machines on your watchlist |
+| **Watches** | Games on your Steam wishlist | GPUs, unified-memory machines and products on your watchlist |
 | **Evidence** | IsThereAnyDeal's full Steam price history | A price log this tool collects for itself |
 | **Asks** | Is this the price to buy at? | Is it cheap, is it good value, does it help *you*? |
 | **Verdicts** | `WAIT` up to `ALL_TIME_LOW` | `PASS` up to `GRAIL` |
@@ -104,6 +104,16 @@ reference-quality vetoes still apply. A part with no
 hunt is matched and then never judged. Specs and reference prices live in
 `alerters/hardware/native/catalog.py`; used-market references decay, so retune
 them against sold data now and then. Your machines live in `rig.py`.
+
+**Products** are the exception to all of the memory math. A `PRODUCT` part in
+the catalog -- the first is the 2026 Zenbook Duo with the Core Ultra X9 388H --
+is something bought for itself, so it is judged on price alone: its own log,
+and its retail list price until the log can rank. There is no $/GB, model
+ladder, fit check or upgrade cap, and the laptop and whole-system vetoes that
+protect the GPU catalog do not apply. The bait, seller and target rules do. A
+list price is only a fair question for a new or open-box unit, so used and
+refurbished listings stay `WATCH` until their own history builds up. Products
+are named by key and never swept up by a `class = "any"` catch-all.
 
 ### Beyond search results
 

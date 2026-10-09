@@ -94,8 +94,12 @@ class TestTheCollisionsWorthNaming:
         assert find_part("Apple Mac Studio M2 Ultra Desktop Computer")[0] is None
 
 
+MEMORY_PARTS = [part for part in PARTS if not part.is_product]
+PRODUCTS = [part for part in PARTS if part.is_product]
+
+
 class TestCatalogInvariants:
-    @pytest.mark.parametrize("part", PARTS, ids=lambda part: part.key)
+    @pytest.mark.parametrize("part", MEMORY_PARTS, ids=lambda part: part.key)
     def test_every_part_can_be_scored(self, part) -> None:
         assert part.vram_gb > 0 and part.bandwidth_gb_s > 0
         assert part.reference_price > 0 and part.capacity_bandwidth > 0
@@ -103,12 +107,23 @@ class TestCatalogInvariants:
     def test_keys_are_unique(self) -> None:
         assert len(BY_KEY) == len(PARTS)
 
-    @pytest.mark.parametrize("part", PARTS, ids=lambda part: part.key)
+    @pytest.mark.parametrize("part", MEMORY_PARTS, ids=lambda part: part.key)
     def test_an_unverified_anchor_says_so(self, part) -> None:
         # Every new entry is an estimate, and estimates are held below the push
         # threshold. A reference_basis of "sold" is a claim about real
         # transactions that nobody has made for these parts yet.
         assert part.reference_basis in ("sold", "estimate")
+
+    @pytest.mark.parametrize("part", PRODUCTS, ids=lambda part: part.key)
+    def test_a_product_is_priced_and_carries_no_memory_claims(self, part) -> None:
+        # A list price is the one basis only a product may use, and a product
+        # with VRAM figures would invite the $/GB math the verdict skips.
+        assert part.reference_basis == "list" and part.reference_price > 0
+        assert part.vram_gb == 0 and part.bandwidth_gb_s == 0
+        assert part.dollars_per_gb == 0 and part.dollars_per_gb_bandwidth == 0
+        # The matcher's laptop vetoes do not apply to products, so a product's
+        # identity rests entirely on its tokens and exclusions.
+        assert part.require_all and part.excludes
 
     @pytest.mark.parametrize("part", [p for p in PARTS if p.kind is Kind.UNIFIED],
                              ids=lambda part: part.key)

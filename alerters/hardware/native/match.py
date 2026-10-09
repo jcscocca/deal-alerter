@@ -501,14 +501,25 @@ def is_junk(text: str) -> bool:
     return bool(JUNK_RE.search(text))
 
 
+def _whole_machine(part: Part) -> bool:
+    """Parts that *are* the computer, so machine words describe them truly.
+
+    Unified-memory boxes (Mac Studio, Framework Desktop, DGX Spark) and
+    products bought for themselves (a laptop) both qualify. The laptop,
+    whole-system, accessory and GPU-absent vetoes exist to stop a machine or a
+    PSU being logged as a bare card, and neither of these is a card.
+    """
+    return part.kind.value in ("unified", "product")
+
+
 def is_system_listing(text: str, part: Part | None) -> bool:
     """Is this a whole computer that happens to contain `part`?
 
     Only meaningful for cards. Unified-memory entries (Mac Studio, Framework
-    Desktop, DGX Spark) *are* whole computers, so the same words that condemn a
-    GPU listing are the correct description there.
+    Desktop, DGX Spark) and products *are* whole computers, so the same words
+    that condemn a GPU listing are the correct description there.
     """
-    if part is None or part.kind.value == "unified":
+    if part is None or _whole_machine(part):
         return False
     text = PULL_ORIGIN_RE.sub("", text)
     if SYSTEM_RE.search(text):
@@ -575,15 +586,24 @@ def is_system_listing(text: str, part: Part | None) -> bool:
 
 
 def is_mobile_listing(text: str, part: Part | None) -> bool:
-    """Is this a laptop? Mobile GPUs are different parts, not cheaper ones."""
-    if part is None or part.kind.value == "unified":
+    """Is this a laptop? Mobile GPUs are different parts, not cheaper ones.
+
+    A laptop hunted as a product is the opposite case: being a laptop is what
+    makes it the thing you asked for.
+    """
+    if part is None or _whole_machine(part):
         return False
     return bool(MOBILE_RE.search(text))
 
 
 def is_accessory_listing(text: str, part: Part | None) -> bool:
-    """A PSU or motherboard that names a GPU only for compatibility."""
-    if part is None or part.kind.value == "unified":
+    """A PSU or motherboard that names a GPU only for compatibility.
+
+    Products are exempt because the pattern's words describe real laptop
+    listings ("with carrying case"); a product's own `excludes` name the
+    accessories that fit it instead.
+    """
+    if part is None or _whole_machine(part):
         return False
     return bool(ACCESSORY_RE.search(text))
 
@@ -834,6 +854,11 @@ def _capacity_agrees(haystack: str, part: Part) -> bool:
     "Apple Mac Studio MU963LL/A (Early 2025) Desktop Computer $1699" is
     correctly skipped rather than assigned to whichever SKU happens to be first.
     """
+    if part.kind.value == "product":
+        # A laptop's "32GB" is system RAM, and the card reading below would
+        # take it for VRAM and contradict the product's zero. A product is
+        # identified by its require_all tokens, aliases and excludes instead.
+        return True
     haystack = CORE_COUNT_RE.sub(" ", haystack)
     stated = {int(m.group(1)) for m in CAPACITY_RE.finditer(haystack)}
     if part.kind.value == "unified":
@@ -907,7 +932,7 @@ def match(
     item_body = _swap_item_body(body, part) if is_swap and part else None
     evidence_body = item_body if item_body is not None else body
     absence_part = part or named_part
-    if absence_part and absence_part.kind.value != "unified" and GPU_ABSENT_RE.search(
+    if absence_part and not _whole_machine(absence_part) and GPU_ABSENT_RE.search(
         f"{evidence_title}\n{evidence_body}"
     ):
         return MatchResult(None, None, "unknown", 0, junk=True)

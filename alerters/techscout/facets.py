@@ -27,7 +27,7 @@ def gpu(title):
     if not re.search(r"\b(?:RTX|GTX|Radeon|NVIDIA|GeForce|Quadro|Tesla|GPU|[AHL]\d{2,3})\b", title, re.I):
         return None
     return one(re.sub(r"\s+\d+GB\b", "", part.name).upper()
-               for part in find_all_parts(title) if part.kind != Kind.UNIFIED)
+               for part in find_all_parts(title) if part.kind not in (Kind.UNIFIED, Kind.PRODUCT))
 
 
 def ram(title):

@@ -30,7 +30,7 @@ from .catalog import (
     class_median_dollars_per_gb_bandwidth,
 )
 from .config import Thresholds
-from .history import PriceStats
+from .history import PriceStats, bucket_for
 from .rig import Fit, capability_gain, check_fit, host_vram_gb, largest_model_at
 
 # Prices within a dollar are the same price.
@@ -208,10 +208,16 @@ def assess(
     ):
         loggable = False
 
-    dollars_per_gb = unit_price / part.vram_gb
-    dollars_per_gb_bandwidth = unit_price / part.capacity_bandwidth
+    # A product has no VRAM, so no $/GB and nothing to unlock or fit. The
+    # zeros travel on the assessment and every sentence about them is skipped.
+    dollars_per_gb = 0.0 if part.is_product else unit_price / part.vram_gb
+    dollars_per_gb_bandwidth = 0.0 if part.is_product else unit_price / part.capacity_bandwidth
     percentile = stats.percentile_of(unit_price) if stats.trustworthy else None
-    if condition == "parts":
+    if part.is_product:
+        before = after = 0.0
+        unlock = part.note or "Judged on price alone."
+        fit = None
+    elif condition == "parts":
         before = after = host_vram_gb()
         unlock = "Sold for parts or not working; usable capacity is unverified. No model upgrade claimed."
         fit = None
@@ -219,7 +225,7 @@ def assess(
         before, after, unlock = capability_gain(part)
         fit = check_fit(part, psu_headroom_w=psu_headroom_w)
     target_hit = target_price is not None and unit_price <= target_price + DOLLAR
-    reference_trusted = part.reference_basis == "sold" and not _anchor_is_stale(part, stats, thresholds)
+    reference_trusted = _reference_trusted(part, stats, thresholds, condition)
 
     verdict, headline, reason, promotion_ceiling = _decide(
         part=part,
@@ -309,7 +315,8 @@ def _decide(
     """The actual call, plus the sentences explaining it."""
 
     class_median = class_median_dollars_per_gb(part.kind)
-    value_note = _value_sentence(
+    # A product is bought for itself, so there is no per-GB value to state.
+    value_note = "" if part.is_product else _value_sentence(
         part,
         dollars_per_gb,
         class_median,
@@ -337,7 +344,19 @@ def _decide(
         promotion_ceiling = min(promotion_ceiling, Verdict.GOOD)
         verdict = min(verdict, Verdict.GOOD)
         headline = f"{_fmt(unit_price)} -- WATCH / UNVERIFIED reference"
-        if part.reference_basis != "sold":
+        if part.is_product and part.reference_basis == "list":
+            # The list price is what a new one costs. Against it a used or
+            # refurbished unit always looks discounted, which is no evidence
+            # that it is cheap for what it is. Watch until its own condition
+            # bucket has history to rank against.
+            label = _CONDITION_LABELS.get(condition, condition.replace("_", " "))
+            headline = f"{_fmt(unit_price)} -- WATCH / {label}, against a new list price"
+            reason += (
+                f" Watch only: the {_fmt(part.reference_price)} it is measured "
+                f"against is the new list price, which says nothing about what a "
+                f"{label} one is worth."
+            )
+        elif part.reference_basis != "sold":
             reason += (
                 f" Watch only: the {_fmt(part.reference_price)} it is measured "
                 "against is an unverified estimate rather than a sold average."
@@ -358,8 +377,9 @@ def _decide(
     # rule that keeps 16GB cards out of your notifications entirely.
     # The unlock sentence is deliberately *not* appended here -- it travels as
     # its own field so the report can place it next to the VRAM bar instead of
-    # burying it at the end of a paragraph.
-    if after <= before + 1:
+    # burying it at the end of a paragraph. A product grows no pool by design,
+    # so the rule cannot apply to it.
+    if not part.is_product and after <= before + 1:
         verdict = min(verdict, Verdict.GOOD)
         promotion_ceiling = min(promotion_ceiling, verdict)
         reason += (
@@ -559,14 +579,24 @@ def _decide_from_history(
     if anchor_verdict >= rank_verdict:
         return rank_verdict, rank_headline, f"{basis} {rank_reason}{context}", Verdict.GRAIL
 
+    # Against a sold anchor, a hold-back is doubt about the price, so a target
+    # may not promote past it. Against a list price it only says the discount
+    # is modest: a new unit under the target you named is still worth your
+    # phone, and the bait and seller vetoes keep their own ceilings.
+    ceiling = Verdict.GRAIL if part.is_product else anchor_verdict
+    ratio = f"{unit_price / part.reference_price:.2f}x the {_fmt(part.reference_price)}"
+    held_back = (
+        f"Held back anyway: at {ratio} it lists at, that is a modest discount "
+        "however well it ranks."
+        if part.reference_basis == "list" else
+        f"Held back anyway: at {ratio} this part is worth, the pool it is "
+        "beating is simply an expensive one."
+    )
     return (
         anchor_verdict,
         f"{_fmt(unit_price)} -- cheap against this listing pool, not against the part",
-        f"{basis} {rank_reason} Held back anyway: at "
-        f"{unit_price / part.reference_price:.2f}x the {_fmt(part.reference_price)} "
-        "this part is worth, the pool it is beating is simply an expensive one."
-        f"{context}",
-        anchor_verdict,
+        f"{basis} {rank_reason} {held_back}{context}",
+        ceiling,
     )
 
 
@@ -592,6 +622,32 @@ def _verdict_from_anchor(
     if ratio <= thresholds.reference_fair_ratio:
         return Verdict.FAIR
     return Verdict.PASS
+
+
+_CONDITION_LABELS = {
+    "used": "used",
+    "refurbished": "refurbished",
+    "open_box": "open-box",
+    "unknown": "unlabelled",
+}
+
+
+def _reference_trusted(part: Part, stats: PriceStats, thresholds: Thresholds, condition: str) -> bool:
+    """Whether the anchor can support a buy claim for this listing.
+
+    A sold average can, until asks fall to it. A product's list price can for
+    a unit priced as new -- the log's own "new" bucket, which takes open-box
+    too -- and not for a used or refurbished one, of which it asks the wrong
+    question. The stale-anchor test is a sold-anchor test: retail asks sit at
+    or under list by nature, which would condemn every list price.
+    """
+    if part.is_product:
+        return part.reference_basis == "list" and bucket_for(condition) == "new"
+    return part.reference_basis == "sold" and not _anchor_is_stale(part, stats, thresholds)
+
+
+def _anchor_name(part: Part) -> str:
+    return "list price" if part.reference_basis == "list" else "reference"
 
 
 def _anchor_is_stale(part: Part, stats: PriceStats, thresholds: Thresholds) -> bool:
@@ -637,9 +693,10 @@ def _decide_from_reference(
         if stats.count
         else "No price history logged for this part yet"
     )
+    anchor = _anchor_name(part)
     basis = (
         f"{seen}, so this is measured against a {_fmt(part.reference_price)} "
-        f"reference rather than real observations."
+        f"{anchor} rather than real observations."
     )
 
     # Capped at EXCEPTIONAL on purpose. The anchor helper will hand out GRAIL,
@@ -651,14 +708,14 @@ def _decide_from_reference(
     )
 
     if verdict >= Verdict.STRONG:
-        headline = f"{_fmt(unit_price)} -- {(1 - ratio) * 100:.0f}% under reference"
+        headline = f"{_fmt(unit_price)} -- {(1 - ratio) * 100:.0f}% under {anchor}"
     elif verdict is Verdict.GOOD:
-        headline = f"{_fmt(unit_price)} -- somewhat under reference"
+        headline = f"{_fmt(unit_price)} -- somewhat under {anchor}"
     elif verdict is Verdict.FAIR:
         headline = f"{_fmt(unit_price)} -- about the going rate"
     else:
         headline = (
-            f"{_fmt(unit_price)} -- above the {_fmt(part.reference_price)} reference"
+            f"{_fmt(unit_price)} -- above the {_fmt(part.reference_price)} {anchor}"
         )
     return verdict, headline, basis
 

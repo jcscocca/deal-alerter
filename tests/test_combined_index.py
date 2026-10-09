@@ -58,7 +58,10 @@ class TestTheArithmetic:
         assert score("rtx_3090", 700).dollars_per_gb_bandwidth == pytest.approx(700 / 22.464)
 
     def test_every_class_has_a_median_to_compare_against(self) -> None:
+        # Products are judged on price alone and have no $/GB-TB/s class.
         for kind in Kind:
+            if kind is Kind.PRODUCT:
+                continue
             assert class_median_dollars_per_gb_bandwidth(kind) > 0, kind
 
     def test_the_index_travels_with_the_assessment(self) -> None:
@@ -98,6 +101,8 @@ class TestTheTwoMeasuresDisagree:
 
     def test_both_figures_always_appear(self) -> None:
         for part in PARTS:
+            if part.is_product:
+                continue
             said = sentence(part.key, part.reference_price)
             assert "/GB of VRAM" in said, part.key
             assert "per GB-TB/s" in said, part.key
