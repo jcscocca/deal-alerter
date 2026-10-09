@@ -464,10 +464,10 @@ def test_watchdog_restarts_even_when_ntfy_is_offline(tmp_path, monkeypatch):
     def fail(_):
         raise RuntimeError("offline")
     monkeypatch.setattr(module, "channels", lambda **_:(Channel("ntfy","push",fail),))
-    with pytest.raises(RuntimeError):
-        module.watchdog(tmp_path,dry_run=False)
+    assert module.watchdog(tmp_path,dry_run=False)
     assert [c[1] for c in calls] == ["/End","/Run"]
     assert not (tmp_path / "watchdog-receipt.json").exists()
+    assert json.loads((tmp_path / "watchdog.json").read_text())["delivery_errors"] == {"ntfy": "RuntimeError"}
 
 
 @pytest.mark.parametrize("final", [4900,4800])
@@ -503,8 +503,7 @@ def test_watchdog_retries_failed_transport_without_repeating_success(tmp_path, m
     def fail(_):
         raise RuntimeError('offline')
     monkeypatch.setattr(module,'channels',lambda **_:(Channel('ntfy','push',success.append),Channel('discord','push',fail)))
-    with pytest.raises(RuntimeError):
-        module.watchdog(tmp_path,dry_run=False)
+    assert module.watchdog(tmp_path,dry_run=False)
     monkeypatch.setattr(module,'channels',lambda **_:(Channel('ntfy','push',success.append),Channel('discord','push',failed.append)))
     module.watchdog(tmp_path,dry_run=False)
     assert len(success)==len(failed)==1

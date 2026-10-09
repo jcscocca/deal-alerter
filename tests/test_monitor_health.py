@@ -263,8 +263,8 @@ def test_each_transport_retries_and_tracks_its_own_delivery_interval(health_watc
         Channel("ntfy", "push", ntfy.append), Channel("discord", "push", fail)))
     check(problems=["Coverage degraded"])
     clock[0] += monitor.HEALTH_GRACE_SECONDS
-    with pytest.raises(RuntimeError):
-        check(problems=["Coverage degraded"])
+    result = check(problems=["Coverage degraded"])
+    assert result["delivery_errors"] == {"discord": "RuntimeError"}
     clock[0] += 60
     monkeypatch.setattr(monitor, "channels", lambda **_: (
         Channel("ntfy", "push", ntfy.append), Channel("discord", "push", discord.append)))
@@ -296,7 +296,85 @@ def test_offline_transport_cannot_mask_recovery_and_a_new_stale_heartbeat(health
     clock[0] += monitor.HEALTH_GRACE_SECONDS
     for heartbeat_stale in (False, True, False, True):
         clock[0] += 60
-        with pytest.raises(RuntimeError):
-            check(jobs=jobs, heartbeat=clock[0] - 100 if heartbeat_stale else None)
+        result = check(jobs=jobs, heartbeat=clock[0] - 100 if heartbeat_stale else None)
+        assert result["delivery_errors"] == {"discord": "RuntimeError"}
     assert len(ntfy) == 3
     assert ntfy[-1].buys[0].badge == "MONITOR STALE"
+
+
+@pytest.mark.parametrize("failed_first", [True, False])
+def test_watchdog_isolates_failed_transports_and_retries_without_replaying_receipts(
+        health_watchdog, monkeypatch, caplog, failed_first):
+    from dealcore.notify import NotificationError
+
+    runtime, clock, _, check = health_watchdog
+    good, recovered, attempts = [], [], []
+
+    def fail(_):
+        attempts.append(clock[0])
+        raise NotificationError("https://private.example/secret-token")
+
+    bad_channel = Channel("ntfy", "push", fail)
+    good_channel = Channel("discord", "push", good.append)
+    monkeypatch.setattr(monitor, "channels", lambda **_: (
+        (bad_channel, good_channel) if failed_first else (good_channel, bad_channel)))
+    result = check(heartbeat=clock[0] - 100)
+    assert result["delivery_errors"] == {"ntfy": "NotificationError"}
+    assert len(good) == len(attempts) == 1
+    receipt = json.loads((runtime / "watchdog-receipt.json").read_text())
+    assert "ntfy" not in receipt and receipt["discord"]["problem_keys"] == ["monitor:heartbeat"]
+    assert "secret-token" not in caplog.text + (runtime / "watchdog.json").read_text()
+    assert "Watchdog ntfy delivery failed (NotificationError)" in caplog.text
+
+    clock[0] += 60
+    check(heartbeat=clock[0] - 100)
+    assert len(attempts) == 2 and len(good) == 1
+    monkeypatch.setattr(monitor, "channels", lambda **_: (
+        Channel("ntfy", "push", recovered.append), good_channel))
+    clock[0] += 60
+    assert check(heartbeat=clock[0] - 100)["delivery_errors"] == {}
+    assert len(recovered) == len(good) == 1
+    receipt = json.loads((runtime / "watchdog-receipt.json").read_text())
+    assert receipt["ntfy"]["sent_at"] == clock[0]
+    assert receipt["discord"]["sent_at"] == 10_000
+
+
+def test_receipt_write_failure_is_not_hidden_as_a_transport_failure(health_watchdog, monkeypatch):
+    _, clock, sent, check = health_watchdog
+    write = monitor.atomic_write
+
+    def fail_receipt(path, text):
+        if path.name == "watchdog-receipt.json":
+            raise OSError("disk unavailable")
+        write(path, text)
+
+    monkeypatch.setattr(monitor, "atomic_write", fail_receipt)
+    with pytest.raises(OSError, match="disk unavailable"):
+        check(heartbeat=clock[0] - 100)
+    assert len(sent) == 1
+
+
+def test_watchdog_entrypoint_reports_delivery_failure_without_claiming_collector_failure(
+        health_watchdog, monkeypatch, capsys):
+    from dealcore.notify import NotificationError
+
+    runtime, clock, _, _ = health_watchdog
+    (runtime / "health.json").write_text(json.dumps({"heartbeat": clock[0] - 100}))
+
+    def fail(_):
+        raise NotificationError("secret")
+
+    monkeypatch.setattr(monitor, "channels", lambda **_: (Channel("ntfy", "push", fail),))
+    monkeypatch.setattr(monitor, "load_dotenv", lambda *_: None)
+    handlers = set(monitor.LOG.handlers)
+    try:
+        assert monitor.main(["--watchdog", "--runtime", str(runtime)]) == 1
+        assert "Monitor failed" not in (runtime / "monitor.log").read_text()
+        assert "secret" not in capsys.readouterr().err
+        monkeypatch.setattr(monitor, "check_owner", lambda *_: (_ for _ in ()).throw(ValueError("secret")))
+        assert monitor.main(["--watchdog", "--runtime", str(runtime)]) == 2
+        assert capsys.readouterr().err == "Watchdog failed: ValueError\n"
+    finally:
+        for handler in set(monitor.LOG.handlers) - handlers:
+            monitor.LOG.removeHandler(handler)
+            handler.close()
