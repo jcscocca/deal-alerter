@@ -7,7 +7,8 @@ legacy_seconds = 900
 heartbeat_seconds = 15
 stale_seconds = 600
 max_backoff_seconds = 3600
-max_products_per_retailer = 48
+# Keep room for 5070 Ti discovery alongside the existing 5080/5090 products.
+max_products_per_retailer = 64
 workers = 6
 # Keep the existing hardware email digest under the same local writer.
 # The installed service reports missing SMTP credentials as degraded health.

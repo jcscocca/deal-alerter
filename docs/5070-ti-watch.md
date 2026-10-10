@@ -34,7 +34,9 @@ not expand seller trust: only the existing trusted seller rules qualify.
 CyberPowerPC, Skytech and iBUYPOWER discovery now recognizes desktop 5070 Ti
 configurations, with each source's existing confirmation limits. Walmart remains
 on-demand research, outside live alert delivery. Existing 5080/5090 settings stay
-unchanged. Retailer access failures and product caps still limit coverage.
+unchanged. The product cap increases from 48 to 64 per retailer to leave room
+for the new GPU alongside existing products, retaining host throttling and
+backoff. Retailer access failures and product caps still limit coverage.
 
 Settings: `config/watchlist.toml`, `config/desktop-profile.toml`,
 `config/monitor.toml`. Deploy using the existing prepared-release procedure.
