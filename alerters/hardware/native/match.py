@@ -18,7 +18,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .catalog import PARTS, Part
+from .catalog import PARTS, Part, BY_KEY
+from ..sodimm import configuration as sodimm_configuration, standalone_memory, SKUS, LAYOUTS
 
 # Phrases that mean the listing is not the thing itself. Checked first, because
 # "RTX 3090 box only" matches the 3090 aliases perfectly well.
@@ -703,6 +704,8 @@ def _excluded(haystack: str, part: Part) -> bool:
     rejected as the match and still counted as a second card in the bundle
     check, turning a Max-Q listing into a two-GPU bundle.
     """
+    if part.key in LAYOUTS and sodimm_configuration(haystack) != part.key:
+        return True
     return any(
         _present(_normalize(token), haystack) for token in part.excludes
     )
@@ -918,6 +921,14 @@ def match(
 
     # On have/want boards, match only against what's actually for sale.
     sale_text, is_swap = split_have_want(title)
+    # A kit's price buys the whole kit, not one module. Resolve memory before
+    # GPU quantity/capacity heuristics and reject ambiguous module menus.
+    if standalone_memory(sale_text) or any(sku in sale_text.lower() for sku in SKUS):
+        key = sodimm_configuration(sale_text)
+        if key is None or multi_variant:
+            return MatchResult(None, None, "unknown", 0, junk=True)
+        return MatchResult(BY_KEY[key], price if price is not None else extract_price(title),
+                           detect_condition(title + "\n" + body), 0, junk=False, quantity=1)
     named_part, _ = find_part(sale_text)
     evidence_title = _included_title(sale_text)
     part, matched_on = find_part(evidence_title)

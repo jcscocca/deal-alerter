@@ -788,6 +788,15 @@ PARTS: tuple[Part, ...] = (
     ),
 )
 
+from ..sodimm import LAYOUTS as SODIMM_LAYOUTS
+
+# Price-only layout watches. References here are merely query-floor anchors
+# based on the selected limits, never MSRP, sold value or cross-brand history.
+PARTS += tuple(Part(key, f"DDR5 SO-DIMM {count * size}GB ({count}x{size}GB)",
+                    Kind.PRODUCT, 0, 0, 0, limit, 2026, "DDR5",
+                    note="ThinkPad P16 Gen 2 memory; verify exact module compatibility.")
+               for key, (count, size, limit) in SODIMM_LAYOUTS.items())
+
 BY_KEY: dict[str, Part] = {part.key: part for part in PARTS}
 
 

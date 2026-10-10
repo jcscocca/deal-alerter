@@ -5,6 +5,7 @@ import re
 
 from alerters.hardware.native.catalog import Kind
 from alerters.hardware.native.match import find_all_parts
+from alerters.hardware.sodimm import standalone_memory, configuration as sodimm_configuration, LAYOUTS
 from .research import cpu_model
 
 UNKNOWN = "Not established"
@@ -31,6 +32,9 @@ def gpu(title):
 
 
 def ram(title):
+    if key := sodimm_configuration(title):
+        count, size, _ = LAYOUTS[key]
+        return f"{count * size}GB"
     # Explicit RAM/DDR/unified-memory evidence only: 32GB GDDR7 is GPU VRAM,
     # and an unqualified 256GB tablet capacity is normally storage.
     if re.search(r"\b(?:choose|select)\b|\b(?:up to|max(?:imum)?|supports?)\s+\d+\s*GB\b", title, re.I):
@@ -57,6 +61,8 @@ def storage(title):
 
 
 def product_type(title):
+    if standalone_memory(title) or sodimm_configuration(title):
+        return "Memory"
     for label, pattern in (
         ("Accessories", r"\b(?:backpack|sleeve|case for|cover for|bag|insect bite|screen protector)\b|\b(?:iPad|tablet|laptop)\s+(?:case|cover|stand)\b"),
         ("Docks & hubs", r"\b(?:dock|docking|hub|KVM)\b"),

@@ -32,6 +32,8 @@ def _query_for(part: Part) -> str:
     key off identical strings.
     """
     query = part.name.split("(")[0].strip()
+    if part.key.startswith("ddr5_sodimm_"):
+        return query
     for suffix in (" 24GB", " 32GB", " 48GB", " 96GB", " 16GB"):
         query = query.replace(suffix, "")
     return query.strip()

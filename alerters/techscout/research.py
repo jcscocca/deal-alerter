@@ -20,7 +20,7 @@ PRESETS = {
     "tablets": ("Apple iPad tablet", "Samsung Galaxy Tab tablet"),
     "computers": ("laptop computer", "desktop computer"),
     "supplies": ("USB C docking station", "computer monitor"),
-    "memory": ("DDR5 desktop memory kit",),
+    "memory": ("DDR5 SO-DIMM 32GB", "DDR5 SO-DIMM 48GB", "DDR5 SO-DIMM 96GB 2x48GB", "DDR5 desktop memory kit"),
 }
 # An already researched desktop remains visible even when search omits it.
 DESKTOP_SEEDS = ("20707507998",)

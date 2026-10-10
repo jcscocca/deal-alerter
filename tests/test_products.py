@@ -230,5 +230,7 @@ class TestWatchlist:
 
     def test_a_catch_all_never_sweeps_up_a_product(self) -> None:
         assert ZENBOOK not in in_class("any")
-        assert in_class("product") == [ZENBOOK]
+        assert ZENBOOK in in_class("product")
+        assert all(part.is_product for part in in_class("product"))
+        assert not set(part.key for part in in_class("product")) & set(part.key for part in in_class("any"))
         assert ZENBOOK.kind is Kind.PRODUCT
