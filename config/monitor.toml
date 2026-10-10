@@ -40,6 +40,18 @@ url = "https://www.newegg.com/p/3D5-000Z-003H2?Item=9SIA1HJKP24777"
 kind = "discover-hp"
 url = "https://www.hp.com/us-en/shop/mdp/omen-45l-gaming-desktop"
 
+[[seed]]
+kind = "newegg"
+url = "https://www.newegg.com/p/N82E16883630088"
+
+[[discovery]]
+kind = "discover-newegg"
+url = "https://www.newegg.com/p/pl?d=RTX+5070+Ti+gaming+desktop&Order=1"
+
+[[discovery]]
+kind = "discover-newegg"
+url = "https://www.newegg.com/p/pl?d=RTX+5070+Ti+64GB+gaming+desktop&Order=1"
+
 [[discovery]]
 kind = "discover-hp"
 url = "https://www.hp.com/us-en/shop/mdp/desktops/omen-max-45l-gaming-desktop"

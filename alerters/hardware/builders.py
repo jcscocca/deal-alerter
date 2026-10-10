@@ -69,7 +69,7 @@ def discover_skytech(body):
     urls = []
     for node in root.findall(ns + "url/" + ns + "loc"):
         url = node.text or ""
-        if not re.search(r"-rtx-(?:5080|5090)-", url):
+        if not re.search(r"-rtx-(?:5070-?ti|5080|5090)-", url):
             continue
         try:
             source, url = builder_product(url)

@@ -26,6 +26,25 @@ target = 3600.0
 urgent = 3300.0
 # The existing RTX 5090 ceiling continues to come from watchlist.toml.
 
+# Added 2026-10-10. Notification settings, not a forecast or purchase budget.
+# New cards only. $900 is a standout stretch deal; current asks are ~$1,170.
+[price.rtx_5070_ti_card]
+ceiling = 1000.0
+target = 950.0
+urgent = 900.0
+
+# Complete PC totals including known shipping, before tax. Recent 32GB sales
+# at $1,899/$1,999 are expired; allow useful reductions above those sale lows.
+[price.rtx_5070_ti_32]
+ceiling = 2200.0
+target = 2100.0
+urgent = 2000.0
+
+[price.rtx_5070_ti_64]
+ceiling = 2400.0
+target = 2300.0
+urgent = 2200.0
+
 [[reviewed_configuration]]
 retailer = "hp"
 sku = "C33HVAA#ABA"

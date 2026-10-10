@@ -1,7 +1,7 @@
 """Conservative published-spec matching. No inferred benchmark equivalence."""
 import re
 
-from .prebuilt import gpu_model
+from .prebuilt import GPU, gpu_model
 
 
 def normalized(value):
@@ -41,9 +41,10 @@ def build_specs(title, specs, condition):
                            ("gpu", "gpuvgatype", "graphics", "includedgpu")),
                          "RTX " + fields.get("selectedgpu", "")])
     gpu = gpu_model(gpu_text)
-    selected_gpus = {m for v in selected for m in re.findall(r"\b(5080|5090)\b", v)}
-    published_gpus = set(re.findall(r"\bRTX\s*[™®]?\s*(\d{4})\b", gpu_text, re.I)) | selected_gpus
-    if published_gpus != {gpu} or re.search(r"\b(?:5080|5090)\s*(?:TI|SUPER)\b", gpu_text, re.I):
+    selected_gpus = {gpu_model("RTX " + m) for v in selected
+                     for m in re.findall(r"\b(50[789]0(?:\s*(?:ti|super|d))?)\b", v, re.I)}
+    published_gpus = {gpu_model("RTX " + m) for m in GPU.findall(gpu_text)} | selected_gpus
+    if published_gpus != {gpu}:
         gpu = None
     ram_values = [v for k,v in fields.items() if k in ("ram", "memory", "memoryram", "memorysize", "memorycapacity",
                                                      "systemmemory", "selectedram", "selectedmemory", "includedram")]

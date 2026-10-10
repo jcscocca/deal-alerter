@@ -6,7 +6,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from .prebuilt import Offer
+from .prebuilt import Offer, gpu_key
 
 
 @dataclass(frozen=True)
@@ -38,26 +38,25 @@ class DesktopProfile:
             raise ValueError("Invalid desktop memory targets")
         if self.memory["required_slots"] != 4 or self.memory["owned_modules"] != 2:
             raise ValueError("Desktop reuse profile requires four slots and an owned pair")
-        for capacity in (32, 64):
-            band = self.prices[f"rtx_5080_{capacity}"]
+        for band in self.prices.values():
             if not (0 < band["urgent"] <= band["target"] <= band["ceiling"]):
-                raise ValueError("Invalid RTX 5080 price thresholds")
+                raise ValueError("Invalid desktop price thresholds")
 
-    def price_band(self, fit: MemoryFit) -> dict:
+    def price_band(self, fit: MemoryFit, gpu: str = "5080") -> dict:
         # Unknown capacity stays discoverable at the wider limit, but cannot
         # earn elevated urgency until the installed RAM is established.
-        return self.prices[f"rtx_5080_{fit.installed_gb or 64}"]
+        return self.prices[f"{gpu_key(gpu)}_{fit.installed_gb or 64}"]
 
     def ceiling(self, gpu: str, legacy_target: float | None, fit: MemoryFit) -> float | None:
-        return self.price_band(fit)["ceiling"] if gpu == "5080" else legacy_target
+        return self.price_band(fit, gpu)["ceiling"] if gpu in ("5070 Ti", "5080") else legacy_target
 
     def priority(self, gpu: str, total: float | None, fit: MemoryFit) -> int:
         if total is None:
             return 3
-        if gpu == "5080":
+        if gpu in ("5070 Ti", "5080"):
             if fit.installed_gb is None:
                 return 3
-            band = self.price_band(fit)
+            band = self.price_band(fit, gpu)
             return 5 if total <= band["urgent"] else 4 if total <= band["target"] else 3
         return 3 if total >= 4500 else 4 if total >= 4000 else 5
 

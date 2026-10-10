@@ -177,7 +177,9 @@ class Config:
                 seen.setdefault(_query_for(part), None)
             for query in hunt.queries:
                 seen.setdefault(query, None)
-        return tuple(list(seen)[:24])
+        # The expanded watchlist has 25 queries; retain its existing product
+        # and datacenter watches when adding the 5070 Ti searches.
+        return tuple(list(seen)[:32])
 
     @property
     def query_price_floors(self) -> dict[str, float]:

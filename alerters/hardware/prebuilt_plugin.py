@@ -9,7 +9,7 @@ from dealcore.types import Assessment, Card, Listing
 from .native.history import PriceStats
 from .native.verdict import Assessment as NativeAssessment
 from .plugin import HardwarePlugin
-from .prebuilt import Offer, OfferState, PrebuiltHistory, announced_start, dollars, exact_desktop, pacific_time
+from .prebuilt import Offer, OfferState, PrebuiltHistory, announced_start, dollars, exact_desktop, gpu_key, pacific_time
 from .retailers import canonical_product
 from .desktop_profile import DEFAULT_PROFILE, DesktopProfile
 
@@ -63,6 +63,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
         self.offers = OfferState(self.state_dir)
         self.pc_details = {}
         self.memory_fits = {}
+        self.card_price_watches = {}
 
     def prepare(self, listing):
         if offer := listing.extra.get("prebuilt_offer"):
@@ -78,14 +79,33 @@ class MonitorHardwarePlugin(HardwarePlugin):
 
     def judge(self, candidate, stats):
         if not isinstance(candidate, PrebuiltCandidate):
-            return super().judge(candidate, stats)
+            assessment = super().judge(candidate, stats)
+            if assessment is None:
+                return None
+            item, listing = assessment.detail, candidate.listing
+            band = self.desktop_profile.prices.get(item.part.key + "_card")
+            if band is None or item.is_system or item.is_bundle:
+                return assessment
+            # Explicit new-card price notices are separate from the native
+            # model-capacity recommendation. Keep its factual grade/history,
+            # and never bypass identity, condition, seller or source vetoes.
+            eligible = (item.condition == "new" and item.quantity == 1 and item.loggable
+                        and listing.loggable and not listing.sold
+                        and not item.multi_variant and item.seller_risk == "low"
+                        and item.mining_risk == "low")
+            hit = eligible and item.unit_price <= band["ceiling"]
+            self.card_price_watches[assessment.key] = band
+            return replace(assessment, alertable=hit, target_override=hit,
+                           axes=(("cheapness", f"Explicit new-card price watch through ${band['ceiling']:,.0f}"),
+                                 ("value", "Listed card price before tax; verify delivery and checkout"),
+                                 ("capability", item.unlock)))
         offer = candidate.offer
-        if offer.gpu not in ("5080", "5090"):
+        if offer.gpu not in ("5070 Ti", "5080", "5090"):
             raise ValueError("Selected desktop GPU is ambiguous or unsupported")
         revision, event = self.offers.observe(offer, self.now)
         total, status = offer.total(self.now), offer.sale_status(self.now)
         gpu = offer.gpu
-        hunt = self.watched.get("rtx_" + gpu)
+        hunt = self.watched.get(gpu_key(gpu))
         fit = self.desktop_profile.assess_memory(offer)
         target = self.desktop_profile.ceiling(gpu, hunt.target if hunt else None, fit)
         self.memory_fits[offer.key] = fit
@@ -98,7 +118,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
         if target is not None and advertised is not None and advertised > target:
             upcoming = False
         verdict = self.bands.STRONG if target_hit or upcoming else self.bands.GOOD
-        part = next(p for p in self.catalog.PARTS if p.key == "rtx_" + gpu)
+        part = next(p for p in self.catalog.PARTS if p.key == gpu_key(gpu))
         # Complete-PC prices never use a loose-GPU percentile or catalog anchor.
         # Target qualification and the existing same-condition 5% promotion remain.
         detail = NativeAssessment(candidate.listing.listing_id, candidate.listing.source, part,
@@ -139,6 +159,17 @@ class MonitorHardwarePlugin(HardwarePlugin):
 
     def card(self, assessment, signal=None):
         if assessment.key not in self.pc_details:
+            if band := self.card_price_watches.get(assessment.key):
+                item = assessment.detail
+                return Card(item.part.name, item.url, f"${item.unit_price:,.2f}",
+                            "CARD PRICE WATCH" + (" · STANDOUT PRICE" if assessment.target_override and item.unit_price <= band["urgent"] else ""),
+                            "Listed price meets your watch limit" if assessment.target_override else "Outside the new-card alert criteria",
+                            "Price notice; not a sold-price valuation or a claim of increased model capacity.",
+                            (item.title, f"via {item.source}; {item.condition}",
+                             f"Alert through ${band['ceiling']:,.0f}; strong price ${band['target']:,.0f}; standout ${band['urgent']:,.0f}.",
+                             "Verify seller, availability, shipping and checkout total before buying."),
+                            ("Confirm card clearance and power cabling for the existing tower.",),
+                            priority=5 if item.unit_price <= band["urgent"] else 4 if item.unit_price <= band["target"] else 3)
             return super().card(assessment, signal)
         signal = signal or getattr(self, "signals", {}).get(assessment.key)
         offer, event, history = self.pc_details[assessment.key]
@@ -171,8 +202,8 @@ class MonitorHardwarePlugin(HardwarePlugin):
         facts += ["RAM goal: 128GB preferred / 96GB acceptable", fit.summary,
                   "Owned RAM: " + self.desktop_profile.memory["owned_kit"], *fit.evidence]
         warnings.append("Adding your existing 2x32GB kit is not a guaranteed RAM upgrade. Mixed kits may need lower speeds or fail stability testing.")
-        if offer.gpu == "5080":
-            band = self.desktop_profile.price_band(fit)
+        if offer.gpu in ("5070 Ti", "5080"):
+            band = self.desktop_profile.price_band(fit, offer.gpu)
             lane = f"Factory {fit.installed_gb}GB" if fit.installed_gb else "Factory RAM unknown"
             facts.append(f"{lane}: watch through ${band['ceiling']:,.0f}; strong-price target ${band['target']:,.0f}. Provisional alert settings, not a purchase recommendation.")
             if total is None:
