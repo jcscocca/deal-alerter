@@ -50,6 +50,6 @@ def test_combined_publishers_supply_agreeing_details_without_splitting_card():
         {"title": "Gaming desktop RTX 5090 32GB DDR5 1000GB SSD"},
         {"title": "Gaming desktop RTX 5090 32GB DDR5 1TB SSD"},
     ]}
-    assert attributes(row) == {"kind": "Desktops", "gpu": "RTX 5090", "ram": "32GB", "storage": "1TB SSD", "cpu": UNKNOWN, "condition": UNKNOWN}
+    assert attributes(row) == {"kind": "Desktops", "gpu": "RTX 5090", "ram": "32GB", "storage": "1TB SSD", "cpu": UNKNOWN, "condition": UNKNOWN, "memory_layout": UNKNOWN}
     row["reports"][1]["title"] = "Gaming desktop RTX 5080 64GB DDR5 2TB SSD"
     assert all(attributes(row)[key] == UNKNOWN for key in ("gpu", "ram", "storage"))
