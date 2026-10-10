@@ -50,6 +50,15 @@ parts = ["rtx_4090"]
 target = 2600.0
 queries = ["RTX 4090 gaming PC"]
 
+# Added 2026-10-10 for gaming/compute price alerts, independent of the native
+# VRAM-pool upgrade score. The live desktop profile owns new-card and PC bands.
+[[hunt]]
+name = "RTX 5070 Ti cards and prebuilts"
+parts = ["rtx_5070_ti"]
+target = 1000.0
+queries = ["RTX 5070 Ti gaming PC"]
+note = "$900 is a standout stretch deal, not an expected holiday price."
+
 # ---------------------------------------------------------------------- tier 2
 # 48GB single-slot-ish pro cards. Blower coolers, no transient power spikes.
 # Split in two because one target cannot serve a $4,000 A6000 and a $7,000 Ada.

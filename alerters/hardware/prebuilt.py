@@ -14,15 +14,20 @@ from dealcore.state import atomic_write, parse_time
 from .price_evidence import PriceEvidence, offer_key
 
 PACIFIC = ZoneInfo("America/Los_Angeles")
-GPU = re.compile(r"\b(?:geforce\s+)?rtx\s*[™®]?\s*(5080|5090)\b", re.I)
-NOT_DESKTOP = re.compile(r"laptop|notebook|mobile|\b5090\s*d\b|\b(?:no|without|optional)\s+(?:gpu|graphics|rtx)|up to.{0,30}(?:5080|5090)", re.I)
+GPU = re.compile(r"\b(?:geforce\s+)?rtx\s*[™®]?\s*(\d{4}(?:\s*(?:ti|super|d))*)\b", re.I)
+SUPPORTED_GPUS = {"5070ti": "5070 Ti", "5080": "5080", "5090": "5090"}
+NOT_DESKTOP = re.compile(r"laptop|notebook|mobile|\b(?:no|without|optional)\s+(?:gpu|graphics|rtx)|up to.{0,30}(?:5070|5080|5090)", re.I)
+
+
+def gpu_key(gpu: str) -> str:
+    return "rtx_" + gpu.lower().replace(" ", "_")
 
 
 def gpu_model(text: str) -> str | None:
-    if re.search(r"\b(?:5080|5090)\s*(?:[/|]|or)\s*(?:RTX\s*)?(?:5080|5090)\b", text, re.I):
+    if re.search(r"\b\d{4}(?:\s*(?:ti|super))?\s*(?:[/|]|or)\s*(?:RTX\s*)?\d{4}\b", text, re.I):
         return None
-    models = set(GPU.findall(text))
-    return models.pop() if len(models) == 1 and not NOT_DESKTOP.search(text) else None
+    models = {re.sub(r"\s+", "", value.lower()) for value in GPU.findall(text)}
+    return SUPPORTED_GPUS.get(models.pop()) if len(models) == 1 and not NOT_DESKTOP.search(text) else None
 
 
 def exact_desktop(text: str) -> bool:

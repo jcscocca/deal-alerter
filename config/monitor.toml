@@ -7,7 +7,8 @@ legacy_seconds = 900
 heartbeat_seconds = 15
 stale_seconds = 600
 max_backoff_seconds = 3600
-max_products_per_retailer = 48
+# Keep room for 5070 Ti discovery alongside the existing 5080/5090 products.
+max_products_per_retailer = 64
 workers = 6
 # Keep the existing hardware email digest under the same local writer.
 # The installed service reports missing SMTP credentials as degraded health.
@@ -39,6 +40,18 @@ url = "https://www.newegg.com/p/3D5-000Z-003H2?Item=9SIA1HJKP24777"
 [[discovery]]
 kind = "discover-hp"
 url = "https://www.hp.com/us-en/shop/mdp/omen-45l-gaming-desktop"
+
+[[seed]]
+kind = "newegg"
+url = "https://www.newegg.com/p/N82E16883630088"
+
+[[discovery]]
+kind = "discover-newegg"
+url = "https://www.newegg.com/p/pl?d=RTX+5070+Ti+gaming+desktop&Order=1"
+
+[[discovery]]
+kind = "discover-newegg"
+url = "https://www.newegg.com/p/pl?d=RTX+5070+Ti+64GB+gaming+desktop&Order=1"
 
 [[discovery]]
 kind = "discover-hp"

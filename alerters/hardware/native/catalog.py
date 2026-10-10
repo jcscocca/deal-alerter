@@ -320,6 +320,23 @@ PARTS: tuple[Part, ...] = (
         low_precision="fp4",
         aliases=("5080",),
     ),
+    Part(
+        key="rtx_5070_ti",
+        name="RTX 5070 Ti 16GB",
+        kind=Kind.CONSUMER_GPU,
+        vram_gb=16,
+        bandwidth_gb_s=896,
+        tdp_w=300,
+        # Current retail asking price checked 2026-10-10, NOT sold evidence.
+        reference_price=1169.99,
+        reference_basis="estimate",
+        year=2025,
+        arch="Blackwell",
+        low_precision="fp4",
+        aliases=("5070 ti", "5070ti"),
+        excludes=("5070 ti super", "5070ti super"),
+        note="Desktop GPU; card dimensions vary. Specs: nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5070-family/",
+    ),
     # ------------------------------------------------------------- AMD / Intel
     # Everything above this line is NVIDIA, which is not a statement about the
     # hardware so much as about the software. These four carry real capacity at

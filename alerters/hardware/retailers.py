@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 from .prebuilt import Coupon, Offer, dollars, exact_desktop, gpu_model
 from .retail_http import Deferred, public_url
 
-DESKTOP_BRANDS = {"abs", "skytech", "cyberpowerpc", "ibuypower", "msi", "gigabyte", "stormcraft", "hp"}
+DESKTOP_BRANDS = {"abs", "skytech", "cyberpowerpc", "ibuypower", "msi", "gigabyte", "stormcraft", "hp", "yeyian"}
 
 
 def initial_state(body: str) -> dict:
@@ -115,8 +115,8 @@ def parse_newegg(body: str, url: str, now: datetime) -> Offer | None:
         if selected:
             specs["Selected " + group.get("GroupDescription", "option")] = selected
         if group.get("GroupDescription", "").lower() == "gpu" and selected:
-            selected_model = re.fullmatch(r"(?:GeForce\s+RTX\s+)?(5080|5090)", selected, re.I)
-            if not selected_model or selected_model[1] != gpu_model(title):
+            selected_model = re.fullmatch(r"(?:GeForce\s+RTX\s+)?(5070\s*Ti|5080|5090)", selected, re.I)
+            if not selected_model or gpu_model("RTX " + selected_model[1]) != gpu_model(title):
                 raise Deferred("Selected GPU conflicts with the product title", 300)
     gpu = specs.get("GPU/VGA Type", "")
     if gpu_model(gpu) != gpu_model(title):

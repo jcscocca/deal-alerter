@@ -211,7 +211,7 @@ def test_new_source_jobs_preserve_config_limits_and_restart(tmp_path, monkeypatc
     assert again.jobs[key]["last_fetch_success"] == 1234 and again.jobs[key]["last_error_at"] == 1500
     assert again.jobs[key]["listing_notes"] == ["Unverified shipping"]
     assert again.client.host("www.cyberpowerpc.com")["blocked_until"] == 9999999999
-    assert any(j["kind"] == "ibuypower" and j["limit"] == 48 for j in again.jobs.values())
+    assert any(j["kind"] == "ibuypower" and j["limit"] == 64 for j in again.jobs.values())
     assert any(j["kind"] == "discover-skytech" and j["interval"] >= 21600 for j in again.jobs.values())
     assert mon.add_product("https://www.ibuypower.com/store/rdy-y50-r02") is None
 
