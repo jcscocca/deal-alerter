@@ -2,6 +2,13 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const B=require('../alerters/techscout/web/browsing.js');
 const now=2000000000;
+test('a single-stick watch excludes a same-total kit or desktop DIMM',()=>{
+  const prefs={...B.defaults(),filters:{memory_layout:'DDR5 SO-DIMM 1x32GB'}};
+  const good={facets:{ram:'32GB',memory_layout:'DDR5 SO-DIMM 1x32GB'}};
+  const wrongKit={facets:{ram:'32GB',memory_layout:B.unknown}};
+  assert.equal(B.matches(good,prefs),true);
+  assert.equal(B.matches(wrongKit,prefs),false);
+});
 const row=(id,changes={})=>({id,title:'Desktop RTX 5090 64GB DDR5',facets:{kind:'Desktops',gpu:'RTX 5090',ram:'64GB',condition:'New'},source:'newegg',total:4000,price:4000,available:true,expires_at:now+60,checked_at:'2026-10-07T00:00:00Z',verification_reasons:[],preference_reasons:[],reasons:[],fit:'NEEDS SPECS',...changes});
 
 test('visible recommendation separates negative verdicts, qualifying deals and unassessed builds',()=>{

@@ -12,6 +12,7 @@ from .plugin import HardwarePlugin
 from .prebuilt import Offer, OfferState, PrebuiltHistory, announced_start, dollars, exact_desktop, gpu_key, pacific_time
 from .retailers import canonical_product
 from .desktop_profile import DEFAULT_PROFILE, DesktopProfile
+from .sodimm import LAYOUTS as SODIMM_LAYOUTS
 
 
 def community_offer(listing: Listing) -> Offer | None:
@@ -64,6 +65,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
         self.pc_details = {}
         self.memory_fits = {}
         self.card_price_watches = {}
+        self.sodimm_watches = {}
 
     def prepare(self, listing):
         if offer := listing.extra.get("prebuilt_offer"):
@@ -78,6 +80,8 @@ class MonitorHardwarePlugin(HardwarePlugin):
         return super().read_history(candidate)
 
     def judge(self, candidate, stats):
+        if not isinstance(candidate, PrebuiltCandidate) and candidate.match.part.key in SODIMM_LAYOUTS:
+            return self.judge_sodimm(candidate)
         if not isinstance(candidate, PrebuiltCandidate):
             assessment = super().judge(candidate, stats)
             if assessment is None:
@@ -136,6 +140,35 @@ class MonitorHardwarePlugin(HardwarePlugin):
                                                  ("capability", f"Desktop RTX {gpu}; {fit.summary}")),
                           alert_revision=revision)
 
+    def judge_sodimm(self, candidate):
+        listing, part = candidate.listing, candidate.match.part
+        price, limit = candidate.match.unit_price, candidate.hunt.target
+        if price is None or not 0 < price < 100000 or limit is None:
+            return None
+        count, size, _ = SODIMM_LAYOUTS[part.key]
+        eligible = (candidate.condition in ("new", "open_box", "used", "refurbished")
+                    and not listing.sold and not listing.multi_variant
+                    and listing.seller_risk == "low"
+                    and listing.extra.get("shopping", {}).get("available") is not False
+                    and not re.search(r"\b(?:rebate|cashback|trade[- ]?in|monthly|deposit|down payment)\b", listing.title, re.I)
+                    and not (count > 1 and re.search(r"\beach\b|\bper\s+(?:stick|module|unit)\b", listing.title, re.I)))
+        hit = eligible and price <= limit
+        verdict = self.bands.STRONG if hit else self.bands.GOOD
+        reason = "Explicit SO-DIMM price watch; not a market-value or compatibility guarantee."
+        detail = NativeAssessment(listing.listing_id, listing.source, part, listing.title, listing.url,
+                                  price, 1, candidate.condition, listing.posted_at, verdict,
+                                  "Within your memory alert limit" if hit else "Outside the memory alert criteria",
+                                  reason, 0, target_price=limit, target_hit=hit, loggable=False,
+                                  reference_trusted=False, seller_risk=listing.seller_risk,
+                                  unlock=f"{count} x {size}GB DDR5 SO-DIMM; {count * size}GB purchase total.")
+        result = Assessment(self.key(listing), price, verdict, detail, rank=(-price,),
+                            alertable=hit, target_override=hit, loggable=False,
+                            axes=(("cheapness", f"Selected alert limit ${limit:,.0f}"),
+                                  ("value", "Listed purchase price; verify shipping and checkout"),
+                                  ("capability", detail.unlock)))
+        self.sodimm_watches[result.key] = detail
+        return result
+
     def append(self, pairs):
         ordinary = []
         for candidate, assessment in pairs:
@@ -159,6 +192,14 @@ class MonitorHardwarePlugin(HardwarePlugin):
         yield from super().undercuts(usable)
 
     def card(self, assessment, signal=None):
+        if item := self.sodimm_watches.get(assessment.key):
+            return Card(item.part.name, item.url, f"${item.unit_price:,.2f}", "SO-DIMM PRICE WATCH",
+                        item.headline, item.reason,
+                        (item.title, f"via {item.source}; {item.condition}", item.unlock,
+                         f"Alert limit ${item.target_price:,.0f} for the complete purchase."),
+                        ("Verify seller, stock, shipping and the exact module specifications before buying.",
+                         "ThinkPad P16 Gen 2: four occupied slots; 32GB sticks replace existing RAM, 4x48GB reaches 192GB.",
+                         "Four 32GB or 48GB modules run at 3600 MT/s; mixing kits requires validation."), priority=3)
         if assessment.key not in self.pc_details:
             if band := self.card_price_watches.get(assessment.key):
                 item = assessment.detail

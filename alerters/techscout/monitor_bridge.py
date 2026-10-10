@@ -14,6 +14,7 @@ from alerters.hardware.prebuilt import Offer, exact_desktop, gpu_model
 from alerters.hardware.native.match import extract_price
 from .research import cpu_model
 from alerters.hardware.prebuilt_specs import public_specs
+from alerters.hardware.sodimm import standalone_memory, configuration as sodimm_configuration
 
 LABELS = {"newegg": "Newegg", "ebay": "eBay", "apple-refurb": "Apple Refurbished",
           "slickdeals": "Slickdeals", "hp": "HP", "reddit": "Reddit",
@@ -71,6 +72,8 @@ def safe_url(value, source):
 
 
 def categories(title, is_system=False):
+    if not is_system and (standalone_memory(title) or sodimm_configuration(title)):
+        return {"memory"}
     if re.search(r"\biPad\b|\btablet\b|Galaxy Tab", title, re.I):
         return {"tablets"}
     if is_system or exact_desktop(title) or re.search(r"\b(?:Mac mini|Mac Studio|Mac Pro|MacBook|laptop|notebook|desktop|mini pc)\b", title, re.I):

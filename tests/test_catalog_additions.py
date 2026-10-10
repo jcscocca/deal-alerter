@@ -17,6 +17,7 @@ import pytest
 
 from alerters.hardware.native.catalog import PARTS, BY_KEY, Kind
 from alerters.hardware.native.match import find_all_parts, find_part
+from alerters.hardware.sodimm import LAYOUTS, configuration
 
 ADDED = [
     ("radeon_pro_w7900", "AMD Radeon PRO W7900 48GB Workstation Graphics Card"),
@@ -118,12 +119,19 @@ class TestCatalogInvariants:
     def test_a_product_is_priced_and_carries_no_memory_claims(self, part) -> None:
         # A list price is the one basis only a product may use, and a product
         # with VRAM figures would invite the $/GB math the verdict skips.
-        assert part.reference_basis == "list" and part.reference_price > 0
+        assert part.reference_price > 0
+        if part.key in LAYOUTS:
+            # Layout watches use explicit targets, never a claimed retail list
+            # value. Their dedicated parser validates module counts and type.
+            assert part.reference_basis == "estimate"
+            assert configuration(part.name) == part.key
+        else:
+            assert part.reference_basis == "list"
+            assert part.require_all and part.excludes
         assert part.vram_gb == 0 and part.bandwidth_gb_s == 0
         assert part.dollars_per_gb == 0 and part.dollars_per_gb_bandwidth == 0
         # The matcher's laptop vetoes do not apply to products, so a product's
         # identity rests entirely on its tokens and exclusions.
-        assert part.require_all and part.excludes
 
     @pytest.mark.parametrize("part", [p for p in PARTS if p.kind is Kind.UNIFIED],
                              ids=lambda part: part.key)

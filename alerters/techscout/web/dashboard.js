@@ -6,7 +6,7 @@
   const date=value=>value ? new Date(value).toLocaleString([],{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}) : 'No successful check';
   const rowFresh=B.fresh, token=document.querySelector('meta[name="techscout-token"]').content;
   const categoryNames={'desktop-memory':'Desktops',tablets:'Tablets',computers:'Computers',supplies:'Tech supplies',memory:'Memory',amazon:'Amazon deals',monitor:'All deals'};
-  const allLabels={kind:'All product types',gpu:'All GPUs',ram:'Any included RAM',cpu:'All CPUs',storage:'All storage',condition:'All conditions'};
+  const allLabels={kind:'All product types',gpu:'All GPUs',ram:'Any included RAM',memory_layout:'Any memory layout',cpu:'All CPUs',storage:'All storage',condition:'All conditions'};
   let category='monitor',view='list',state=null,related=[],pending=false,poll=null,version=0;
   let savedViews={},prefs=B.defaults(),picks=new Set(),expanded=new Set(),expandedReports=new Set(),limits={current:12,other:12,similar:6};
   try {

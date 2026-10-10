@@ -126,3 +126,25 @@ parts = ["zenbook_duo_2026_x9_388h"]
 # June pre-order. List is $2,699.99.
 target = 2500.0
 note = "UX8407AA-PSXT. The 386H base model has a third of the graphics and is not hunted."
+
+# ThinkPad P16 Gen 2: user requested both spare 32GB and upgrade 48GB modules.
+# Kit limits are for the complete purchase, not per module. 2026-10-10.
+[[hunt]]
+name = "ThinkPad DDR5 SO-DIMM 32GB sticks"
+parts = ["ddr5_sodimm_32"]
+target = 200.0
+
+[[hunt]]
+name = "ThinkPad DDR5 SO-DIMM 48GB sticks"
+parts = ["ddr5_sodimm_48"]
+target = 300.0
+
+[[hunt]]
+name = "ThinkPad DDR5 SO-DIMM 64GB kits (2x32GB)"
+parts = ["ddr5_sodimm_64_kit"]
+target = 400.0
+
+[[hunt]]
+name = "ThinkPad DDR5 SO-DIMM 96GB kits (2x48GB)"
+parts = ["ddr5_sodimm_96_kit"]
+target = 600.0

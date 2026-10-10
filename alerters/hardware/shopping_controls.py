@@ -9,7 +9,7 @@ import re
 from alerters.techscout.facets import attributes
 
 CATEGORIES = {"monitor", "amazon", "desktop-memory", "computers", "tablets", "memory", "supplies"}
-FACETS = {"kind", "gpu", "ram", "cpu", "storage", "condition"}
+FACETS = {"kind", "gpu", "ram", "cpu", "storage", "condition", "memory_layout"}
 
 
 def defaults():
