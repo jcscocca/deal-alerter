@@ -159,6 +159,20 @@ def test_ebay_variant_and_seller_guards(tmp_path, changes):
     assert not state(tmp_path)["groups"] and state(tmp_path)["held"]
 
 
+def test_ebay_item_stock_evidence_survives_export_and_labels_unavailable_rows(tmp_path):
+    row = listing()
+    row.extra["shopping"].update(available=False, stock="out_of_stock",
+                                 availability_checked_at=NOW.isoformat(),
+                                 availability_note="eBay item detail: unavailable")
+    exporter = publish(tmp_path, Batch(listings=[row]), source="ebay")
+    exported = json.loads(exporter.path.read_text())["sources"][0]["rows"][0]
+    assert exported["shopping"]["availability_checked_at"] == NOW.isoformat()
+    result = state(tmp_path)
+    assert not result["groups"]
+    assert result["held"][0]["stock"] == "out_of_stock"
+    assert "Out of stock at last check" in result["held"][0]["verification_reasons"]
+
+
 def test_export_excludes_sold_unassessed_and_private_extra_fields(tmp_path):
     good = listing()
     good.extra["secret"] = "SECRET"

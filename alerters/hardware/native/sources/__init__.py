@@ -47,6 +47,8 @@ def build_sources(cfg) -> list[Source]:
                 client_id=cfg.ebay_client_id,
                 client_secret=cfg.ebay_client_secret,
                 price_floors=cfg.query_price_floors,
+                memory_limits={key: hunt.target for key, hunt in cfg.all_watched_parts().items()
+                               if key.startswith("ddr5_sodimm_") and hunt.target is not None},
             )
         )
     # HARDWARE_SOURCES narrows a run to some of them, so Reddit's throttled

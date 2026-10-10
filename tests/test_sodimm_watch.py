@@ -22,7 +22,7 @@ NOW = datetime.now(timezone.utc)
 
 def execute(tmp_path, title="Crucial 32GB DDR5-5600 SO-DIMM Laptop Memory", price=200, **changes):
     row = replace(Listing("memory", "ebay", title, "https://www.ebay.com/itm/123", NOW,
-                          price=price, condition_hint="new"), **changes)
+                          price=price, condition_hint="new", extra={"shopping": {"available": True}}), **changes)
     plugin = MonitorHardwarePlugin(ROOT / "config/hardware.toml", tmp_path, now=NOW)
     try:
         plugin.sources = (SimpleNamespace(name="fixture", fetch=lambda: FetchResult([row])),)
@@ -79,6 +79,8 @@ def test_wrong_modules_ambiguous_kits_and_whole_computers_are_not_memory_alerts(
     {"seller_risk":"moderate"}, {"seller_risk":"high"}, {"condition_hint":"unknown"},
     {"sold":True}, {"multi_variant":True}, {"condition_hint":"parts"},
     {"extra":{"shopping":{"available":False}}},
+    {"extra":{}}, {"extra":{"shopping":{}}},
+    {"extra":{"shopping":{"available":None}}},
     {"title":"32GB DDR5 SO-DIMM for parts not working"},
     {"title":"32GB DDR5 SO-DIMM after trade-in rebate"},
     {"title":"2x48GB DDR5 SO-DIMM $200 each"},

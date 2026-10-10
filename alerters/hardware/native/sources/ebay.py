@@ -22,14 +22,19 @@ import base64
 import html
 import math
 import re
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 import requests
 
 from .base import Listing, SourceError
+from ...sodimm import configuration as memory_configuration
 
 OAUTH_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
+ITEM_URL = "https://api.ebay.com/buy/browse/v1/item/"
+MAX_STOCK_CHECKS = 20
 INSIGHTS_URL = (
     "https://api.ebay.com/buy/marketplace_insights/v1_beta/item_sales/search"
 )
@@ -145,6 +150,7 @@ class EbaySource:
         limit_per_query: int = 50,
         include_sold: bool = True,
         price_floors: dict[str, float] | None = None,
+        memory_limits: dict[str, float] | None = None,
     ) -> None:
         self.name = "ebay"
         self.queries = queries
@@ -153,6 +159,7 @@ class EbaySource:
         # returns thousands of matches whose cheapest 50 are stickers and
         # brackets, and not one actual card.
         self.price_floors = price_floors or {}
+        self.memory_limits = memory_limits or {}
         self.client_id = client_id
         self.client_secret = client_secret
         self.limit_per_query = limit_per_query
@@ -215,7 +222,72 @@ class EbaySource:
                     pass
         if failures and not listings:
             raise SourceError("; ".join(failures))
-        return listings
+        return self._verify_memory_stock(listings)
+
+    def _verify_memory_stock(self, listings: list[Listing]) -> list[Listing]:
+        """Search is discovery; a memory alert needs fresh, exact-item evidence.
+
+        Bound extra requests to affordable watched modules, with one lookup per
+        item per fetch. Neither errors nor the request limit imply availability.
+        The monitor's rate-limit exceptions propagate to its existing backoff.
+        """
+        checked: dict[str, Listing] = {}
+        out = []
+        requests_used = 0
+        for listing in listings:
+            key = memory_configuration(listing.title + "\n" + listing.body)
+            if not key or listing.sold:
+                out.append(listing)
+                continue
+            shopping = {**listing.extra.get("shopping", {}), "available": None,
+                        "stock": "unknown", "availability_note": "Item stock has not been verified"}
+            listing = replace(listing, extra={**listing.extra, "shopping": shopping})
+            limit = self.memory_limits.get(key)
+            if (limit is None or listing.price is None or not 0 < listing.price <= limit
+                    or listing.multi_variant or listing.seller_risk != "low"
+                    or listing.condition_hint not in ("new", "open_box", "used", "refurbished")):
+                out.append(listing)
+                continue
+            if listing.listing_id in checked:
+                out.append(checked[listing.listing_id])
+                continue
+            if requests_used >= MAX_STOCK_CHECKS:
+                shopping["availability_note"] = "Item stock check deferred by request limit"
+                out.append(listing)
+                continue
+            requests_used += 1
+            shopping["availability_checked_at"] = datetime.now(timezone.utc).isoformat()
+            shopping["availability_note"] = "Item stock check failed; availability unknown"
+            try:
+                response = self.session.get(ITEM_URL + quote(listing.listing_id, safe=""),
+                                            headers=self._headers(), timeout=TIMEOUT)
+                if response.status_code in (401, 403, 429, 503):
+                    raise SourceError(f"eBay item stock check HTTP {response.status_code}")
+                if response.status_code == 200:
+                    item = response.json()
+                    price = _delivered_price(item)
+                    if (item.get("itemId") == listing.listing_id
+                            and memory_configuration(item.get("title", "")) == key
+                            and (item.get("price") or {}).get("currency") == "USD"
+                            and price is not None and math.isfinite(price) and price > 0
+                            and "FIXED_PRICE" in (item.get("buyingOptions") or [])):
+                        available = _availability_of(item, datetime.now(timezone.utc))
+                        verified_shopping = dict(shopping, item_price=_price_of(item), shipping=_shipping_of(item),
+                                                 available=available,
+                                                 stock="in_stock" if available is True else "out_of_stock" if available is False else "unknown",
+                                                 availability_note="eBay item detail: " + ("in stock" if available is True else "unavailable" if available is False else "stock unknown"))
+                        risk, note = _seller_risk(item)
+                        listing = replace(listing, title=item["title"], price=price, body="",
+                                          condition_hint=_condition_of(item), seller_risk=risk, seller_note=note,
+                                          extra={**listing.extra, "seller": (item.get("seller") or {}).get("username", ""),
+                                                 "shopping": verified_shopping})
+                    else:
+                        shopping["availability_note"] = "Item identity, price or purchase option could not be verified"
+            except (requests.RequestException, ValueError, TypeError, AttributeError):
+                pass
+            checked[listing.listing_id] = listing
+            out.append(listing)
+        return out
 
     def _search_active(self, query: str) -> list[Listing]:
         # Buy-It-Now only. Auction prices mid-flight are not prices; a 3090
@@ -265,9 +337,7 @@ class EbaySource:
                     source="ebay",
                     title=item.get("title", ""),
                     url=item.get("itemWebUrl", ""),
-                    # Browse doesn't return a listing date on summaries. Active
-                    # listings are current by definition, so treat them as now
-                    # rather than dropping them on the age filter.
+                    # This is the search observation time, not evidence of stock.
                     posted_at=now,
                     price=price,
                     # EXTENDED adds eBay's short description to the
@@ -307,8 +377,7 @@ class EbaySource:
                         "country": (item.get("itemLocation") or {}).get("country", ""),
                         "shopping": {"item_price": _price_of(item) if (item.get("price") or {}).get("currency", "USD") == "USD" else None,
                                      "shipping": _shipping_of(item),
-                                     "available": (item.get("estimatedAvailabilityStatus") not in ("OUT_OF_STOCK", "TEMPORARILY_UNAVAILABLE")
-                                                   and (not item.get("itemEndDate") or (_parse_iso(item["itemEndDate"]) or now) > now))},
+                                     "available": _availability_of(item, now)},
                     },
                 )
             )
@@ -381,6 +450,43 @@ class EbaySource:
                 )
             )
         return out
+
+
+def _availability_of(item: dict, now: datetime) -> bool | None:
+    """Explicit shipping stock only. Missing or conflicting data stays unknown."""
+    if item.get("itemEndDate"):
+        if not isinstance(item["itemEndDate"], str):
+            return None
+        end = _parse_iso(item["itemEndDate"])
+        if end is None:
+            return None
+        if end <= now:
+            return False
+    entries = item.get("estimatedAvailabilities") or []
+    if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
+        return None
+    entries = [entry for entry in entries if isinstance(entry, dict)
+               and (not entry.get("deliveryOptions") or "SHIP_TO_HOME" in entry["deliveryOptions"])]
+    if item.get("estimatedAvailabilityStatus"):
+        entries = [*entries, {"estimatedAvailabilityStatus": item["estimatedAvailabilityStatus"]}]
+    statuses = set()
+    for entry in entries:
+        status = entry.get("estimatedAvailabilityStatus")
+        if not isinstance(status, str):
+            return None
+        if status in ("OUT_OF_STOCK", "TEMPORARILY_UNAVAILABLE"):
+            return False
+        if "estimatedAvailableQuantity" in entry:
+            try:
+                quantity = float(entry["estimatedAvailableQuantity"])
+            except (TypeError, ValueError):
+                return None
+            if not math.isfinite(quantity) or quantity < 0 or not quantity.is_integer():
+                return None
+            if quantity == 0:
+                return False
+        statuses.add(status)
+    return True if statuses == {"IN_STOCK"} else None
 
 
 def _variant_of_many(item_id: str) -> bool:
