@@ -269,7 +269,7 @@ def assess(
         reason=reason,
         dollars_per_gb=dollars_per_gb,
         dollars_per_gb_bandwidth=dollars_per_gb_bandwidth,
-        percentile=percentile,
+        percentile=None if is_system else percentile,
         stats=stats,
         vram_before=before,
         vram_after=after,
@@ -316,7 +316,7 @@ def _decide(
 
     class_median = class_median_dollars_per_gb(part.kind)
     # A product is bought for itself, so there is no per-GB value to state.
-    value_note = "" if part.is_product else _value_sentence(
+    value_note = "" if part.is_product or is_system else _value_sentence(
         part,
         dollars_per_gb,
         class_median,
@@ -334,6 +334,14 @@ def _decide(
         )
         promotion_ceiling = Verdict.GRAIL
 
+    if is_system:
+        # Retain every existing grade/promotion veto, but do not present a
+        # component's percentile or reference as a rating of this entire PC.
+        headline = f"{_fmt(unit_price)} for the complete PC"
+        reason = "Whole-PC asking price; loose-GPU history and efficiency metrics do not rate this system."
+        if promotion_ceiling < Verdict.STRONG:
+            reason += " Existing price-evidence safety rules block target and price-gap promotion."
+
     # Both paths lean on `reference_price` -- one as the whole answer, one as
     # the sanity check on the percentile -- so an unverified anchor weakens both
     # equally. Half the catalog is still estimates, and on 2026-08-17 those sat
@@ -344,7 +352,10 @@ def _decide(
         promotion_ceiling = min(promotion_ceiling, Verdict.GOOD)
         verdict = min(verdict, Verdict.GOOD)
         headline = f"{_fmt(unit_price)} -- WATCH / UNVERIFIED reference"
-        if part.is_product and part.reference_basis == "list":
+        if is_system:
+            headline = f"{_fmt(unit_price)} for the complete PC -- WATCH / UNVERIFIED"
+            reason += " The loose-GPU reference is unverified; target and price-gap promotion remain blocked."
+        elif part.is_product and part.reference_basis == "list":
             # The list price is what a new one costs. Against it a used or
             # refurbished unit always looks discounted, which is no evidence
             # that it is cheap for what it is. Watch until its own condition
@@ -502,7 +513,7 @@ def _decide(
     # just doesn't get escalated on the strength of a price we won't record.
     if target_hit and verdict < Verdict.STRONG <= promotion_ceiling:
         verdict = Verdict.STRONG
-        headline = f"{_fmt(unit_price)} -- under your {_fmt(target_price)} target"
+        headline = (f"{_fmt(unit_price)} for the complete PC" if is_system else _fmt(unit_price)) + f" -- under your {_fmt(target_price)} target"
 
     return verdict, headline, reason, promotion_ceiling
 

@@ -154,6 +154,16 @@ and purchase link. Unverified notices stay at normal priority. Above-target
 systems can still qualify through the existing 5% same-condition undercut rule,
 using fresh eligible loose-GPU evidence (at most 20 minutes old).
 
+RTX 5080 email cards use the installed-RAM tier's complete-total watch ceiling
+and strong-price target. `Within the watch range` requires a confirmed live,
+eligible offer at or below the ceiling; an over-ceiling total is explicitly
+outside the range. An unavailable offer within the numeric ceiling keeps its
+stock/unconfirmed label and cannot claim confirmed watch qualification. Unknown
+totals remain unverified. A separate loose-card price-gap promotion does not
+change the displayed watch ceiling or make an above-ceiling price within it.
+The dashboard continues to rate exact builds and current comparable PCs
+separately from notification thresholds and RAM suitability.
+
 `prebuilt-prices.jsonl` contains complete-PC observations, keyed by retailer SKU,
 seller, exact configuration and condition. New, refurbished and open-box are
 separate. No prebuilt observation enters `prices.jsonl` or its GPU percentiles.

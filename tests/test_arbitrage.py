@@ -48,7 +48,7 @@ class TestTheSignalFires:
     def test_a_machine_under_the_cheapest_loose_card(self) -> None:
         found = signals(row("pc", 500, is_system=True), row("card", 700))
         assert set(found) == {"pc"}
-        assert "$200 of room" in found["pc"]
+        assert "$200 lower asking price" in found["pc"]
         assert "Same condition on both sides" in found["pc"]
 
     def test_the_cheapest_card_sets_the_bar_not_the_first_one(self) -> None:
@@ -93,7 +93,7 @@ class TestConditionHonesty:
         found = signals(row("pc", 500, is_system=True, condition="used"),
                         row("new", 600, condition="new"),
                         row("used", 650, condition="used"))
-        assert "$150 of room" in found["pc"]
+        assert "$150 lower asking price" in found["pc"]
         assert "Same condition on both sides" in found["pc"]
 
     def test_an_unstated_condition_cannot_claim_a_match(self) -> None:
@@ -130,7 +130,7 @@ class TestAnUnnamedEditionIsNotTheWorkstationCard:
                 row("mq", 14999.99, condition="new", part=MAXQ,
                     title="New NVIDIA RTX PRO 6000 Blackwell Max-Q 96GB GDDR7 Graphics Card PG153B"),
             )
-            assert "$1,000 of room" in found["pc"]
+            assert "$1,000 lower asking price" in found["pc"]
             assert "RTX PRO 6000 Blackwell Workstation this run" in found["pc"]
 
 
