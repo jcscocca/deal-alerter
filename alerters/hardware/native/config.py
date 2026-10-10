@@ -202,6 +202,9 @@ class Config:
             for part in hunt.parts:
                 query = _query_for(part)
                 floor = part.reference_price * self.thresholds.min_price_ratio
+                if part.key.startswith("ddr5_sodimm_"):
+                    # Explicit price watches have no guessed minimum price.
+                    floor = 0.0
                 floors[query] = min(floors.get(query, floor), floor)
             if hunt.queries:
                 floor = min(part.reference_price for part in hunt.parts) * self.thresholds.min_price_ratio

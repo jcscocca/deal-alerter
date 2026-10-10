@@ -5,7 +5,7 @@ import re
 
 from alerters.hardware.native.catalog import Kind
 from alerters.hardware.native.match import find_all_parts
-from alerters.hardware.sodimm import standalone_memory, configuration as sodimm_configuration, LAYOUTS
+from alerters.hardware.sodimm import standalone_memory, configuration as sodimm_configuration, LAYOUTS, layout_label
 from .research import cpu_model
 
 UNKNOWN = "Not established"
@@ -104,4 +104,5 @@ def attributes(row):
         "cpu": one(cpu_model(title) for title in titles) or UNKNOWN,
         "storage": one(storage(title) for title in titles) or UNKNOWN,
         "condition": condition,
+        "memory_layout": one(layout_label(title) for title in titles) or UNKNOWN,
     }

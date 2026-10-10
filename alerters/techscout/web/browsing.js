@@ -2,8 +2,8 @@
 (function(root) {
   'use strict';
   const unknown = 'Not established';
-  const keys = ['kind','gpu','ram','cpu','storage','condition'];
-  const labels = {kind:'Product type',gpu:'GPU',ram:'Included RAM',cpu:'CPU',storage:'Storage',condition:'Condition'};
+  const keys = ['kind','gpu','ram','memory_layout','cpu','storage','condition'];
+  const labels = {kind:'Product type',gpu:'GPU',ram:'Included RAM',memory_layout:'Memory modules',cpu:'CPU',storage:'Storage',condition:'Condition'};
   const defaults = () => ({filters:{},source:'all',budget:null,sort:'recommended',reuse:true,similar:true,quality:'all'});
   const value = (row,key) => row.facets?.[key] || unknown;
   const hasSource = (row,source) => row.source === source || (row.sources || []).includes(source);

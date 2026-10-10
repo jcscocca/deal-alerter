@@ -19,6 +19,13 @@ SKUS = {
 }
 
 
+def layout_label(title: str) -> str | None:
+    if key := configuration(title):
+        count, size, _ = LAYOUTS[key]
+        return f"DDR5 SO-DIMM {count}x{size}GB"
+    return None
+
+
 def standalone_memory(title: str) -> bool:
     """Display classification only; matching below still verifies the layout."""
     primary = re.split(r"\b(?:compatible with|for (?:lenovo|thinkpad|laptops?|notebooks?))\b", title, maxsplit=1, flags=re.I)[0]

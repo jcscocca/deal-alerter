@@ -9,7 +9,7 @@ import pytest
 from alerters.hardware.native.match import match
 from alerters.hardware.prebuilt_plugin import MonitorHardwarePlugin
 from alerters.hardware.sodimm import configuration
-from alerters.techscout.facets import product_type, ram
+from alerters.techscout.facets import product_type, ram, attributes, UNKNOWN
 from alerters.techscout.monitor_bridge import categories
 from dealcore.notify import Channel
 from dealcore.run import run
@@ -106,6 +106,9 @@ def test_kit_facets_do_not_report_one_module_capacity():
     assert ram("Crucial CT2K32G56C46S5") == "64GB"
     assert categories("DDR5 32GB desktop memory kit") == {"memory"}
     assert categories("Gaming PC RTX 5080 32GB DDR5 2TB SSD") != {"memory"}
+    assert attributes({"title":"32GB DDR5 SO-DIMM Laptop Memory"})["memory_layout"] == "DDR5 SO-DIMM 1x32GB"
+    assert attributes({"title":"32GB (2x16GB) DDR5 SO-DIMM Laptop Memory"})["memory_layout"] == UNKNOWN
+    assert attributes({"title":"32GB DDR5 desktop UDIMM memory"})["memory_layout"] == UNKNOWN
 
 
 def test_memory_queries_fit_without_displacing_prior_watches(tmp_path):
@@ -114,6 +117,7 @@ def test_memory_queries_fit_without_displacing_prior_watches(tmp_path):
         assert len(plugin.cfg.search_queries) == 29
         for capacity in (32, 48, 64, 96):
             assert f"DDR5 SO-DIMM {capacity}GB" in plugin.cfg.search_queries
+            assert plugin.cfg.query_price_floors[f"DDR5 SO-DIMM {capacity}GB"] == 0
         assert any("Zenbook" in q for q in plugin.cfg.search_queries)
     finally:
         plugin.close()

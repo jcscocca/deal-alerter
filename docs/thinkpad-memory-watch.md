@@ -25,7 +25,9 @@ The monitor searches these four layouts through its existing eBay searches
 and community feeds. Retailer coverage through those feeds is indirect; this
 does not add continuous Amazon, Walmart or Newegg memory scraping. The Memory
 tab's on-demand Walmart searches now include SO-DIMMs as well as desktop kits.
-Memory results with “laptop memory” titles stay under Memory. Generic brands
+Memory results with “laptop memory” titles stay under Memory. The Memory modules
+filter distinguishes a 32GB stick from a 32GB 2x16GB kit and from desktop RAM.
+Generic brands
 need explicit DDR5 SO-DIMM and capacity evidence; known Crucial/Kingston model
 numbers can resolve omitted wording. Different brands are not pooled into a
 claimed market-value history. Existing notification receipts handle repeated
