@@ -56,7 +56,8 @@ class ShoppingExport:
                          "is_system": bool(getattr(detail, "is_system", False)),
                          "judgment": judgments.get(getattr(assessment, "key", "")),
                          "shopping": {name: shopping.get(name) for name in
-                                      ("item_price", "shipping", "available")}})
+                                      ("item_price", "shipping", "available", "stock",
+                                       "availability_checked_at", "availability_note")}})
         for row in rows:
             identity = row["offer"]["retailer"] + ":" + str(row["offer"]["sku"]) + json.dumps([row["offer"]["seller"], row["offer"]["condition"], row["offer"]["specs"]], sort_keys=True) if row["type"] == "offer" else row["source"] + ":" + row["id"]
             identity = hashlib.sha256(identity.encode()).hexdigest()[:24]
@@ -74,6 +75,12 @@ class ShoppingExport:
                 event = {**event, "at": datetime.fromisoformat(event["at"]).replace(microsecond=0).isoformat()}
                 identity = hashlib.sha256(json.dumps([judgment["id"], event["channel"], event["status"], event["at"]]).encode()).hexdigest()[:24]
                 row = {k: judgment[k] for k in ("id", "source", "title", "url", "verdict", "price")}
+                if event["status"] == "sent" and not event.get("receipt") and judgment.get("stock_evidence"):
+                    row["stock_evidence"] = judgment["stock_evidence"]
+                elif identity in self.events and self.events[identity].get("stock_evidence"):
+                    # A later receipt projection must not replace delivery-time
+                    # stock with the result of a different check.
+                    row["stock_evidence"] = self.events[identity]["stock_evidence"]
                 self.events[identity] = {**row, **event, "event_id": identity}
         ordered = sorted(self.events.values(), key=lambda e: e["at"])[-500:]
         self.events = {e["event_id"]: e for e in ordered}

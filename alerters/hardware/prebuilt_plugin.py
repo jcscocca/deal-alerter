@@ -66,6 +66,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
         self.memory_fits = {}
         self.card_price_watches = {}
         self.sodimm_watches = {}
+        self.sodimm_stock = {}
 
     def prepare(self, listing):
         if offer := listing.extra.get("prebuilt_offer"):
@@ -142,6 +143,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
 
     def judge_sodimm(self, candidate):
         listing, part = candidate.listing, candidate.match.part
+        shopping = listing.extra.get("shopping", {})
         price, limit = candidate.match.unit_price, candidate.hunt.target
         if price is None or not 0 < price < 100000 or limit is None:
             return None
@@ -149,12 +151,15 @@ class MonitorHardwarePlugin(HardwarePlugin):
         eligible = (candidate.condition in ("new", "open_box", "used", "refurbished")
                     and not listing.sold and not listing.multi_variant
                     and listing.seller_risk == "low"
-                    and listing.extra.get("shopping", {}).get("available") is not False
+                    and shopping.get("available") is True
                     and not re.search(r"\b(?:rebate|cashback|trade[- ]?in|monthly|deposit|down payment)\b", listing.title, re.I)
                     and not (count > 1 and re.search(r"\beach\b|\bper\s+(?:stick|module|unit)\b", listing.title, re.I)))
         hit = eligible and price <= limit
         verdict = self.bands.STRONG if hit else self.bands.GOOD
         reason = "Explicit SO-DIMM price watch; not a market-value or compatibility guarantee."
+        reason += " " + shopping.get("availability_note", "Stock verified" if shopping.get("available") is True else "Stock unconfirmed") + "."
+        if shopping.get("availability_checked_at"):
+            reason += " Stock checked: " + pacific_time(shopping["availability_checked_at"]) + "."
         detail = NativeAssessment(listing.listing_id, listing.source, part, listing.title, listing.url,
                                   price, 1, candidate.condition, listing.posted_at, verdict,
                                   "Within your memory alert limit" if hit else "Outside the memory alert criteria",
@@ -167,6 +172,8 @@ class MonitorHardwarePlugin(HardwarePlugin):
                                   ("value", "Listed purchase price; verify shipping and checkout"),
                                   ("capability", detail.unlock)))
         self.sodimm_watches[result.key] = detail
+        self.sodimm_stock[result.key] = {name: shopping.get(name) for name in
+                                       ("available", "stock", "availability_checked_at", "availability_note")}
         return result
 
     def append(self, pairs):

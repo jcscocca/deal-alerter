@@ -57,6 +57,15 @@ in the repository's Reddit source notes; that gap remains reported.
 
 ## Offer evidence and notifications
 
+SO-DIMM eBay search hits require an exact-item Browse check before a memory
+alert. The check refreshes price, condition and seller, and requires explicit
+shipping availability with no zero quantity or expired end time. Missing or
+failed stock checks remain unconfirmed and cannot notify. Up to 20 distinct
+affordable watched memory listings are checked per eBay collection; duplicate
+search hits share one check, and unchecked items remain unconfirmed. Existing
+API backoff still applies. Successful alert activity retains the stock result
+and check time rather than replacing them with a later receipt projection.
+
 Newegg confirmation uses its public `window.__initialState__.ItemDetail` and
 `PropertyCollection.SelectedProperty`. Product identity includes the selected
 seller item, configuration and condition. A 5080 selected under a family page

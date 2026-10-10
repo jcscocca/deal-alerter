@@ -126,6 +126,8 @@ def public_row(raw, source, checked, expires, problems, now, profile):
         price = number(shopping.get("item_price")) if source == "ebay" else number(data.get("price"))
         shipping = number(shopping.get("shipping"))
         available = shopping.get("available") is True if source == "ebay" else source == "apple-refurb"
+        if source == "ebay":
+            stock = stock_state(shopping.get("stock"))
         if price is not None and shipping is not None:
             total = round(price + shipping, 2)
         if exact_desktop(title):
