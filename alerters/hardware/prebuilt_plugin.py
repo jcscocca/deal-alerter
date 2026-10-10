@@ -91,6 +91,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
             # and never bypass identity, condition, seller or source vetoes.
             eligible = (item.condition == "new" and item.quantity == 1 and item.loggable
                         and listing.loggable and not listing.sold
+                        and listing.extra.get("shopping", {}).get("available") is not False
                         and not item.multi_variant and item.seller_risk == "low"
                         and item.mining_risk == "low")
             hit = eligible and item.unit_price <= band["ceiling"]

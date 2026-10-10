@@ -81,6 +81,7 @@ def test_new_card_prices_send_without_claiming_sold_reference_or_vram_upgrade(tm
 @pytest.mark.parametrize("changes", [
     {"condition_hint":"used"}, {"condition_hint":"open_box"}, {"condition_hint":"refurbished"},
     {"seller_risk":"high"}, {"seller_risk":"moderate"}, {"loggable":False}, {"multi_variant":True}, {"sold":True},
+    {"extra":{"shopping":{"available":False}}},
     {"title":"RTX 5070 Ti Laptop 12GB"}, {"title":"RTX 5070 Ti water block"},
     {"title":"RTX 5070 Ti for parts not working"}, {"title":"2x RTX 5070 Ti 16GB graphics cards"},
     {"title":"Gaming PC RTX 5070 Ti 16GB RAM 1TB SSD"},
