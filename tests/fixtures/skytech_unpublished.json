@@ -1,0 +1,87 @@
+{
+  "captured_at": "2026-10-09T04:58:57+00:00",
+  "note": "Public page on October 8 PDT; selected schema, Nuxt fields and disabled purchase button. Presentation markup and unused metadata removed.",
+  "url": "https://skytechgaming.com/prebuilt-gaming-pc/st-prism5-3545-w-al/prism-5/r9-9950x3d-rtx-5090-32gb-64gb-4tb-2",
+  "product": {
+    "@type": "Product",
+    "name": "Prism 5 RTX 5090 32GB · R9 9950X3D #3545-W",
+    "sku": "ST-PRISM5-3545-W-AL",
+    "description": "Skytech Prism 5 prebuilt gaming PC: AMD R9 9950X3D, Nvidia RTX 5090 32GB, 64GB DDR5 6000MHZ RGB, 4 TB NVMe Gen4. Assembled in the USA with free shipping and lifetime technical support. From $8999.99.",
+    "offers": {
+      "@type": "Offer",
+      "url": "https://skytechgaming.com/prebuilt-gaming-pc/st-prism5-3545-w-al/prism-5/r9-9950x3d-rtx-5090-32gb-64gb-4tb-2",
+      "price": "8999.99",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/OutOfStock",
+      "itemCondition": "https://schema.org/NewCondition"
+    },
+    "additionalProperty": [
+      {
+        "@type": "PropertyValue",
+        "name": "CPU",
+        "value": "AMD R9 9950X3D"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Motherboard",
+        "value": "X870"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "RAM",
+        "value": "64GB DDR5 6000MHZ RGB"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "GPU",
+        "value": "Nvidia RTX 5090 32GB"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Storage",
+        "value": "4 TB NVMe Gen4"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Power Supply",
+        "value": "1000W GOLD ATX 3.0"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Warranty",
+        "value": "1-Year Parts, Labor & Shipping Support, Lifetime Technical Support"
+      }
+    ]
+  },
+  "state": {
+    "sku": "ST-PRISM5-3545-W-AL",
+    "source": "Complete",
+    "published": false,
+    "is_deleted": false,
+    "price": "8999.99",
+    "in_stock": true,
+    "stock": 40,
+    "quantity_available": 0,
+    "product_option_mark": true,
+    "product_options": {
+      "warranty": [
+        {
+          "name": "1-Year Standard Warranty",
+          "price": 0,
+          "open_mark": true
+        },
+        {
+          "name": "2-Year Refundable Protection Program",
+          "price": 300,
+          "open_mark": true
+        },
+        {
+          "name": "3-Year Refundable Protection Program",
+          "price": 400,
+          "open_mark": true
+        }
+      ]
+    }
+  },
+  "panel": "<section aria-labelledby=\"product-overview-heading\"><h1 class=\"montserrat-font mb-4\" data-v-562b02c6=\"\" id=\"product-overview-heading\"><span class=\"block text-[45px] font-bold uppercase\" data-v-562b02c6=\"\">Prism 5</span> <span class=\"block text-base text-[#777] mt-1\" data-v-562b02c6=\"\">RTX 5090 32GB · R9 9950X3D</span> <span class=\"block text-xs text-[#777] mt-0.5\" data-v-562b02c6=\"\"> #3545-W</span></h1><button disabled=\"\"><span data-v-562b02c6=\"\">OUT OF STOCK</span><!-- --><!-- --></button></section>"
+}

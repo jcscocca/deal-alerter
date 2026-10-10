@@ -210,8 +210,10 @@ def parse_skytech(body, url, now):
     if product["sku"].lower() != urlsplit(url).path.split("/")[2]:
         raise Deferred("Skytech changed the selected SKU", 900)
     state = _sky_state(soup, product["sku"])
-    if state.get("source") != "Complete" or state.get("published") is not True or state.get("is_deleted") is not False:
+    if (state.get("source") != "Complete" or type(state.get("published")) is not bool
+            or state.get("is_deleted") is not False):
         raise Deferred("Skytech fixed complete PC unavailable", 900)
+    unpublished = state["published"] is False
     if dollars(state.get("price")) != price:
         raise Deferred("Skytech selected price disagrees with product schema", 900)
     options = state.get("product_options") or {}
@@ -235,6 +237,14 @@ def parse_skytech(body, url, now):
     text = panel.get_text(" ", strip=True)
     buttons = [b for b in panel.select("button") if b.get_text(" ", strip=True).upper() == "ADD TO CART" and not b.has_attr("disabled")]
     evidence = "Skytech selected SKU schema and product state"
+    if unpublished:
+        unavailable_button = any(b.has_attr("disabled") and b.get_text(" ", strip=True).upper() in
+                                 ("OUT OF STOCK", "SOLD OUT") for b in panel.select("button"))
+        if stock != "out_of_stock" or not unavailable_button or buttons:
+            raise Deferred("Skytech unpublished product availability conflicts or is unknown", 900)
+        # A recognized withdrawn listing is a successful read, but its price
+        # remains unverified and cannot enter history or produce a deal alert.
+        evidence = "Skytech unpublished selected SKU; schema and disabled purchase button show out of stock"
     if state.get("in_stock") is False or re.search(r"sold out|out of stock", text, re.I):
         stock = "out_of_stock"
     elif re.search(r"pre[- ]?order|back[- ]?order|special order", text, re.I):
@@ -253,7 +263,7 @@ def parse_skytech(body, url, now):
         shipping = 0.0
     title = "Skytech " + product["name"] + " Gaming PC · " + specs.get("Memory", "") + " · " + specs.get("SSD", "")
     return Offer("skytech", product["sku"], title, url, "Skytech", condition, specs, price, shipping,
-                 stock, stock != "unknown" and condition != "unknown", now.isoformat(), evidence=evidence)
+                 stock, not unpublished and stock != "unknown" and condition != "unknown", now.isoformat(), evidence=evidence)
 
 
 def parse_ibuypower_catalog(body, now):

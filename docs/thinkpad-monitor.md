@@ -64,6 +64,14 @@ mentioning a 5090 is rejected. Only ABS/Skytech desktop configurations qualify.
 The current trusted seller mapping accepts the Skytech store ID A1HJ and
 Newegg's own seller identity; third-party sellers remain unconfirmed.
 
+For direct Skytech pages, an unpublished fixed SKU can still be read as
+unavailable when its exact Product/Offer schema and disabled purchase button
+both show out of stock. Its quoted price remains unverified and is excluded
+from price history and deal alerts. Deleted products, missing publication
+flags, configuration/price mismatches and conflicting stock evidence still
+fail verification. This handles the unpublished Prism 5 page captured on
+October 8, 2026, without treating a withdrawn listing as a retailer outage.
+
 HP confirmation requires a primary fixed-SKU Product/Offer matching the page's
 heading, exact desktop RTX 5090 inclusion, a real USD price and known stock.
 Zero placeholders, aggregate/from prices and configurable base-SKU prices fail
@@ -214,7 +222,12 @@ only newly affected sources; unchanged degradation gets at most one full reminde
 per day. Recovery removes resolved identities without resetting the interval.
 A newly stale heartbeat alerts immediately at high priority, regardless of the
 source grace period or coverage interval.
-Failed transports retry without repeating a successful delivery. Legacy health
+Failed transports retry without repeating a successful delivery, and a failed
+channel does not prevent the watchdog from trying later channels. Sanitized
+per-channel failures appear in `watchdog.json` under `delivery_errors`; they
+clear after a successful retry or when the incident resolves. The log names
+watchdog failures separately from collector failures. Receipt persistence
+errors still fail loudly. Legacy health
 receipts are migrated to source identities using the prior diagnostic snapshot
 and delivery time, without replaying already-delivered warnings.
 Restart is independent of ntfy connectivity. Both

@@ -155,6 +155,46 @@ def test_skytech_sold_out_overrides_schema_and_recommendations():
     assert offer.stock == "out_of_stock" and offer.sale_status(NOW) == "unavailable"
 
 
+def test_skytech_unpublished_out_of_stock_page_is_readable_but_never_price_evidence(tmp_path):
+    f = json.loads((FIXTURES / "skytech_unpublished.json").read_text(encoding="utf-8"))
+    offer = parse_skytech(sky_page(f), f["url"], NOW)
+    assert offer.sku == "ST-PRISM5-3545-W-AL" and offer.base_price == 8999.99
+    assert offer.stock == "out_of_stock" and not offer.confirmed
+    assert offer.sale_status(NOW) == "unavailable" and "unpublished" in offer.evidence
+    history = PrebuiltHistory(tmp_path)
+    history.record(offer, NOW)
+    assert not history.rows and history.evidence(offer, NOW)["observed_days"] == 0
+
+
+@pytest.mark.parametrize("change", ["schema_in_stock", "missing_button", "enabled_button", "cart_button",
+                                  "missing_published", "invalid_published", "deleted", "source", "price", "options"])
+def test_skytech_unpublished_exception_requires_matching_unavailable_evidence(change):
+    f = json.loads((FIXTURES / "skytech_unpublished.json").read_text(encoding="utf-8"))
+    if change == "schema_in_stock":
+        f["product"]["offers"]["availability"] = "https://schema.org/InStock"
+    elif change == "missing_button":
+        # An unrelated recommendation or plain stock text is insufficient.
+        f["panel"] = f'<h1>{f["product"]["name"]}</h1><section aria-labelledby="product-overview-heading">Out of Stock</section><aside><button disabled>OUT OF STOCK</button></aside>'
+    elif change == "enabled_button":
+        f["panel"] = f["panel"].replace('disabled=""', '')
+    elif change == "cart_button":
+        f["panel"] = f["panel"].replace('</section>', '<button>ADD TO CART</button></section>')
+    elif change == "missing_published":
+        del f["state"]["published"]
+    elif change == "invalid_published":
+        f["state"]["published"] = 0
+    elif change == "deleted":
+        f["state"]["is_deleted"] = True
+    elif change == "source":
+        f["state"]["source"] = "Custom"
+    elif change == "price":
+        f["state"]["price"] = 1
+    elif change == "options":
+        f["state"]["product_options"]["gpu"] = [{"name": "RTX 5080", "price": 0}]
+    with pytest.raises(Deferred):
+        parse_skytech(sky_page(f), f["url"], NOW)
+
+
 def test_skytech_sitemap_uses_only_exact_gpu_skus():
     url = sky_fixture()["url"]
     body = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join(
@@ -216,14 +256,16 @@ def test_new_source_jobs_preserve_config_limits_and_restart(tmp_path, monkeypatc
     assert mon.add_product("https://www.ibuypower.com/store/rdy-y50-r02") is None
 
 
-def test_unverified_offer_is_a_successful_check_without_inventory_or_deal_promotion(tmp_path, monkeypatch):
+@pytest.mark.parametrize("fixture_name,stock", [("skytech_prebuilt.json", "unknown"),
+                                               ("skytech_unpublished.json", "out_of_stock")])
+def test_unverified_offer_is_a_successful_check_without_inventory_or_deal_promotion(tmp_path, monkeypatch, fixture_name, stock):
     from alerters.hardware import monitor as module
     from alerters.hardware.monitor_sources import Batch
     from dealcore.notify import Channel
-    f = sky_fixture()
+    f = json.loads((FIXTURES / fixture_name).read_text(encoding="utf-8"))
     f["state"]["quantity_available"] = 0
     offer = parse_skytech(sky_page(f), f["url"], NOW)
-    assert not offer.confirmed and offer.stock == "unknown"
+    assert not offer.confirmed and offer.stock == stock
     sent = []
     monkeypatch.setattr(module, "channels", lambda **_: (Channel("ntfy", "push", sent.append),))
     mon = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", tmp_path / "runtime", dry_run=False)
@@ -237,7 +279,7 @@ def test_unverified_offer_is_a_successful_check_without_inventory_or_deal_promot
     assert job["listing_notes"] == [module.LISTING_UNVERIFIED]
     assert not sent
     raw = mon.shopping.batches[key]["rows"][0]
-    assert raw["offer"]["confirmed"] is False and raw["offer"]["stock"] == "unknown"
+    assert raw["offer"]["confirmed"] is False and raw["offer"]["stock"] == stock
     assert raw["judgment"]["eligible"] is False
 
 

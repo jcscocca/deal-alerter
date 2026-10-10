@@ -395,7 +395,7 @@ def watchdog(runtime: Path, *, dry_run: bool):
     current = incidents(status, issues, prior_health, now)
     eligible = eligible_incidents(current, now)
     result = {"checked_at": datetime.now(timezone.utc).isoformat(), "problems": issues,
-              "incidents": current, "alertable": sorted(eligible)}
+              "incidents": current, "alertable": sorted(eligible), "delivery_errors": {}}
     atomic_write(runtime / "watchdog.json", json.dumps(result, indent=2) + "\n")
     if dry_run:
         print(json.dumps(result, indent=2))
@@ -450,12 +450,22 @@ def watchdog(runtime: Path, *, dry_run: bool):
                                 "Monitoring health", "", "",
                                 (Card("ThinkPad hardware monitor", "", "", "MONITOR STALE" if stale else "COVERAGE DEGRADED",
                                       headline, reason, priority=4 if stale else 2),))
-                channel.send(report)
+                try:
+                    channel.send(report)
+                except Exception as exc:
+                    # A failed transport earns no receipt and must not prevent
+                    # later transports from reporting the same incident.
+                    # Exception messages may contain private webhook URLs.
+                    result["delivery_errors"][channel.name] = type(exc).__name__
+                    LOG.warning("Watchdog %s delivery failed (%s); retry on next check",
+                                channel.name, type(exc).__name__)
+                    continue
                 previous[channel.name] = {"problem_keys": sorted(set(record.get("problem_keys", [])) | reported), "sent_at": now}
                 previous.update(version=3, fingerprint=fingerprint, sent_at=now)
                 atomic_write(receipt_path, json.dumps(previous) + "\n")
     # Delivery times survive recovery; coverage flapping cannot reset the limit.
     # The diagnostics above still update on every watchdog check.
+    atomic_write(runtime / "watchdog.json", json.dumps(result, indent=2) + "\n")
     return bool(issues)
 
 
@@ -493,9 +503,10 @@ def main(argv=None):
                 signal.signal(sig, lambda *_: setattr(monitor, "stopping", True))
             return monitor.loop(once=args.once)
     except Exception as exc:
-        LOG.error("Monitor failed: %s", type(exc).__name__)
+        role = "Watchdog" if args.watchdog else "Monitor"
+        LOG.error("%s failed: %s", role, type(exc).__name__)
         if sys.stderr:
-            print(f"Monitor failed: {type(exc).__name__}", file=sys.stderr)
+            print(f"{role} failed: {type(exc).__name__}", file=sys.stderr)
         return 2
 
 
