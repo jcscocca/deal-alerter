@@ -140,6 +140,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
     def card(self, assessment, signal=None):
         if assessment.key not in self.pc_details:
             return super().card(assessment, signal)
+        signal = signal or getattr(self, "signals", {}).get(assessment.key)
         offer, event, history = self.pc_details[assessment.key]
         total = offer.total(self.now)
         confirmed = offer.confirmed and not offer.announcement and offer.sale_status(self.now) == "live"
@@ -157,6 +158,8 @@ class MonitorHardwarePlugin(HardwarePlugin):
             badge = "OFFER UNCONFIRMED"
         fit = self.memory_fits[offer.key]
         badge += " · RAM: " + fit.status
+        if signal and assessment.verdict >= self.bands.EXCEPTIONAL:
+            badge += " · WHOLE-PC PRICE GAP"
         facts = [offer.title, f"Seller: {offer.seller}; condition: {offer.condition}; stock: {offer.stock}"]
         if not offer.announcement:
             facts.append("Price and stock checked: " + pacific_time(offer.observed_at))
@@ -172,8 +175,16 @@ class MonitorHardwarePlugin(HardwarePlugin):
             band = self.desktop_profile.price_band(fit)
             lane = f"Factory {fit.installed_gb}GB" if fit.installed_gb else "Factory RAM unknown"
             facts.append(f"{lane}: watch through ${band['ceiling']:,.0f}; strong-price target ${band['target']:,.0f}. Provisional alert settings, not a purchase recommendation.")
-            if total is not None and total > band["target"]:
+            if total is None:
+                facts.append("Watch-range qualification unverified; complete PC total unknown.")
+            elif total > band["ceiling"]:
+                facts.append("Above this RAM tier's watch ceiling; outside the watch range.")
+            elif not confirmed or not assessment.alertable:
+                facts.append("Price is within this RAM tier's watch ceiling; stock, offer or RAM eligibility prevents a confirmed watch-range qualification.")
+            elif total > band["target"]:
                 facts.append("Within the watch range; above this RAM tier's strong-price target.")
+            else:
+                facts.append("Within the watch range; at or below this RAM tier's strong-price target.")
         if offer.coupon:
             facts.append("Coupon: " + offer.coupon.instructions)
             facts.append(f"Coupon discount: {cost(offer.coupon.discount)}; additional required accessories: {cost(offer.coupon.required_accessories)}")

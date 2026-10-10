@@ -45,3 +45,12 @@ recommendations and notifications until the number is refreshed. Unverified
 estimates use the same watch-only treatment. A target hit or a prebuilt price
 comparison cannot override it.
 `stale_anchor_ask_ratio` in `config/hardware.toml` sets the line.
+
+Whole-PC notifications name the complete PC in the subject and card. They do
+not present loose-GPU history as a rating of its total or show GPU efficiency or an
+assumed upgrade to the existing desktop. A same-condition price-gap promotion
+is labeled `WHOLE-PC PRICE GAP` and explains the cheapest eligible loose card
+from the current run, including when the benchmark is absent from that delivery.
+This compares different products' asking prices; it establishes neither
+whole-PC market value nor resale profit. Trust, suspicious-price, condition
+and eligibility guards still apply, and system prices remain outside GPU history.

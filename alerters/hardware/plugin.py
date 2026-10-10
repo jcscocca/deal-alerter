@@ -152,7 +152,7 @@ class HardwarePlugin:
                              and item.promotion_ceiling == self.bands.GRAIL
                              and not item.multi_variant),
             loggable=item.loggable, axes=(("cheapness", item.reason),
-                ("value", "Price only: judged against its own log and list price" if product else
+                ("value", "Complete PC asking price" if result.is_system else "Price only: judged against its own log and list price" if product else
                           f"{money(item.dollars_per_gb, whole_above=100)}/GB, "
                           f"{money(item.dollars_per_gb_bandwidth, whole_above=100)}/GB-TB/s"),
                 ("capability", item.unlock)))
@@ -193,11 +193,11 @@ class HardwarePlugin:
             headline = (f"Whole machine at {money(detail.unit_price, decimals=0)} "
                         f"undercuts the cheapest loose {cheapest.detail.part.name} this run at "
                         f"{money(cheapest.detail.unit_price, decimals=0)} -- "
-                        f"{money(saving, decimals=0)} of room before the rest of the PC costs anything.")
+                        f"{money(saving, decimals=0)} lower asking price.")
             signals[item.key] = headline + (
                 " Potential only: conditions differ or are unstated, so the two prices are not like for like."
                 if not matched else
-                " Same condition on both sides. Confirm the machine actually contains the card before anything else.")
+                " Same condition on both sides. This compares a whole PC with a component, not comparable whole-PC builds or sold prices; it establishes neither market value nor resale profit. Confirm the machine actually contains the card.")
         return signals
 
     def undercuts(self, assessments: list[Assessment]):
@@ -267,33 +267,39 @@ class HardwarePlugin:
 
     def card(self, assessment: Assessment, signal: str | None = None) -> Card:
         item = assessment.detail
+        signal = signal or getattr(self, "signals", {}).get(assessment.key)
         product = item.part.is_product
+        system = item.is_system
         facts = [item.title, f"via {item.source}; {item.condition}",
                  (f"List price {money(item.part.reference_price)}"
                   + (f"; your target {money(item.target_price, decimals=0)}" if item.target_price else "")
                   if product else
+                  f"Complete PC containing {item.part.name}; {item.part.vram_gb}GB GPU VRAM; verify the full system configuration"
+                  if system else
                   f"{money(item.dollars_per_gb, decimals=0)}/GB; "
                   f"{money(item.dollars_per_gb_bandwidth, decimals=0)}/GB-TB/s; "
-                  f"{item.part.vram_gb}GB; {item.part.bandwidth_gb_s:,} GB/s"), item.unlock]
+                  f"{item.part.vram_gb}GB; {item.part.bandwidth_gb_s:,} GB/s")]
+        if not system:
+            facts.append(item.unlock)
         if item.quantity > 1:
             facts.append(f"Quantity {item.quantity}; lot total {money(item.total_price, decimals=0)}")
         warnings = []
-        if item.confidence == "reference":
+        if item.confidence == "reference" and not system:
             # Below min_observations (or the minimum time span), native judgment
             # falls back to catalog references and says so instead of pretending
             # to a confidence it does not have. Keep the warning in every channel.
             warnings.append("Judged against a catalog reference, not observed history; provisional.")
-        if item.fit and not item.fit.ok:
+        if item.fit and not item.fit.ok and not system:
             warnings.append(item.fit.summary)
         if item.mining_risk != "low":
             warnings.append(f"Mining risk: {item.mining_risk}")
         if item.multi_variant:
             warnings.append("Confirm which option this price buys; not recorded in price history.")
-        if signal:
+        if signal and not system:
             warnings.append(signal)
         # The VRAM bar is the model ladder before and after; a product has none.
         bar, bar_labels = (), ("", "")
-        if not product:
+        if not product and not system:
             models = sorted(self.rig.LADDER, key=lambda model: model.params_b)
             before, after = self.rig.largest_model_at(item.vram_before), self.rig.largest_model_at(item.vram_after)
             rung = lambda model: models.index(model) + 1 if model else 0
@@ -312,9 +318,12 @@ class HardwarePlugin:
         }
         fg, bg = colours[item.verdict]
         badge = item.verdict.label if item.reference_trusted else "WATCH / UNVERIFIED"
-        return Card(item.part.name, item.url, money(item.unit_price, decimals=0),
+        title = f"Whole PC with {item.part.name}" if system else item.part.name
+        if system and signal and item.verdict >= self.bands.EXCEPTIONAL:
+            badge += " · WHOLE-PC PRICE GAP"
+        return Card(title, item.url, money(item.unit_price, decimals=0),
                     badge + (" · HITS YOUR TARGET" if item.target_hit else ""),
-                    item.headline, item.reason, tuple(facts), tuple(warnings),
+                    signal if system and signal else item.headline, item.reason, tuple(facts), tuple(warnings),
                     bar=bar, bar_labels=bar_labels,
                     foreground=fg, background=bg,
                     priority=5 if item.verdict >= self.bands.EXCEPTIONAL else
