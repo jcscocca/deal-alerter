@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .prebuilt import Offer, gpu_key
+from .prebuilt_specs import build_specs, normalized
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,7 @@ class DesktopProfile:
         self.data = tomllib.loads(path.read_text(encoding="utf-8"))
         self.memory = self.data["memory"]
         self.prices = self.data["price"]
+        self.components = self.data["components"]
         self.reviewed = self.data.get("reviewed_configuration", [])
         if not (0 < self.memory["minimum_gb"] <= self.memory["preferred_gb"]):
             raise ValueError("Invalid desktop memory targets")
@@ -42,21 +44,34 @@ class DesktopProfile:
             if not (0 < band["urgent"] <= band["target"] <= band["ceiling"]):
                 raise ValueError("Invalid desktop price thresholds")
 
-    def price_band(self, fit: MemoryFit, gpu: str = "5080") -> dict:
+    def adjustments(self, fit: MemoryFit, offer: Offer) -> dict[str, float]:
+        parts = self.components
+        core = build_specs(offer.title, offer.specs, offer.condition)["core"]
+        resale = {normalized(name): value for name, value in parts["cpu_resale"].items()}
+        cpu = resale.get(normalized(core["cpu"] or ""))
         # Unknown capacity stays discoverable at the wider limit, but cannot
         # earn elevated urgency until the installed RAM is established.
-        return self.prices[f"{gpu_key(gpu)}_{fit.installed_gb or 64}"]
+        return {"RAM": ((fit.installed_gb or 64) - parts["reference_ram_gb"]) * parts["ram_per_gb"],
+                "storage": (core["ssd_gb"] / 1000 - parts["reference_ssd_tb"]) * parts["ssd_per_tb"] if core["ssd_gb"] else 0.0,
+                "CPU": cpu - resale[normalized(parts["reference_cpu"])] if cpu is not None else 0.0}
 
-    def ceiling(self, gpu: str, legacy_target: float | None, fit: MemoryFit) -> float | None:
-        return self.price_band(fit, gpu)["ceiling"] if gpu in ("5070 Ti", "5080") else legacy_target
+    def price_band(self, fit: MemoryFit, gpu: str, offer: Offer) -> dict:
+        base = self.prices[gpu_key(gpu)]
+        adjustments = self.adjustments(fit, offer)
+        shift = sum(adjustments.values())
+        return {**{key: base[key] + shift for key in ("ceiling", "target", "urgent")},
+                "base": base["ceiling"], "adjustments": adjustments}
 
-    def priority(self, gpu: str, total: float | None, fit: MemoryFit) -> int:
+    def ceiling(self, gpu: str, legacy_target: float | None, fit: MemoryFit, offer: Offer) -> float | None:
+        return self.price_band(fit, gpu, offer)["ceiling"] if gpu in ("5070 Ti", "5080") else legacy_target
+
+    def priority(self, gpu: str, total: float | None, fit: MemoryFit, offer: Offer) -> int:
         if total is None:
             return 3
         if gpu in ("5070 Ti", "5080"):
             if fit.installed_gb is None:
                 return 3
-            band = self.price_band(fit, gpu)
+            band = self.price_band(fit, gpu, offer)
             return 5 if total <= band["urgent"] else 4 if total <= band["target"] else 3
         return 3 if total >= 4500 else 4 if total >= 4000 else 5
 

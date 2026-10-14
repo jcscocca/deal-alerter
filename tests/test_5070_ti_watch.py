@@ -102,9 +102,9 @@ def test_card_receipts_dedupe_and_allow_material_drop(tmp_path):
 
 @pytest.mark.parametrize("capacity,price,priority", [
     (32,2200,3), (32,2100,4), (32,2000,5), (32,2200.01,None),
-    (64,2400,3), (64,2300,4), (64,2200,5), (64,2400.01,None),
+    (64,2680,3), (64,2580,4), (64,2480,5), (64,2680.01,None),
 ])
-def test_prebuilt_uses_separate_whole_pc_ram_price_bands(tmp_path, capacity, price, priority):
+def test_prebuilt_bands_add_the_value_of_extra_factory_ram(tmp_path, capacity, price, priority):
     sent, result = execute(tmp_path, pc(price, capacity))
     if priority is None:
         assert not sent
@@ -112,7 +112,7 @@ def test_prebuilt_uses_separate_whole_pc_ram_price_bands(tmp_path, capacity, pri
         assert sent[0].buys[0].priority == priority
         assert sent[0].buys[0].title == "RTX 5070 Ti prebuilt"
         assert "POSSIBLE REUSE" in sent[0].buys[0].badge
-        assert result.assessments[0].detail.target_price == (2200 if capacity == 32 else 2400)
+        assert result.assessments[0].detail.target_price == (2200 if capacity == 32 else 2680)
 
 
 @pytest.mark.parametrize("changes", [{"stock":"out_of_stock"}, {"shipping":None}, {"shipping":101},

@@ -87,7 +87,7 @@ def execute(tmp_path, offer, profile=None):
 
 @pytest.mark.parametrize("capacity,price,level", [
     (32,2500,5), (32,2800,4), (32,3000,3), (32,3000.01,None),
-    (64,3300,5), (64,3600,4), (64,4000,3), (64,4000.01,None),
+    (64,2980,5), (64,3280,4), (64,3480,3), (64,3480.01,None),
 ])
 def test_5080_thresholds_use_installed_ram_tier_and_pc_total(tmp_path, capacity, price, level):
     offer = pc(base_price=price)
@@ -130,7 +130,7 @@ def test_only_factory_32gb_and_64gb_belong_in_reuse_watch(tmp_path, capacity):
 
 
 def test_unknown_capacity_keeps_wider_watch_limit_but_normal_priority(tmp_path):
-    sent = execute(tmp_path, pc(base_price=3799, specs={}))
+    sent = execute(tmp_path, pc(base_price=3479, specs={}))
     assert sent[0].buys[0].priority == 3
     assert "NEEDS SPECS" in sent[0].buys[0].badge
 

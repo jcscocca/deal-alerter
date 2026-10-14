@@ -171,8 +171,8 @@ and purchase link. Unverified notices stay at normal priority. Above-target
 systems can still qualify through the existing 5% same-condition undercut rule,
 using fresh eligible loose-GPU evidence (at most 20 minutes old).
 
-RTX 5080 email cards use the installed-RAM tier's complete-total watch ceiling
-and strong-price target. `Within the watch range` requires a confirmed live,
+RTX 5080 email cards use the configuration's complete-total watch ceiling and
+strong-price target: the base band adjusted for installed RAM, SSD and CPU. `Within the watch range` requires a confirmed live,
 eligible offer at or below the ceiling; an over-ceiling total is explicitly
 outside the range. An unavailable offer within the numeric ceiling keeps its
 stock/unconfirmed label and cannot claim confirmed watch qualification. Unknown
