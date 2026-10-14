@@ -26,7 +26,12 @@ next attempt and sanitized failure. Rotating logs retain five 2 MB files.
 
 `config/monitor.toml` requests a 120-second interval after each successful
 retailer check, 300 seconds for feeds, 600 seconds for retailer discovery,
-900 seconds for eBay and one hour for Apple refurb. Fetch jobs run concurrently;
+900 seconds for eBay and one hour for Apple refurb. Newegg products and
+discovery are held to at least one hour: two-minute polling of 64 products drew
+an IP-wide HTTP 403 on October 14, 2026. Slickdeals still surfaces Newegg deals
+every five minutes. HP is paused unless a verified `[hp_browser]` is enabled,
+because its pages refuse the plain HTTP client; the pause is a coverage note,
+not an outage push. Fetch jobs run concurrently;
 only the main process judges, sends and writes state. Due jobs run in deadline
 order, so earlier products cannot repeatedly jump ahead of overdue discoveries.
 A slow retailer/feed does not hold up a different host. Each public host has
@@ -80,6 +85,12 @@ from price history and deal alerts. Deleted products, missing publication
 flags, configuration/price mismatches and conflicting stock evidence still
 fail verification. This handles the unpublished Prism 5 page captured on
 October 8, 2026, without treating a withdrawn listing as a retailer outage.
+
+CyberPowerPC sold-out systems render an empty configuration form. When the
+schema says sold out, the purchase panel says out of stock and no cart button
+exists, the page is read as unavailable with an unverified price, excluded
+from history and alerts. A later in-stock read of the same SKU is a restock.
+Any disagreement still fails as a configuration mismatch.
 
 HP confirmation requires a primary fixed-SKU Product/Offer matching the page's
 heading, exact desktop RTX 5090 inclusion, a real USD price and known stock.

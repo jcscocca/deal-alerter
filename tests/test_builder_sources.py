@@ -11,7 +11,7 @@ from alerters.hardware.builders import (builder_product, discover_cyberpowerpc, 
                                        parse_cyberpowerpc, parse_skytech, parse_ibuypower_catalog)
 from alerters.hardware.monitor import Monitor
 from alerters.hardware.monitor_sources import fetch_job
-from alerters.hardware.prebuilt import PrebuiltHistory
+from alerters.hardware.prebuilt import OfferState, PrebuiltHistory
 from alerters.hardware.retail_http import Deferred
 from alerters.hardware.prebuilt_specs import build_specs
 from alerters.techscout.prebuilt_value import history_view
@@ -98,6 +98,44 @@ def test_cyberpower_recommendations_cannot_supply_selected_gpu_or_price():
     soup.select_one('[data-summary-sec="VIDEO"] [data-type="sumamry-sec-val"]').string = "RTX 5090"
     with pytest.raises(Deferred, match="specifications disagree"):
         parse_cyberpowerpc(str(soup), CP_URL, NOW)
+
+
+def cp_sold_out_page():
+    # Captured October 14, 2026: sold-out systems keep their schema and summary
+    # but render an empty config form and no cart button.
+    soup = BeautifulSoup(cp_page().replace("schema.org/InStock", "schema.org/SoldOut")
+                         .replace("In Stock", "Out of Stock"), "html.parser")
+    for node in soup.select('form#config_form input, [data-type="addtocart"]'):
+        node.decompose()
+    return str(soup)
+
+
+def test_cyberpower_sold_out_page_is_readable_but_never_price_evidence(tmp_path):
+    offer = parse_cyberpowerpc(cp_sold_out_page(), CP_URL, NOW)
+    assert offer.sku == "PBET99752" and offer.stock == "out_of_stock" and not offer.confirmed
+    assert offer.sale_status(NOW) == "unavailable" and "sold out" in offer.evidence
+    history = PrebuiltHistory(tmp_path)
+    history.record(offer, NOW)
+    assert not history.rows
+
+
+@pytest.mark.parametrize("change", ["schema_in_stock", "panel_in_stock", "cart_button"])
+def test_cyberpower_sold_out_exception_requires_matching_unavailable_evidence(change):
+    page = cp_sold_out_page()
+    if change == "schema_in_stock":
+        page = page.replace("schema.org/SoldOut", "schema.org/InStock")
+    elif change == "panel_in_stock":
+        page = page.replace("Out of Stock", "In Stock")
+    else:
+        page = page.replace("</form>", '</form><div data-type="addtocart">Add to Cart</div>', 1)
+    with pytest.raises(Deferred):
+        parse_cyberpowerpc(page, CP_URL, NOW)
+
+
+def test_cyberpower_restock_after_sold_out_read_is_a_restock_event(tmp_path):
+    state = OfferState(tmp_path)
+    state.observe(parse_cyberpowerpc(cp_sold_out_page(), CP_URL, NOW), NOW)
+    assert state.observe(parse_cyberpowerpc(cp_page(), CP_URL, NOW), NOW)[1] == "restock"
 
 
 def test_cyberpower_discovery_only_uses_fixed_prebuilt_cards():
