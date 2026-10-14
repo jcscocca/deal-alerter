@@ -336,6 +336,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Update-M
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Update-Monitor.ps1 -PreparedDirectory .local/upgrade -ApproveUpgrade
 ```
 
+Over key-based SSH, `gh` cannot read its Windows credential store, so the gate
+check reads a fine-grained token (this repository only, Variables: read) from
+`%USERPROFILE%\.deal-alerter\github-variables.token`, scoped to that one call.
+Without the file it uses the interactive `gh` login. An expired token or a
+401/403 fails closed and names the file. Save or replace the token on the
+ThinkPad; it prompts without echoing and leaves the file readable only by you:
+
+```powershell
+$d = Join-Path $env:USERPROFILE '.deal-alerter'; $u = '*' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value; New-Item -ItemType Directory -Force -Path $d | Out-Null; icacls $d /inheritance:r /grant:r "${u}:(OI)(CI)F" | Out-Null; $s = Read-Host -AsSecureString 'Read-only GitHub token'; [IO.File]::WriteAllText((Join-Path $d 'github-variables.token'), [Net.NetworkCredential]::new('', $s).Password.Trim()); icacls (Join-Path $d 'github-variables.token') /inheritance:r /grant:r "${u}:F" | Out-Null; 'Saved ' + (Join-Path $d 'github-variables.token')
+```
+
 The helper verifies a clean merged package, the installed owner and closed
 GitHub hardware gates before disabling the watchdog and hardware tasks. It
 backs up application/state/owner/task definitions without copying secrets,
