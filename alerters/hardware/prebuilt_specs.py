@@ -16,9 +16,10 @@ def public_specs(value):
 def cpu_models(value):
     value = value.replace("®", "").replace("™", "")
     value = re.sub(r"\bU([579])\s+(\d{3})", r"Ultra \1 \2", value, flags=re.I)
+    value = re.sub(r"\bUltra\s+([579])\s+Processor\s+(\d{3})", r"Ultra \1 \2", value, flags=re.I)
     value = re.sub(r"\bi([3579])\s*[- ]\s*(\d)", r"i\1-\2", value, flags=re.I)
     return {re.sub(r"\s+", " ", m.upper()) for m in re.findall(
-        r"\b(?:[1-9]\d{3}(?:X3D|[XF])|i[3579]-\d{4,5}[A-Z]{0,3}|Ultra\s+[579]\s+\d{3}[A-Z]{0,2}(?:\s+Plus)?)\b", value, re.I)}
+        r"\b(?:[1-9]\d{3}(?:X3D2?|[XF])|i[3579]-\d{4,5}[A-Z]{0,3}|Ultra\s+[579]\s+\d{3}[A-Z]{0,2}(?:\s+Plus)?)\b", value, re.I)}
 
 
 def capacities(value):

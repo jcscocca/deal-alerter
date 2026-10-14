@@ -113,7 +113,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
         gpu = offer.gpu
         hunt = self.watched.get(gpu_key(gpu))
         fit = self.desktop_profile.assess_memory(offer)
-        target = self.desktop_profile.ceiling(gpu, hunt.target if hunt else None, fit)
+        target = self.desktop_profile.ceiling(gpu, hunt.target if hunt else None, fit, offer)
         self.memory_fits[offer.key] = fit
         memory_ok = fit.eligible and self.desktop_profile.memory["allow_unverified"]
         trusted = (offer.confirmed and total is not None and total > 0 and status == "live"
@@ -252,19 +252,24 @@ class MonitorHardwarePlugin(HardwarePlugin):
                   "Owned RAM: " + self.desktop_profile.memory["owned_kit"], *fit.evidence]
         warnings.append("Adding your existing 2x32GB kit is not a guaranteed RAM upgrade. Mixed kits may need lower speeds or fail stability testing.")
         if offer.gpu in ("5070 Ti", "5080"):
-            band = self.desktop_profile.price_band(fit, offer.gpu)
+            band = self.desktop_profile.price_band(fit, offer.gpu, offer)
+            parts = self.desktop_profile.components
             lane = f"Factory {fit.installed_gb}GB" if fit.installed_gb else "Factory RAM unknown"
             facts.append(f"{lane}: watch through ${band['ceiling']:,.0f}; strong-price target ${band['target']:,.0f}. Provisional alert settings, not a purchase recommendation.")
+            signed = lambda amount: f"{'+' if amount >= 0 else '-'}${abs(amount):,.0f}"
+            facts.append(f"Ceiling: base ${band['base']:,.0f} ({parts['reference_ram_gb']}GB, {parts['reference_ssd_tb']}TB SSD, "
+                         f"{parts['reference_cpu']}-class CPU) · " + " · ".join(
+                             f"{name} {signed(amount)}" for name, amount in band["adjustments"].items()))
             if total is None:
                 facts.append("Watch-range qualification unverified; complete PC total unknown.")
             elif total > band["ceiling"]:
-                facts.append("Above this RAM tier's watch ceiling; outside the watch range.")
+                facts.append("Above this configuration's watch ceiling; outside the watch range.")
             elif not confirmed or not assessment.alertable:
-                facts.append("Price is within this RAM tier's watch ceiling; stock, offer or RAM eligibility prevents a confirmed watch-range qualification.")
+                facts.append("Price is within this configuration's watch ceiling; stock, offer or RAM eligibility prevents a confirmed watch-range qualification.")
             elif total > band["target"]:
-                facts.append("Within the watch range; above this RAM tier's strong-price target.")
+                facts.append("Within the watch range; above this configuration's strong-price target.")
             else:
-                facts.append("Within the watch range; at or below this RAM tier's strong-price target.")
+                facts.append("Within the watch range; at or below this configuration's strong-price target.")
         if offer.coupon:
             facts.append("Coupon: " + offer.coupon.instructions)
             facts.append(f"Coupon discount: {cost(offer.coupon.discount)}; additional required accessories: {cost(offer.coupon.required_accessories)}")
@@ -285,7 +290,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
             warnings.append(signal)
         return Card(f"RTX {offer.gpu} prebuilt", offer.url, cost(total) if total is not None else "Total unverified",
                     badge, f"{cost(total)} before tax" if total is not None else "Advance/community notice; recheck required",
-                    history, tuple(facts), tuple(warnings), priority=self.desktop_profile.priority(offer.gpu, total, fit) if confirmed else 3)
+                    history, tuple(facts), tuple(warnings), priority=self.desktop_profile.priority(offer.gpu, total, fit, offer) if confirmed else 3)
 
     def persist(self):
         super().persist()

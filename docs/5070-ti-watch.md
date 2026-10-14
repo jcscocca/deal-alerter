@@ -7,7 +7,11 @@ settings are not spending approval or predictions of holiday prices.
 | --- | ---: | ---: | ---: |
 | New desktop card | $1,000 | $950 | $900 |
 | Factory 32GB prebuilt | $2,200 | $2,100 | $2,000 |
-| Factory 64GB prebuilt | $2,400 | $2,300 | $2,200 |
+| Factory 64GB prebuilt | $2,680 | $2,580 | $2,480 |
+
+Prebuilt limits are for a 1TB SSD and a 9800X3D-class CPU. Since October 13,
+2026, storage, CPU and RAM differences shift them; see `[components]` in
+`config/desktop-profile.toml` and `docs/desktop-upgrade-watch.md`.
 
 The $900 card price is a standout stretch deal. Current retail was $1,169.99
 at Newegg when checked. September 32GB prebuilt sales at $1,899 and $1,999

@@ -43,11 +43,16 @@ Provisional 5080 notification settings, calibrated to the checked listings below
 | Factory RAM | Potential total with owned kit | Highest priority | High priority | Normal watch range |
 | --- | --- | --- | --- | --- |
 | 32GB (2x16GB) | 96GB | Up to $2,500 | Through $2,800 | Through $3,000 |
-| 64GB (2x32GB) | 128GB | Up to $3,300 | Through $3,600 | Through $4,000 |
+| 64GB (2x32GB) | 128GB | Up to $2,980 | Through $3,280 | Through $3,480 |
 
 These are editable alert settings, not user-approved spending limits, proven
-market floors or predictions of future sales. Unknown installed capacity uses
-the wider $4,000 limit at normal priority. The two tiers are not interchangeable.
+market floors or predictions of future sales. The bands price a reference build
+(32GB, 1TB SSD, 9800X3D-class CPU). Since October 13, 2026, `[components]` in
+`config/desktop-profile.toml` shifts all three thresholds by the value of the
+parts that differ: RAM and SSD at retail per GB/TB, the CPU at used resale
+against the 9800X3D. The 64GB row above assumes no storage or CPU difference.
+Missing storage or CPU earns no credit. Unknown installed capacity is valued as
+64GB at normal priority. Each card shows the base and every adjustment.
 
 Manually checked in the browser on October 6, 2026 (prices before tax):
 

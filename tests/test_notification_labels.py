@@ -43,18 +43,19 @@ def judge_offer(plugin, offer):
     return plugin.judge(candidate, plugin.read_history(candidate))
 
 
-@pytest.mark.parametrize("offer", [
-    pc(4272.99, sku="C9NVV-1277US", title="MSI Aegis ZS2 C9NVV-1277US Gaming Desktop RTX 5080 64GB DDR5"),
-    pc(4829.99, sku="GML70943", stock="out_of_stock",
-       title="CyberpowerPC Gaming Desktop PC Gamer Supreme GML70943 AMD Ryzen 9 9950X3D2 64GB DDR5 4TB NVMe SSD GeForce RTX 5080 Windows 11 Home"),
+@pytest.mark.parametrize("offer,ceiling", [
+    (pc(4272.99, sku="C9NVV-1277US", title="MSI Aegis ZS2 C9NVV-1277US Gaming Desktop RTX 5080 64GB DDR5"), 3480),
+    # The extra 3TB of storage and the 9950X3D2 raise its ceiling.
+    (pc(4829.99, sku="GML70943", stock="out_of_stock",
+        title="CyberpowerPC Gaming Desktop PC Gamer Supreme GML70943 AMD Ryzen 9 9950X3D2 64GB DDR5 4TB NVMe SSD GeForce RTX 5080 Windows 11 Home"), 4200),
 ])
-def test_production_5080_examples_explain_the_actual_ceiling(plugin, offer):
+def test_production_5080_examples_explain_the_actual_ceiling(plugin, offer, ceiling):
     item = judge_offer(plugin, offer)
-    assert item.detail.target_price == 4000 and not item.detail.target_hit
+    assert item.detail.target_price == ceiling and not item.detail.target_hit
     assert not qualifies(item, plugin.options.push_floor)
     report = plugin.report([], [item], [])
     for body in (render_text(report), render_html(report)):
-        assert "Factory 64GB: watch through $4,000" in body
+        assert f"Factory 64GB: watch through ${ceiling:,.0f}" in body
         assert "outside the watch range" in body
         assert "Within the watch range" not in body
     card = report.others[0]
@@ -63,7 +64,7 @@ def test_production_5080_examples_explain_the_actual_ceiling(plugin, offer):
         assert not item.alertable
 
 
-@pytest.mark.parametrize("ram,target,ceiling", [(32, 2800, 3000), (64, 3600, 4000)])
+@pytest.mark.parametrize("ram,target,ceiling", [(32, 2800, 3000), (64, 3280, 3480)])
 @pytest.mark.parametrize("boundary,offset", [("target", -.01), ("target", 0), ("target", .01),
                                              ("ceiling", -.01), ("ceiling", 0), ("ceiling", .01)])
 def test_watch_labels_and_qualification_share_inclusive_boundaries(plugin, ram, target, ceiling, boundary, offset):
@@ -86,7 +87,7 @@ def test_watch_labels_and_qualification_share_inclusive_boundaries(plugin, ram, 
     {"ends_at": (NOW - timedelta(hours=1)).isoformat()}, {"specs": {"Memory Slots": "2"}},
 ])
 def test_unavailable_or_ineligible_pc_never_claims_confirmed_watch_qualification(plugin, changes):
-    item = judge_offer(plugin, pc(**changes))
+    item = judge_offer(plugin, pc(3400, **changes))
     facts = " ".join(plugin.card(item).facts)
     assert "Within the watch range" not in facts
     assert "prevents a confirmed watch-range qualification" in facts
@@ -105,7 +106,7 @@ def test_unknown_complete_total_cannot_claim_watch_membership(plugin, changes):
 @pytest.mark.parametrize("coupon,expected", [(None, False), (Coupon("SAVE", "Enter SAVE", 300, True), True),
                                            (Coupon("SAVE", "Membership required", 300, False), False)])
 def test_label_uses_delivered_total_and_confirmed_coupon_eligibility(plugin, coupon, expected):
-    item = judge_offer(plugin, pc(3990, shipping=30, required_accessories=10, coupon=coupon))
+    item = judge_offer(plugin, pc(3470, shipping=30, required_accessories=10, coupon=coupon))
     assert qualifies(item, plugin.options.push_floor) is expected
     assert ("Within the watch range" in " ".join(plugin.card(item).facts)) is expected
 
