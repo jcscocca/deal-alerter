@@ -49,18 +49,21 @@ reference_ssd_tb = 1
 ssd_per_tb = 135.0
 reference_cpu = "9800X3D"
 
-# eBay sold averages (2026-10-06); 14900F estimated at ~78% of new.
-# The spec parser does not recognise the 9950X3D2 yet, so it earns no credit.
+# eBay sold averages (2026-10-06). No sold data yet, so estimated from new:
+# 9950X3D2 and 14900F at ~78%; 9850X3D from used asks; 270K Plus like the 265K.
 [components.cpu_resale]
+"9950X3D2" = 690.0
 "9950X3D" = 509.0
 "9950X" = 419.0
 "9900X3D" = 317.0
 "9900X" = 278.0
+"9850X3D" = 400.0
 "9800X3D" = 375.0
 "9700X" = 226.0
 "7800X3D" = 304.0
 "Ultra 9 285K" = 398.0
 "Ultra 9 285" = 393.0
+"Ultra 7 270K Plus" = 225.0
 "Ultra 7 265K" = 216.0
 "Ultra 7 265KF" = 199.0
 "Ultra 7 265F" = 180.0

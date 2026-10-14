@@ -45,9 +45,9 @@ def judge_offer(plugin, offer):
 
 @pytest.mark.parametrize("offer,ceiling", [
     (pc(4272.99, sku="C9NVV-1277US", title="MSI Aegis ZS2 C9NVV-1277US Gaming Desktop RTX 5080 64GB DDR5"), 3480),
-    # The extra 3TB of storage raises its ceiling; the 9950X3D2 is not yet recognised for CPU credit.
+    # The extra 3TB of storage and the 9950X3D2 raise its ceiling.
     (pc(4829.99, sku="GML70943", stock="out_of_stock",
-        title="CyberpowerPC Gaming Desktop PC Gamer Supreme GML70943 AMD Ryzen 9 9950X3D2 64GB DDR5 4TB NVMe SSD GeForce RTX 5080 Windows 11 Home"), 3885),
+        title="CyberpowerPC Gaming Desktop PC Gamer Supreme GML70943 AMD Ryzen 9 9950X3D2 64GB DDR5 4TB NVMe SSD GeForce RTX 5080 Windows 11 Home"), 4200),
 ])
 def test_production_5080_examples_explain_the_actual_ceiling(plugin, offer, ceiling):
     item = judge_offer(plugin, offer)

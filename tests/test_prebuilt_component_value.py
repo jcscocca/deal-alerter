@@ -71,8 +71,23 @@ def test_missing_cpu_and_storage_earn_no_credit():
     assert band("Gaming desktop RTX 5070 Ti 16GB 32GB DDR5")["ceiling"] == 2200
 
 
-def test_unrecognised_cpu_earns_no_credit():
-    assert band("Gaming desktop RTX 5070 Ti 16GB Ryzen 9 9950X3D2 32GB DDR5")["ceiling"] == 2200
+def test_unpriced_cpu_earns_no_credit():
+    assert band("Gaming desktop RTX 5070 Ti 16GB Ryzen 5 7600X 32GB DDR5")["ceiling"] == 2200
+
+
+@pytest.mark.parametrize("text,cpu", [
+    ("AMD Ryzen 9 9950X3D2 64GB DDR5", "9950X3D2"),
+    ("Intel® Core™ Ultra 7 Processor 265KF 8P + 12E 3.9GHz", "ULTRA 7 265KF"),
+    ("Intel Core Ultra 9 Processor 285K", "ULTRA 9 285K"),
+])
+def test_spec_parser_reads_x3d2_and_builder_processor_wording(text, cpu):
+    assert cpu_models(text) == {cpu}
+
+
+@pytest.mark.parametrize("cpu,credit", [("Ryzen 9 9950X3D2", 315), ("R7 9850X3D", 25), ("U7 270K Plus", -150),
+                                        ("Core Ultra 7 Processor 265KF", -176)])
+def test_newer_and_builder_worded_cpus_earn_their_credit(cpu, credit):
+    assert band(f"Gaming desktop RTX 5070 Ti 16GB {cpu} 32GB DDR5")["ceiling"] == 2200 + credit
 
 
 def test_cheaper_cpu_and_smaller_ssd_lower_the_ceiling():
