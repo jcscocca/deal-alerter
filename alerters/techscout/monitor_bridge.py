@@ -14,7 +14,7 @@ from alerters.hardware.prebuilt import Offer, exact_desktop, gpu_model
 from alerters.hardware.native.match import extract_price
 from .research import cpu_model
 from alerters.hardware.prebuilt_specs import public_specs
-from alerters.hardware.sodimm import standalone_memory, configuration as sodimm_configuration
+from alerters.hardware.memory import standalone_memory, configuration as sodimm_configuration
 
 LABELS = {"newegg": "Newegg", "ebay": "eBay", "apple-refurb": "Apple Refurbished",
           "slickdeals": "Slickdeals", "hp": "HP", "reddit": "Reddit",

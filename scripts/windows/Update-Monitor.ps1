@@ -102,8 +102,22 @@ foreach ($relative in @('requirements.txt','alerters\hardware\native\requirement
     if ((Get-FileHash -LiteralPath (Join-Path $app $relative)).Hash -ne
         (Get-FileHash -LiteralPath (Join-Path $packageApp $relative)).Hash) { throw 'Dependency changes need a separately prepared environment.' }
 }
-$variables = & gh api repos/jcscocca/deal-alerter/actions/variables
-if ($LASTEXITCODE -ne 0) { throw 'Cannot verify hardware writer gates.' }
+# A read-only token (this repository only, Variables: read) lets the gate check run
+# over key-based SSH, where gh cannot read its own credential store. It is scoped
+# to this one call and never printed; without the file, gh's own login is used.
+$tokenFile = Join-Path $env:USERPROFILE '.deal-alerter\github-variables.token'
+$savedToken = Test-Path -LiteralPath $tokenFile
+if ($savedToken) { $env:GH_TOKEN = (Get-Content -Raw -LiteralPath $tokenFile).Trim() }
+try {
+    $variables = & gh api repos/jcscocca/deal-alerter/actions/variables
+    $gateStatus = $LASTEXITCODE
+} finally {
+    if ($savedToken) { Remove-Item Env:GH_TOKEN -ErrorAction SilentlyContinue }
+}
+if ($gateStatus -ne 0) {
+    if ($savedToken) { throw "Cannot verify hardware writer gates with $tokenFile. If it expired or GitHub returned 401/403, regenerate the token and re-run the save command (jcscocca/deal-alerter only, Variables: read)." }
+    throw "Cannot verify hardware writer gates. To deploy over SSH, save a read-only token (jcscocca/deal-alerter only, Variables: read) to $tokenFile."
+}
 $gates = @{}
 foreach ($variable in ($variables | ConvertFrom-Json).variables) { $gates[$variable.name] = $variable.value }
 if ($gates.HARDWARE_WRITER -ne 'thinkpad' -or $gates.ENABLE_HARDWARE -ne 'false' -or $gates.ENABLE_HARDWARE_FAST -ne 'false') {

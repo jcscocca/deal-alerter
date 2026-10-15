@@ -7,6 +7,7 @@ from .community import SLICKDEALS_COVERAGE
 
 HEALTH_GRACE_SECONDS = 10 * 60
 LISTING_UNVERIFIED = "Offer found but seller/configuration/landed total cannot be confirmed"
+HP_PAUSED = "HP paused: its pages refuse the plain HTTP client; enable a verified hp_browser to resume"
 LABELS = {"hp": "HP", "newegg": "Newegg", "skytech": "Skytech", "cyberpowerpc": "CyberPowerPC",
           "ibuypower": "iBUYPOWER", "reddit": "Reddit", "slickdeals": "Slickdeals",
           "ebay": "eBay", "apple-refurb": "Apple refurbished"}
@@ -49,7 +50,7 @@ def failure_type(error):
 
 
 def coverage_limitation(problem):
-    return (problem == SLICKDEALS_COVERAGE or ": discovery cap reached;" in problem
+    return (problem in (SLICKDEALS_COVERAGE, HP_PAUSED) or ": discovery cap reached;" in problem
             or problem == "HP browser: custom/configuration-selector URLs remain unverified")
 
 

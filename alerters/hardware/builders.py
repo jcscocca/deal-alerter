@@ -133,9 +133,11 @@ def parse_cyberpowerpc(body, url, now):
     def field(name):
         tag = form.select_one(f'input[name="{name}"]') if form else None
         return tag.get("value") if tag else None
-    if field("code") != product["sku"] or field("skey") != url.rsplit("/", 1)[-1]:
+    # Sold-out systems render an empty config form; the panel check below must agree.
+    sold_out = form is not None and not form.select("input") and stock == "out_of_stock"
+    if not sold_out and (field("code") != product["sku"] or field("skey") != url.rsplit("/", 1)[-1]):
         raise Deferred("CyberPowerPC selected configuration mismatch", 900)
-    if dollars(field("bp")) != price or dollars(field("fp")) != price:
+    if not sold_out and (dollars(field("bp")) != price or dollars(field("fp")) != price):
         raise Deferred("CyberPowerPC selected price disagrees with product schema", 900)
     # Repeated mobile/desktop summaries must agree; never scan recommendations.
     specs = {"Model": product["sku"]}
@@ -158,6 +160,13 @@ def parse_cyberpowerpc(body, url, now):
         raise Deferred("CyberPowerPC purchase panel unavailable", 900)
     panel = panels[0]
     text = panel.get_text(" ", strip=True)
+    evidence = "CyberPowerPC selected prebuilt schema, configuration and purchase panel"
+    if sold_out:
+        if not re.search(r"sold out|out of stock", text, re.I) or soup.select_one('[data-type="addtocart"]'):
+            raise Deferred("CyberPowerPC sold-out page availability conflicts", 900)
+        # A recognized sold-out page is a successful read, but its price is not
+        # cross-checked against the cart form and cannot enter history or alert.
+        evidence = "CyberPowerPC sold out; schema and purchase panel show out of stock, price unverified"
     if re.search(r"sold out|out of stock|unavailable", text, re.I):
         stock = "out_of_stock"
     elif re.search(r"pre[- ]?order|back[- ]?order|special order", text, re.I):
@@ -167,8 +176,8 @@ def parse_cyberpowerpc(body, url, now):
         stock = "unknown"
     title = "CyberPowerPC " + product["name"] + " · " + " · ".join(specs.get(k, "") for k in ("CPU", "GPU/VGA Type", "Memory", "SSD"))
     return Offer("cyberpowerpc", product["sku"], title, url, "CyberPowerPC", condition, specs,
-                 price, _shipping(schema), stock, stock != "unknown" and condition != "unknown", now.isoformat(),
-                 evidence="CyberPowerPC selected prebuilt schema, configuration and purchase panel")
+                 price, _shipping(schema), stock, not sold_out and stock != "unknown" and condition != "unknown",
+                 now.isoformat(), evidence=evidence)
 
 
 def _sky_state(soup, sku):

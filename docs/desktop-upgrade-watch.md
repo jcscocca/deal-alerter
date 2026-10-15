@@ -1,5 +1,46 @@
 # Desktop purchase watch: factory 32/64GB plus the owned 64GB kit
 
+As of October 14, 2026, the user supplied a completed MSI/9950X3D desktop with
+128GB DDR5, an internal RTX 5090 and a separately powered OCuLink RTX 5070 Ti.
+`config/desktop-inventory.toml` records the build and remaining uncertainties.
+The Corsair pair is allocated to that build. The user requested a small
+extension of existing watches: additional high-end 50-series cards, especially
+immediate 5090 notifications, desktop 96GB (2x48GB) UDIMM kits and single 64GB
+UDIMMs. The earlier prebuilt reuse strategy below remains configured; it is
+historical purchase logic rather than the current inventory.
+
+New-card ceilings are $1,000 for 5070 Ti (existing), $1,500 for 5080
+(provisional), and $5,000 for 5090 (existing). All qualifying 5090 card notices
+use push priority 5. The 5080 target/standout prices are $1,400/$1,300; 5090
+$4,500/$4,000. Desktop memory notices use $1,109.99 for a complete
+2x48GB kit and $937.49 for a single 64GB module. The original $600/$400 guesses
+were replaced after the user's benchmark review on October 14. These are
+editable alert settings, not asserted sold values or purchase budgets. Two 96GB kits may
+provide 192GB, but their combined compatibility and speed require validation.
+MSI publishes four DDR5 UDIMM slots and a 256GB maximum for the PRO B840-VC WIFI:
+https://www.msi.com/Motherboard/PRO-B840-VC-WIFI/Specification
+
+`config/desktop-memory-market.toml` preserves the dated reference quotes and
+their stock/shipping limitations. Newegg's selected new offers showed Add to
+cart at $1,249.99 for Kingston KF556C36BBEA-64 and $1,479.99 for G.SKILL
+F5-5600J4040D48GX2-RM5RW. At the user's request, the alert limits apply a 25%
+reduction, rounded down to cents. These are a small sample of retail asks, not market-wide
+medians or sold-price evidence. CDW's $1,209.99 single-module quote had no
+confirmed delivery/stock evidence; Corsair's $1,421.99 96GB kit and Newegg's
+$1,449.99 Flare X5 kit were sold out, so they were recorded as context rather
+than selected in-stock references. No speed or RGB premium is inferred.
+
+- https://www.newegg.com/p/0RN-001J-015E9?Item=0RN-001J-015E9&SoldByNewegg=1
+- https://www.newegg.com/p/N82E16820374549?Item=N82E16820374549&SoldByNewegg=1
+
+The card notices retain condition, identity, seller and bait-price checks.
+eBay sorted asks stay excluded from market history; explicit watches can
+notify only after an exact-item lookup confirms identity, delivered price and
+stock. The existing bounded lookup budget and source backoff also apply to
+these checks. Other card discovery remains through the existing community
+feeds; this does not add direct GPU-store polling. A checkout change requires
+the existing release procedure before the installed monitor uses it.
+
 The desktop profile extends the existing ThinkPad monitor and uses the same
 notification delivery, deduplication, offer history and source health reports.
 The implementation is in the checkout; deploying it to the installed runtime

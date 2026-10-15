@@ -5,7 +5,7 @@ import re
 
 from alerters.hardware.native.catalog import Kind
 from alerters.hardware.native.match import find_all_parts
-from alerters.hardware.sodimm import standalone_memory, configuration as sodimm_configuration, LAYOUTS, layout_label
+from alerters.hardware.memory import standalone_memory, configuration as sodimm_configuration, LAYOUTS, layout_label
 from .research import cpu_model
 
 UNKNOWN = "Not established"

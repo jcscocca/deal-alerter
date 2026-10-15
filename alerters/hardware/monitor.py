@@ -38,7 +38,7 @@ from .retail_http import Deferred, PublicClient, public_url
 from .shopping_export import ShoppingExport
 from .shopping_activity import judgments
 from .shopping_controls import read_controls, delivery_filter
-from .monitor_health import (HEALTH_GRACE_SECONDS, LISTING_UNVERIFIED, incidents,
+from .monitor_health import (HEALTH_GRACE_SECONDS, HP_PAUSED, LISTING_UNVERIFIED, incidents,
                              eligible_incidents, problem_key as health_problem_key, migrate_key)
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -46,6 +46,8 @@ DEFAULT_RUNTIME = Path(os.environ.get("PROGRAMDATA", ROOT / ".local")) / "DealAl
 LOG = logging.getLogger("hardware-monitor")
 HEALTH_CHANGE_SECONDS = 30 * 60
 HEALTH_REMINDER_SECONDS = 24 * 3600
+# Two-minute polling of 64 products drew an IP-wide 403 on 2026-10-14.
+NEWEGG_SECONDS = 3600
 
 
 def read_json(path, default):
@@ -122,7 +124,12 @@ class Monitor:
             self.add_product(seed["url"])
         for discovery in self.config.get("discovery", []):
             public_url(discovery["url"])
+            if discovery["kind"] == "discover-hp" and not self.client.hp_reader:
+                self.pause_hp()
+                continue
             interval = max(21600, self.cfg["discovery_seconds"]) if discovery["kind"] == "discover-skytech" else self.cfg["discovery_seconds"]
+            if discovery["kind"] == "discover-newegg":
+                interval = max(NEWEGG_SECONDS, interval)
             self.add_job(discovery["kind"], interval, discovery["url"])
         for catalog in self.config.get("catalog", []):
             if catalog.get("kind") != "ibuypower" or catalog.get("url") != "https://www.ibuypower.com/gaming-pcs/prebuilt-gaming-pcs":
@@ -171,6 +178,9 @@ class Monitor:
         if kind is None:
             # iBUYPOWER remains one bounded catalog job; product-page access failed.
             return None
+        if kind == "hp" and not self.client.hp_reader:
+            self.pause_hp()
+            return None
         if kind == "hp" and self.client.hp_reader:
             from .hp_browser import hp_page_url
             try:
@@ -190,7 +200,13 @@ class Monitor:
         interval = max(300, self.cfg["retailer_seconds"]) if kind == "hp" and self.client.hp_reader else self.cfg["retailer_seconds"]
         if kind in ("cyberpowerpc", "skytech"):
             interval = max(600, interval)
+        if kind == "newegg":
+            interval = max(NEWEGG_SECONDS, interval)
         return self.add_job(kind, interval, url)
+
+    def pause_hp(self):
+        if HP_PAUSED not in self.problems:
+            self.problems.append(HP_PAUSED)
 
     def process(self, key: str, batch: Batch):
         now = datetime.now(timezone.utc)

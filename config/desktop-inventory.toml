@@ -1,0 +1,51 @@
+# Completed build supplied by the user on 2026-10-14.
+# These are reported components and plans, not arrival or benchmark results.
+[system]
+reported_on = "2026-10-14"
+cpu = "Ryzen 9 9950X3D"
+board = "MSI PRO B840-VC WIFI"
+case = "MSI MEG MAESTRO 700L PZ"
+case_status = "Per retailer listings; confirm on arrival"
+description = "MSI PRO B840-VC WIFI / Ryzen 9 9950X3D / 128GB DDR5 / MSI 1300W; RTX 5090 internal + RTX 5070 Ti OCuLink"
+
+[memory]
+installed_gb = 128
+modules = 4
+module_gb = 32
+kits = ["CyberPower-supplied 2x32GB", "Corsair Vengeance RGB CMH64GX5M2B6000C40W 2x32GB"]
+expected_mt_s = [4800, 5600]
+speed_status = "User expectation; actual speed and mixed-kit stability unmeasured"
+owned_corsair_kit_allocated = true
+
+[power]
+main_psu = "MSI 1300W"
+main_watts = 1300
+dock_psu = "GF1 750W"
+dock_watts = 750
+# Retained conservative allowance for CPU, board, drives and fans, not measured draw.
+base_system_draw_w = 300
+
+[[gpu]]
+name = "RTX 5090 (internal; exact model TBD)"
+catalog_key = "rtx_5090"
+host = "desktop"
+power_domain = "desktop"
+connection = "PCI_E1, PCIe 4.0 x16 (user supplied)"
+role = "display/gaming/UE5/VR"
+
+[[gpu]]
+name = "RTX 5070 Ti (CyberPower; DEG1 OCuLink dock)"
+catalog_key = "rtx_5070_ti"
+host = "desktop"
+power_domain = "dock"
+connection = "Minisforum DEG1 / RIITOP adapter / M.2_2"
+role = "secondary GPU"
+
+[storage]
+boot = "CyberPower 4TB Gen4 NVMe in M.2_1"
+extra = "Crucial P3 Plus 4TB from old PC"
+extra_plan = "USB enclosure, or sell; decision pending"
+
+[previous_desktop]
+description = "Z790 AORUS PRO X / i7-14700 / 64GB / EVGA SuperNOVA 1000 GT / RTX 3080 + RTX 2080"
+status = "Superseded as purchase baseline; remaining ownership/disposition unspecified"

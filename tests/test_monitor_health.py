@@ -378,3 +378,8 @@ def test_watchdog_entrypoint_reports_delivery_failure_without_claiming_collector
         for handler in set(monitor.LOG.handlers) - handlers:
             monitor.LOG.removeHandler(handler)
             handler.close()
+
+
+def test_paused_hp_coverage_is_a_limitation_not_an_incident():
+    from alerters.hardware.monitor_health import HP_PAUSED, incidents
+    assert incidents({"jobs": {}}, [HP_PAUSED], {}, 20_000) == {}

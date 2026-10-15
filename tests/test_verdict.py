@@ -62,7 +62,7 @@ class TestCapabilityCap:
     def test_card_smaller_than_current_pool_is_capped(self) -> None:
         """The rule that stops 16GB cards ever reaching the push threshold.
 
-        The desktop already holds 18GB, so a 16GB card is a sidegrade however
+        The desktop already has a 32GB device, so a 16GB card is a sidegrade however
         cheap it is -- and at $400 against a $1000 reference it is very cheap.
         """
         item = score("rtx_5080", 400.0)
@@ -70,7 +70,7 @@ class TestCapabilityCap:
         assert "not an upgrade" in item.reason
 
     def test_bigger_card_is_not_capped(self) -> None:
-        item = score("rtx_3090", 800.0)
+        item = score("rtx_a6000", BY_KEY["rtx_a6000"].reference_price * 0.8)
         assert item.verdict > Verdict.GOOD
         assert "not an upgrade" not in item.reason
 
@@ -107,8 +107,9 @@ class TestHistoryVsReference:
         assert item.verdict <= Verdict.EXCEPTIONAL
 
     def test_rich_history_uses_percentiles(self) -> None:
-        rich = stats(count=50, low=575, p10=610, p25=665, median=745)
-        item = score("rtx_3090", 580.0, stats=rich)
+        ref = BY_KEY["rtx_a6000"].reference_price
+        rich = stats(count=50, low=ref * .72, p10=ref * .8, p25=ref * .9, median=ref)
+        item = score("rtx_a6000", ref * .73, stats=rich)
         assert item.confidence == "history"
         assert item.percentile is not None
         assert item.verdict == Verdict.GRAIL
@@ -126,7 +127,8 @@ class TestTargets:
     # own, so neither one could demonstrate that the *target* is what promoted
     # the listing. A price the engine would otherwise call GOOD can.
     def test_target_forces_at_least_strong(self) -> None:
-        item = score("rtx_3090", 1000.0, target_price=1020.0)
+        ref = BY_KEY["rtx_a6000"].reference_price
+        item = score("rtx_a6000", ref, target_price=ref + 20)
         assert item.target_hit
         assert item.verdict >= Verdict.STRONG
 
@@ -173,7 +175,7 @@ class TestLadderMath:
         assert usable_for_weights(24.0) == pytest.approx(20.4)
 
     def test_current_desktop_is_the_baseline(self) -> None:
-        assert host_vram_gb() == 18
+        assert host_vram_gb() == 32
 
 
 class TestBundlesAreNotSystems:

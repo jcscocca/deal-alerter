@@ -1,0 +1,58 @@
+# Manual US retailer quote review, not sold-price history or an automated feed.
+# Selected references are exact new desktop UDIMM products with Add to cart
+# visible on the selected retailer offer. Prices exclude tax; checkout shipping
+# must still be verified. These are representative asks, not a market median.
+checked_on = "2026-10-14"
+currency = "USD"
+basis = "retail_asking_quote"
+alert_policy = "25% below the selected in-stock item ask, rounded down to cents; edit watchlist.toml to change alert limits."
+
+[reference.ddr5_udimm_64]
+modules = 1
+module_gb = 64
+reference_item_price = 1249.99
+retailer = "Newegg"
+seller = "Newegg"
+sku = "KF556C36BBEA-64"
+title = "Kingston FURY Beast 64GB 288-Pin PC RAM DDR5 5600 (PC5 44800) Memory (Desktop Memory) Model KF556C36BBEA-64"
+stock_evidence = "Selected seller shows Add to cart; no checkout/delivery check performed"
+shipping_evidence = "Not established from the direct page read"
+url = "https://www.newegg.com/p/0RN-001J-015E9?Item=0RN-001J-015E9&SoldByNewegg=1"
+identity_source = "https://www.kingston.com/datasheets/KF556C36BBEA-64.pdf"
+
+[reference.ddr5_udimm_96_kit]
+modules = 2
+module_gb = 48
+reference_item_price = 1479.99
+retailer = "Newegg"
+seller = "Newegg"
+sku = "F5-5600J4040D48GX2-RM5RW"
+title = "G.SKILL Ripjaws M5 RGB Series 96GB (2 x 48GB) 288-Pin PC RAM DDR5 5600 (PC5 44800) Desktop Memory Model F5-5600J4040D48GX2-RM5RW"
+stock_evidence = "Selected seller shows Add to cart; no checkout/delivery check performed"
+shipping_evidence = "Search excerpt quotes free shipping; not established by the direct page read"
+url = "https://www.newegg.com/p/N82E16820374549?Item=N82E16820374549&SoldByNewegg=1"
+
+[[context_quote]]
+sku = "KVR56U46BD8-64"
+layout = "1x64GB desktop non-ECC UDIMM, verified against Kingston's specification"
+retailer = "CDW"
+item_price = 1209.99
+status = "Add to cart visible; stock and shipping unconfirmed, so excluded from selected in-stock reference"
+url = "https://www.cdw.com/product/kingston-valueram-ddr5-module-64-gb-dimm-288-pin-pc5-44800-unbu/9243791"
+identity_source = "https://www.kingston.com/en/memory/search?partid=KVR56U46BD8-64"
+
+[[context_quote]]
+sku = "F5-5600J4040D48GX2-FX5"
+layout = "2x48GB desktop kit"
+retailer = "Newegg"
+item_price = 1449.99
+status = "Out of stock on direct page; excluded from selected in-stock reference"
+url = "https://www.newegg.com/p/N82E16820374478"
+
+[[context_quote]]
+sku = "CMK96GX5M2E6000Z36"
+layout = "2x48GB desktop kit"
+retailer = "Corsair"
+item_price = 1421.99
+status = "Out of stock on direct page; excluded from selected in-stock reference"
+url = "https://www.corsair.com/us/en/p/memory/cmk96gx5m2e6000z36/vengeance-96gb-2x48gb-ddr5-dram-6000mt-s-cl36-amd-expo-intel-xmp-memory-kit-cmk96gx5m2e6000z36"

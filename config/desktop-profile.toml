@@ -1,4 +1,6 @@
-# Watch factory 32GB and 64GB PCs to combine with the owned 2x32GB kit.
+# Retained prebuilt purchase watch. The completed build is
+# recorded in desktop-inventory.toml and already allocates the Corsair pair.
+# This profile still watches factory 32GB/64GB PCs; it is not current inventory.
 # Prices are PC totals before tax. Mixing compatibility remains unverified.
 [memory]
 owned_kit = "Corsair Vengeance RGB CMH64GX5M2B6000C40W"
@@ -29,6 +31,19 @@ urgent = 2500.0
 ceiling = 1000.0
 target = 950.0
 urgent = 900.0
+
+# New-card price notices remain independent of the 32GB capacity baseline.
+# 5080: provisional reductions below the ~$1,580 retailer asks checked Oct 14.
+[price.rtx_5080_card]
+ceiling = 1500.0
+target = 1400.0
+urgent = 1300.0
+
+# Preserve the existing $5,000 5090 target; every qualifying card is priority 5.
+[price.rtx_5090_card]
+ceiling = 5000.0
+target = 4500.0
+urgent = 4000.0
 
 # Complete PC totals including known shipping, before tax. Recent 32GB sales
 # at $1,899/$1,999 are expired; allow useful reductions above those sale lows.

@@ -102,7 +102,8 @@ def test_uncertain_reference_is_watch_only_in_every_channel_even_under_target(st
     assert "provisional" in report.others[0].warnings[0]
 
 
-def test_trusted_explicit_target_still_reaches_push():
+def test_trusted_explicit_target_still_reaches_push(monkeypatch):
+    monkeypatch.setattr("alerters.hardware.native.rig.host_vram_gb", lambda:18)
     store = plugin()
     part = BY_KEY["rtx_3090"]
     row = candidate(part, part.reference_price)
@@ -139,7 +140,8 @@ def test_prebuilt_comparison_cannot_undo_native_veto(risk):
     assert not store.signals
 
 
-def test_real_prebuilt_can_promote_but_never_be_logged():
+def test_real_prebuilt_can_promote_but_never_be_logged(monkeypatch):
+    monkeypatch.setattr("alerters.hardware.native.rig.host_vram_gb", lambda:18)
     store = plugin()
     part = BY_KEY["rtx_5090"]
     row = candidate(part, part.reference_price * 0.9, is_system=True)
@@ -163,7 +165,8 @@ def test_source_veto_cannot_supply_a_prebuilt_benchmark():
     assert not store.signals
 
 
-def test_structured_nonworking_hint_cannot_claim_model_capacity():
+def test_structured_nonworking_hint_cannot_claim_model_capacity(monkeypatch):
+    monkeypatch.setattr("alerters.hardware.native.rig.host_vram_gb", lambda:18)
     store = plugin()
     part = BY_KEY["rtx_3090"]
     store.matcher = match.match
