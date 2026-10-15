@@ -139,7 +139,15 @@ separate PC history and stock/sale events. See its dry-run coverage report befor
 cutover: dynamic HP configurations and blocked feeds cannot be treated as
 confirmed offers. It preserves the $5,000 RTX 5090 target.
 
-The [desktop upgrade watch](docs/desktop-upgrade-watch.md) extends that monitor
+The completed MSI desktop is recorded in `config/desktop-inventory.toml`:
+9950X3D, 128GB DDR5, internal RTX 5090 and separately powered OCuLink RTX 5070 Ti.
+Capacity scoring uses the largest device (32GB), without assuming pooled VRAM.
+New-card price watches for the 5070 Ti/5080/5090 operate independently of that
+capacity cap; qualifying 5090 cards and prebuilt target hits use maximum push
+priority. Desktop 96GB (2x48GB) UDIMM kits and single 64GB UDIMMs have separate
+price watches; the existing ThinkPad SO-DIMM watches remain independent.
+
+The earlier [desktop upgrade watch](docs/desktop-upgrade-watch.md) extends that monitor
 to RTX 5080 prebuilts and a 96GB/128GB RAM goal. It distinguishes documented
 layout from unverified mixed-kit compatibility, reusing the owned Corsair 64GB
 kit where possible. Rules live in `config/desktop-profile.toml`; checkout changes

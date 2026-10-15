@@ -1,19 +1,18 @@
 """The machines you already own, and what a candidate part would change.
 
-This is the module that makes the difference between "that's a cheap 3090" and
-"that's a cheap 3090 *and it takes you from 18GB to 42GB, which is the first
-time you can hold a 70B at Q4*". The Steam project answered "is this discount
-good for this game"; the hardware equivalent has to answer "is this purchase
-good for this cluster", and that needs to know what the cluster is.
-
-Edit NODES to match reality if anything changes.
+The completed desktop is recorded in config/desktop-inventory.toml. Its internal
+5090 and separately powered OCuLink 5070 Ti are distinct memory devices. Use the
+largest device as the capacity baseline; adding capacities would assume a
+multi-GPU workload that has not been validated.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+import tomllib
 
-from .catalog import Part
+from .catalog import BY_KEY, Part
 
 
 @dataclass(frozen=True)
@@ -23,33 +22,35 @@ class Node:
     vram_gb: float
     bandwidth_gb_s: int
     arch: str
-    # Only counts toward a pooled total if the accelerators can actually be
-    # used together. Separate boxes on a LAN cannot, for tensor parallelism.
+    # Physical compute host. Sharing it does not establish a pooled memory space.
     host: str
+    # A dock can share a host while drawing from a different PSU.
+    power_domain: str = ""
+
+
+DESKTOP_INVENTORY = tomllib.loads(
+    (Path(__file__).resolve().parents[3] / "config/desktop-inventory.toml").read_text(encoding="utf-8")
+)
 
 
 NODES: tuple[Node, ...] = (
-    Node("RTX 3080 (Gaming Z Trio)", "planner/architect", 10, 760, "Ampere", "desktop"),
-    Node("RTX 2080 (Zotac)", "planner/architect", 8, 448, "Turing", "desktop"),
+    *(Node(row["name"], row["role"], BY_KEY[row["catalog_key"]].vram_gb,
+           BY_KEY[row["catalog_key"]].bandwidth_gb_s, BY_KEY[row["catalog_key"]].arch,
+           row["host"], row["power_domain"]) for row in DESKTOP_INVENTORY["gpu"]),
     Node("RTX 3500 Ada (P16 Gen 2)", "orchestrator/coder", 12, 432, "Ada", "thinkpad"),
     Node("M4 Pro (MacBook Pro)", "reviewer/loop-breaker", 18, 273, "Apple", "macbook"),
 )
 
 # The box a new card would actually go into.
 TARGET_HOST = "desktop"
-TARGET_HOST_DESC = "Z790 AORUS PRO X / i7-14700 / 64GB / EVGA SuperNOVA 1000 GT"
-PSU_WATTS = 1000
-# i7-14700 peaks near 220W under all-core load; add board, drives and fans.
-BASE_SYSTEM_DRAW_W = 300
-# The top x16 slot is the only one with full bandwidth. The middle slot is PCH
-# x4, which is fine for inference weights that stay resident but painful for
-# anything that streams layers across the bus.
-FULL_SPEED_SLOTS = 1
-TOTAL_USABLE_SLOTS = 2
+TARGET_HOST_DESC = DESKTOP_INVENTORY["system"]["description"]
+PSU_WATTS = DESKTOP_INVENTORY["power"]["main_watts"]
+BASE_SYSTEM_DRAW_W = DESKTOP_INVENTORY["power"]["base_system_draw_w"]
 
 
 def host_vram_gb(host: str = TARGET_HOST) -> float:
-    return sum(node.vram_gb for node in NODES if node.host == host)
+    """Largest device on a host; unvalidated multi-GPU memory is not pooled."""
+    return max((node.vram_gb for node in NODES if node.host == host), default=0.0)
 
 
 def cluster_vram_gb() -> float:
@@ -60,17 +61,16 @@ def cluster_vram_gb() -> float:
 # Reference TDPs for the cards currently in the target host. Kept here rather
 # than in the catalog because these are installed hardware, not things we hunt.
 INSTALLED_GPU_TDP_W = {
-    "RTX 3080 (Gaming Z Trio)": 350,
-    "RTX 2080 (Zotac)": 225,
+    row["name"]: BY_KEY[row["catalog_key"]].tdp_w for row in DESKTOP_INVENTORY["gpu"]
 }
 
 
 def host_draw_w(host: str = TARGET_HOST) -> int:
-    """Current GPU draw on the target host, for PSU headroom math."""
+    """Reference GPU draw on this power domain, excluding separately powered docks."""
     return sum(
         INSTALLED_GPU_TDP_W.get(node.name, 0)
         for node in NODES
-        if node.host == host
+        if (node.power_domain or node.host) == host
     )
 
 
@@ -159,9 +159,9 @@ class Fit:
 def check_fit(part: Part, *, psu_headroom_w: int = 150, replace_both: bool = True) -> Fit:
     """Can this go in the desktop, and what has to change if not?
 
-    `replace_both` models the realistic upgrade: the 3080 and 2080 come out and
-    the new part goes in. Keeping them installed alongside a 575W card is what
-    actually blows the power budget, so the answer differs a lot.
+    The retained `replace_both` argument means replacement of the internal GPU.
+    The separately powered dock stays outside the main PSU's budget. This is a
+    power estimate, not verification of connectors, clearance or free slots.
     """
     notes: list[str] = []
     ok = True
@@ -170,7 +170,7 @@ def check_fit(part: Part, *, psu_headroom_w: int = 150, replace_both: bool = Tru
         return Fit(
             True,
             [
-                "Standalone box -- becomes a fourth node rather than going in "
+                "Standalone box -- becomes a separate node rather than going in "
                 "the tower, so no PSU or slot constraints apply."
             ],
         )
@@ -187,6 +187,9 @@ def check_fit(part: Part, *, psu_headroom_w: int = 150, replace_both: bool = Tru
     else:
         notes.append(f"~{total}W total, within the {PSU_WATTS}W PSU.")
 
+    notes.append(f"Main PSU estimate; the OCuLink dock uses its own {DESKTOP_INVENTORY['power']['dock_watts']}W PSU.")
+    notes.append("Verify exact card dimensions, power connectors and available slots.")
+
     if part.slots and part.slots > 3.0:
         notes.append(f"{part.slots}-slot card -- check case clearance.")
 
@@ -196,10 +199,10 @@ def check_fit(part: Part, *, psu_headroom_w: int = 150, replace_both: bool = Tru
             "airflow. Desktop cases generally cannot do this."
         )
 
-    if part.arch not in {"Ampere"} and not replace_both:
+    if not replace_both:
         notes.append(
-            f"{part.arch} alongside Ampere+Turing still can't tensor-parallel "
-            "cleanly -- treat it as a single-card node."
+            "Keeping the internal RTX 5090 requires a verified expansion path; "
+            "shared workload support and pooled VRAM are unverified."
         )
 
     return Fit(ok, notes)
@@ -208,8 +211,8 @@ def check_fit(part: Part, *, psu_headroom_w: int = 150, replace_both: bool = Tru
 def capability_gain(part: Part) -> tuple[float, float, str]:
     """(before_gb, after_gb, one sentence on what it unlocks).
 
-    "After" assumes the new part replaces the desktop's two cards rather than
-    joining them, because a Turing card in the pool caps you at fp16 anyway.
+    Compare a candidate device with the largest installed device. Do not add
+    its memory to the installed 5090 or docked 5070 Ti.
     """
     before = host_vram_gb()
     after = part.usable_vram_gb
@@ -227,6 +230,9 @@ def capability_gain(part: Part) -> tuple[float, float, str]:
             f"First time you can hold {new_best.name} at Q4 -- today the desktop "
             f"tops out below {_LADDER_BY_SIZE[0].name}.",
         )
+
+    if after <= before:
+        return before, after, f"No single-device capacity upgrade over the desktop's {before:.0f}GB baseline."
 
     if new_best.name == old_best.name:
         return (

@@ -29,7 +29,7 @@ from urllib.parse import quote
 import requests
 
 from .base import Listing, SourceError
-from ...sodimm import configuration as memory_configuration
+from ...memory import configuration as memory_configuration
 
 OAUTH_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
@@ -151,6 +151,7 @@ class EbaySource:
         include_sold: bool = True,
         price_floors: dict[str, float] | None = None,
         memory_limits: dict[str, float] | None = None,
+        card_limits: dict[str, float] | None = None,
     ) -> None:
         self.name = "ebay"
         self.queries = queries
@@ -160,6 +161,7 @@ class EbaySource:
         # brackets, and not one actual card.
         self.price_floors = price_floors or {}
         self.memory_limits = memory_limits or {}
+        self.card_limits = card_limits or {}
         self.client_id = client_id
         self.client_secret = client_secret
         self.limit_per_query = limit_per_query
@@ -225,7 +227,7 @@ class EbaySource:
         return self._verify_memory_stock(listings)
 
     def _verify_memory_stock(self, listings: list[Listing]) -> list[Listing]:
-        """Search is discovery; a memory alert needs fresh, exact-item evidence.
+        """Verify explicit memory/card price watches against exact-item evidence.
 
         Bound extra requests to affordable watched modules, with one lookup per
         item per fetch. Neither errors nor the request limit imply availability.
@@ -234,18 +236,34 @@ class EbaySource:
         checked: dict[str, Listing] = {}
         out = []
         requests_used = 0
+
+        def identity(title):
+            if key := memory_configuration(title):
+                return key
+            if not self.card_limits:
+                return None
+            from ..match import match
+            result = match(title)
+            if (not result.junk and result.part and result.part.key in self.card_limits
+                    and result.quantity == 1 and not result.is_system and not result.is_bundle):
+                return result.part.key
+            return None
+
         for listing in listings:
-            key = memory_configuration(listing.title + "\n" + listing.body)
+            key = identity(listing.title + "\n" + listing.body)
             if not key or listing.sold:
                 out.append(listing)
                 continue
             shopping = {**listing.extra.get("shopping", {}), "available": None,
                         "stock": "unknown", "availability_note": "Item stock has not been verified"}
             listing = replace(listing, extra={**listing.extra, "shopping": shopping})
-            limit = self.memory_limits.get(key)
+            limit = self.memory_limits.get(key, self.card_limits.get(key))
             if (limit is None or listing.price is None or not 0 < listing.price <= limit
                     or listing.multi_variant or listing.seller_risk != "low"
                     or listing.condition_hint not in ("new", "open_box", "used", "refurbished")):
+                out.append(listing)
+                continue
+            if key in self.card_limits and listing.condition_hint != "new":
                 out.append(listing)
                 continue
             if listing.listing_id in checked:
@@ -267,13 +285,14 @@ class EbaySource:
                     item = response.json()
                     price = _delivered_price(item)
                     if (item.get("itemId") == listing.listing_id
-                            and memory_configuration(item.get("title", "")) == key
+                            and identity(item.get("title", "")) == key
                             and (item.get("price") or {}).get("currency") == "USD"
                             and price is not None and math.isfinite(price) and price > 0
                             and "FIXED_PRICE" in (item.get("buyingOptions") or [])):
                         available = _availability_of(item, datetime.now(timezone.utc))
                         verified_shopping = dict(shopping, item_price=_price_of(item), shipping=_shipping_of(item),
                                                  available=available,
+                                                 verified_price_watch=key,
                                                  stock="in_stock" if available is True else "out_of_stock" if available is False else "unknown",
                                                  availability_note="eBay item detail: " + ("in stock" if available is True else "unavailable" if available is False else "stock unknown"))
                         risk, note = _seller_risk(item)

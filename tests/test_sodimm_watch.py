@@ -116,7 +116,7 @@ def test_kit_facets_do_not_report_one_module_capacity():
 def test_memory_queries_fit_without_displacing_prior_watches(tmp_path):
     plugin = MonitorHardwarePlugin(ROOT / "config/hardware.toml", tmp_path)
     try:
-        assert len(plugin.cfg.search_queries) == 29
+        assert len(plugin.cfg.search_queries) == 32
         for capacity in (32, 48, 64, 96):
             assert f"DDR5 SO-DIMM {capacity}GB" in plugin.cfg.search_queries
             assert plugin.cfg.query_price_floors[f"DDR5 SO-DIMM {capacity}GB"] == 0

@@ -17,7 +17,7 @@ import pytest
 
 from alerters.hardware.native.catalog import PARTS, BY_KEY, Kind
 from alerters.hardware.native.match import find_all_parts, find_part
-from alerters.hardware.sodimm import LAYOUTS, configuration
+from alerters.hardware.memory import LAYOUTS, configuration
 
 ADDED = [
     ("radeon_pro_w7900", "AMD Radeon PRO W7900 48GB Workstation Graphics Card"),

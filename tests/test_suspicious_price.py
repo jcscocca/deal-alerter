@@ -99,7 +99,7 @@ class TestTargetCannotResurrect:
         assert item.target_hit
         assert item.verdict < Verdict.STRONG
 
-    def test_a_trusted_listing_under_target_still_gets_through(self) -> None:
+    def test_a_trusted_listing_under_target_still_gets_through(self, monkeypatch) -> None:
         """The override must keep working for prices we believe.
 
         Priced at the reference rather than under it: after the 2026-08-17
@@ -107,6 +107,7 @@ class TestTargetCannotResurrect:
         old fixture proved nothing about the override. Only a price that would
         not otherwise alert can show that the target is what promoted it.
         """
+        monkeypatch.setattr("alerters.hardware.native.rig.host_vram_gb", lambda:18)
         ordinary = REF * 1.00
         item = _assess(ordinary, target_price=ordinary * 1.02)
         assert item.target_hit

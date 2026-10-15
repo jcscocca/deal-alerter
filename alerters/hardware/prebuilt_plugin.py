@@ -12,7 +12,7 @@ from .plugin import HardwarePlugin
 from .prebuilt import Offer, OfferState, PrebuiltHistory, announced_start, dollars, exact_desktop, gpu_key, pacific_time
 from .retailers import canonical_product
 from .desktop_profile import DEFAULT_PROFILE, DesktopProfile
-from .sodimm import LAYOUTS as SODIMM_LAYOUTS
+from .memory import LAYOUTS as SODIMM_LAYOUTS, DESKTOP_LAYOUTS
 
 
 def community_offer(listing: Listing) -> Offer | None:
@@ -94,14 +94,27 @@ class MonitorHardwarePlugin(HardwarePlugin):
             # Explicit new-card price notices are separate from the native
             # model-capacity recommendation. Keep its factual grade/history,
             # and never bypass identity, condition, seller or source vetoes.
-            eligible = (item.condition == "new" and item.quantity == 1 and item.loggable
-                        and listing.loggable and not listing.sold
-                        and listing.extra.get("shopping", {}).get("available") is not False
+            shopping = listing.extra.get("shopping", {})
+            checked = shopping.get("availability_checked_at")
+            try:
+                fresh = 0 <= (self.now - datetime.fromisoformat(checked)).total_seconds() <= 1200
+            except (TypeError, ValueError):
+                fresh = False
+            # Sorted eBay asks remain excluded from market history, but a fresh
+            # exact-item check can support this explicit price-only notice.
+            verified = (listing.source == "ebay" and shopping.get("verified_price_watch") == item.part.key
+                        and shopping.get("available") is True and fresh)
+            anchor = stats.median if stats.trustworthy and stats.median else item.part.reference_price
+            credible = item.unit_price >= anchor * self.cfg.thresholds.suspicious_price_ratio
+            eligible = (item.condition == "new" and item.quantity == 1 and credible
+                        and (item.loggable and listing.loggable or verified) and not listing.sold
+                        and shopping.get("available") is not False
                         and not item.multi_variant and item.seller_risk == "low"
                         and item.mining_risk == "low")
             hit = eligible and item.unit_price <= band["ceiling"]
             self.card_price_watches[assessment.key] = band
             return replace(assessment, alertable=hit, target_override=hit,
+                           rank=(int(item.part.key == "rtx_5090"), -item.unit_price),
                            axes=(("cheapness", f"Explicit new-card price watch through ${band['ceiling']:,.0f}"),
                                  ("value", "Listed card price before tax; verify delivery and checkout"),
                                  ("capability", item.unlock)))
@@ -156,7 +169,8 @@ class MonitorHardwarePlugin(HardwarePlugin):
                     and not (count > 1 and re.search(r"\beach\b|\bper\s+(?:stick|module|unit)\b", listing.title, re.I)))
         hit = eligible and price <= limit
         verdict = self.bands.STRONG if hit else self.bands.GOOD
-        reason = "Explicit SO-DIMM price watch; not a market-value or compatibility guarantee."
+        kind = "desktop UDIMM" if part.key in DESKTOP_LAYOUTS else "SO-DIMM"
+        reason = f"Explicit {kind} price watch; not a market-value or compatibility guarantee."
         reason += " " + shopping.get("availability_note", "Stock verified" if shopping.get("available") is True else "Stock unconfirmed") + "."
         if shopping.get("availability_checked_at"):
             reason += " Stock checked: " + pacific_time(shopping["availability_checked_at"]) + "."
@@ -165,7 +179,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
                                   "Within your memory alert limit" if hit else "Outside the memory alert criteria",
                                   reason, 0, target_price=limit, target_hit=hit, loggable=False,
                                   reference_trusted=False, seller_risk=listing.seller_risk,
-                                  unlock=f"{count} x {size}GB DDR5 SO-DIMM; {count * size}GB purchase total.")
+                                  unlock=f"{count} x {size}GB DDR5 {kind}; {count * size}GB purchase total.")
         result = Assessment(self.key(listing), price, verdict, detail, rank=(-price,),
                             alertable=hit, target_override=hit, loggable=False,
                             axes=(("cheapness", f"Selected alert limit ${limit:,.0f}"),
@@ -200,13 +214,17 @@ class MonitorHardwarePlugin(HardwarePlugin):
 
     def card(self, assessment, signal=None):
         if item := self.sodimm_watches.get(assessment.key):
-            return Card(item.part.name, item.url, f"${item.unit_price:,.2f}", "SO-DIMM PRICE WATCH",
+            desktop = item.part.key in DESKTOP_LAYOUTS
+            memory_warnings = ("MSI desktop: all four slots are occupied; new modules replace existing RAM.",
+                               "Two 2x48GB kits total 192GB; four 64GB modules total 256GB. Verify exact board/BIOS support and stability.") if desktop else (
+                               "ThinkPad P16 Gen 2: four occupied slots; 32GB sticks replace existing RAM, 4x48GB reaches 192GB.",
+                               "Four 32GB or 48GB modules run at 3600 MT/s; mixing kits requires validation.")
+            return Card(item.part.name, item.url, f"${item.unit_price:,.2f}", "DESKTOP RAM PRICE WATCH" if desktop else "SO-DIMM PRICE WATCH",
                         item.headline, item.reason,
                         (item.title, f"via {item.source}; {item.condition}", item.unlock,
                          f"Alert limit ${item.target_price:,.0f} for the complete purchase."),
                         ("Verify seller, stock, shipping and the exact module specifications before buying.",
-                         "ThinkPad P16 Gen 2: four occupied slots; 32GB sticks replace existing RAM, 4x48GB reaches 192GB.",
-                         "Four 32GB or 48GB modules run at 3600 MT/s; mixing kits requires validation."), priority=3)
+                         *memory_warnings), priority=3)
         if assessment.key not in self.pc_details:
             if band := self.card_price_watches.get(assessment.key):
                 item = assessment.detail
@@ -218,7 +236,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
                              f"Alert through ${band['ceiling']:,.0f}; strong price ${band['target']:,.0f}; standout ${band['urgent']:,.0f}.",
                              "Verify seller, availability, shipping and checkout total before buying."),
                             ("Confirm card clearance and power cabling for the existing tower.",),
-                            priority=5 if item.unit_price <= band["urgent"] else 4 if item.unit_price <= band["target"] else 3)
+                            priority=5 if item.part.key == "rtx_5090" and assessment.target_override or item.unit_price <= band["urgent"] else 4 if item.unit_price <= band["target"] else 3)
             return super().card(assessment, signal)
         signal = signal or getattr(self, "signals", {}).get(assessment.key)
         offer, event, history = self.pc_details[assessment.key]
@@ -290,7 +308,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
             warnings.append(signal)
         return Card(f"RTX {offer.gpu} prebuilt", offer.url, cost(total) if total is not None else "Total unverified",
                     badge, f"{cost(total)} before tax" if total is not None else "Advance/community notice; recheck required",
-                    history, tuple(facts), tuple(warnings), priority=self.desktop_profile.priority(offer.gpu, total, fit, offer) if confirmed else 3)
+                    history, tuple(facts), tuple(warnings), priority=5 if confirmed and offer.gpu == "5090" and assessment.target_override else self.desktop_profile.priority(offer.gpu, total, fit, offer) if confirmed else 3)
 
     def persist(self):
         super().persist()

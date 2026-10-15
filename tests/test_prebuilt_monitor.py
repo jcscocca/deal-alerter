@@ -65,7 +65,7 @@ def test_full_core_success_receipt_suppresses_and_failed_delivery_retries(tmp_pa
     assert result.problems and not sent
     result, sent = evaluate(tmp_path, [offer])
     assert not result.problems and len(sent) == 1
-    assert sent[0].buys[0].priority == 4
+    assert sent[0].buys[0].priority == 5
     _, sent = evaluate(tmp_path, [offer])
     assert not sent
     _, sent = evaluate(tmp_path, [replace(offer, base_price=3999)])

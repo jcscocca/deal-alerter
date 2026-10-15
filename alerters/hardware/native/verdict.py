@@ -9,7 +9,7 @@ meaningless and context alone doesn't tell you whether you want the thing.
                           inference, against the rest of its class
   3. Does it help?     -- what it changes about what the desktop can actually
                           load. A $200 RTX 5080 is a wonderful price and a
-                          pointless purchase when you already have 18GB.
+                          no capacity upgrade over the installed 32GB RTX 5090.
 
 Cheapness leads, because that's what a deal alerter is for. The other two
 modulate: a part that unlocks nothing is capped below the alert threshold no

@@ -126,7 +126,9 @@ def gpu_listing(plugin, price=4000, *, system=True, condition="open_box", **chan
     return item
 
 
-def test_production_4090_system_promotion_subject_body_and_dashboard_agree(plugin, tmp_path):
+def test_production_4090_system_promotion_subject_body_and_dashboard_agree(plugin, tmp_path, monkeypatch):
+    # Historical incident: exercise promotion against its original smaller host.
+    monkeypatch.setattr("alerters.hardware.native.rig.host_vram_gb", lambda:18)
     system, loose = gpu_listing(plugin), gpu_listing(plugin, 4500, system=False)
     promoted = plugin.promote([system, loose])[0]
     assert promoted.verdict == Verdict.EXCEPTIONAL and not promoted.loggable
@@ -168,7 +170,8 @@ def test_system_comparison_that_cannot_promote_has_no_exceptional_claim(plugin, 
 
 
 @pytest.mark.parametrize("price,exceptional", [(3149.99, False), (3150, True), (4275, True), (4275.01, False)])
-def test_system_price_gap_keeps_existing_floor_and_margin_boundaries(plugin, price, exceptional):
+def test_system_price_gap_keeps_existing_floor_and_margin_boundaries(plugin, price, exceptional, monkeypatch):
+    monkeypatch.setattr("alerters.hardware.native.rig.host_vram_gb", lambda:18)
     system, loose = gpu_listing(plugin, price), gpu_listing(plugin, 4500, system=False)
     promoted = plugin.promote([system, loose])[0]
     assert (promoted.verdict == Verdict.EXCEPTIONAL) is exceptional

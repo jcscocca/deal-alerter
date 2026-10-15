@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass
 
 from .catalog import PARTS, Part, BY_KEY
-from ..sodimm import configuration as sodimm_configuration, standalone_memory, SKUS, LAYOUTS
+from ..memory import configuration as sodimm_configuration, standalone_memory, SKUS, LAYOUTS
 
 # Phrases that mean the listing is not the thing itself. Checked first, because
 # "RTX 3090 box only" matches the 3090 aliases perfectly well.

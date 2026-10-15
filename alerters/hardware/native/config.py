@@ -32,7 +32,7 @@ def _query_for(part: Part) -> str:
     key off identical strings.
     """
     query = part.name.split("(")[0].strip()
-    if part.key.startswith("ddr5_sodimm_"):
+    if part.key.startswith(("ddr5_sodimm_", "ddr5_udimm_")):
         return query
     for suffix in (" 24GB", " 32GB", " 48GB", " 96GB", " 16GB"):
         query = query.replace(suffix, "")
@@ -179,8 +179,8 @@ class Config:
                 seen.setdefault(_query_for(part), None)
             for query in hunt.queries:
                 seen.setdefault(query, None)
-        # The expanded watchlist has 25 queries; retain its existing product
-        # and datacenter watches when adding the 5070 Ti searches.
+        # The expanded watchlist fits 32 queries, retaining existing product,
+        # datacenter and ThinkPad watches alongside desktop RAM and 5080 cards.
         return tuple(list(seen)[:32])
 
     @property
@@ -202,7 +202,7 @@ class Config:
             for part in hunt.parts:
                 query = _query_for(part)
                 floor = part.reference_price * self.thresholds.min_price_ratio
-                if part.key.startswith("ddr5_sodimm_"):
+                if part.key.startswith(("ddr5_sodimm_", "ddr5_udimm_")):
                     # Explicit price watches have no guessed minimum price.
                     floor = 0.0
                 floors[query] = min(floors.get(query, floor), floor)

@@ -174,7 +174,9 @@ def test_memory_limits_follow_configured_hunts(monkeypatch):
     cfg = Config.load(ROOT / "config/hardware.toml", ROOT / "config/watchlist.toml")
     feed = build_sources(cfg)[0]
     assert feed.memory_limits == {"ddr5_sodimm_32": 200, "ddr5_sodimm_48": 300,
-                                 "ddr5_sodimm_64_kit": 400, "ddr5_sodimm_96_kit": 600}
+                                 "ddr5_sodimm_64_kit": 400, "ddr5_sodimm_96_kit": 600,
+                                 "ddr5_udimm_64": 937.49, "ddr5_udimm_96_kit": 1109.99}
+    assert feed.card_limits == {"rtx_5070_ti": 1000, "rtx_5080": 1500, "rtx_5090": 5000}
 
 
 def test_delivery_activity_retains_original_stock_and_does_not_backfill_old_receipts(tmp_path):

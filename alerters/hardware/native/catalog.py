@@ -255,7 +255,7 @@ PARTS: tuple[Part, ...] = (
         low_precision="fp4",
         aliases=("5090", "geforce rtx 5090"),
         note="Fastest memory you can buy without going pro. 575W and transient "
-        "spikes past 600W -- the 1000 GT handles one, not two.",
+        "spikes past 600W; check the exact card, PSU connectors and power budget.",
     ),
     Part(
         key="rtx_4090",
@@ -788,15 +788,17 @@ PARTS: tuple[Part, ...] = (
     ),
 )
 
-from ..sodimm import LAYOUTS as SODIMM_LAYOUTS
+from ..memory import LAYOUTS as MEMORY_LAYOUTS, DESKTOP_LAYOUTS
 
-# Price-only layout watches. Required catalog references are untrusted target
-# placeholders, never MSRP, sold value or cross-brand history. The monitor
-# uses the explicit watchlist limits, without reference-based price floors.
-PARTS += tuple(Part(key, f"DDR5 SO-DIMM {count * size}GB ({count}x{size}GB)",
+# Price-only layout watches. Desktop references are dated retailer asking
+# quotes; laptop references remain untrusted target placeholders. Neither is
+# sold value or cross-brand history. The monitor uses explicit watchlist limits
+# without reference-based price floors.
+PARTS += tuple(Part(key, f"DDR5 {'UDIMM' if key in DESKTOP_LAYOUTS else 'SO-DIMM'} {count * size}GB ({count}x{size}GB)",
                     Kind.PRODUCT, 0, 0, 0, limit, 2026, "DDR5",
-                    note="ThinkPad P16 Gen 2 memory; verify exact module compatibility.")
-               for key, (count, size, limit) in SODIMM_LAYOUTS.items())
+                    note="Desktop DDR5; verify MSI board/BIOS compatibility and four-module stability."
+                    if key in DESKTOP_LAYOUTS else "ThinkPad P16 Gen 2 memory; verify exact module compatibility.")
+               for key, (count, size, limit) in MEMORY_LAYOUTS.items())
 
 BY_KEY: dict[str, Part] = {part.key: part for part in PARTS}
 

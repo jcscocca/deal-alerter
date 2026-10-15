@@ -110,13 +110,17 @@ class TestSellerRisk:
         assert _seller_risk({"seller": {}}) == ("low", "")
 
     def test_high_risk_downgrades_and_blocks_logging(self, state: Path) -> None:
-        clean, _ = evaluate(state, [_listing(price=700.0)])
+        # A capacity upgrade lets this test isolate seller risk from the
+        # completed desktop's cap on 24GB cards.
+        from alerters.hardware.native.catalog import BY_KEY
+        price = BY_KEY["rtx_a6000"].reference_price * 0.8
+        clean, _ = evaluate(state, [_listing(title="NVIDIA RTX A6000 48GB", price=price)])
         risky, _ = evaluate(
             state,
             [
                 _listing(
                     listing_id="l2",
-                    price=700.0,
+                    title="NVIDIA RTX A6000 48GB", price=price,
                     seller_risk="high",
                     seller_note="the seller has 3 feedback",
                 )
