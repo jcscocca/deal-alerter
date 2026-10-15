@@ -65,6 +65,7 @@ class MonitorHardwarePlugin(HardwarePlugin):
         self.pc_details = {}
         self.memory_fits = {}
         self.card_price_watches = {}
+        self.card_stock = {}
         self.sodimm_watches = {}
         self.sodimm_stock = {}
 
@@ -100,19 +101,23 @@ class MonitorHardwarePlugin(HardwarePlugin):
                 fresh = 0 <= (self.now - datetime.fromisoformat(checked)).total_seconds() <= 1200
             except (TypeError, ValueError):
                 fresh = False
-            # Sorted eBay asks remain excluded from market history, but a fresh
-            # exact-item check can support this explicit price-only notice.
+            # Every eBay card notice needs fresh exact-item stock evidence.
+            # Best Match asks are loggable; that does not establish availability.
             verified = (listing.source == "ebay" and shopping.get("verified_price_watch") == item.part.key
                         and shopping.get("available") is True and fresh)
             anchor = stats.median if stats.trustworthy and stats.median else item.part.reference_price
             credible = item.unit_price >= anchor * self.cfg.thresholds.suspicious_price_ratio
             eligible = (item.condition == "new" and item.quantity == 1 and credible
-                        and (item.loggable and listing.loggable or verified) and not listing.sold
+                        and (verified if listing.source == "ebay" else item.loggable and listing.loggable)
+                        and not listing.sold
                         and shopping.get("available") is not False
                         and not item.multi_variant and item.seller_risk == "low"
                         and item.mining_risk == "low")
             hit = eligible and item.unit_price <= band["ceiling"]
             self.card_price_watches[assessment.key] = band
+            if listing.source == "ebay":
+                self.card_stock[assessment.key] = {name: shopping.get(name) for name in
+                                                 ("available", "stock", "availability_checked_at", "availability_note")}
             return replace(assessment, alertable=hit, target_override=hit,
                            rank=(int(item.part.key == "rtx_5090"), -item.unit_price),
                            axes=(("cheapness", f"Explicit new-card price watch through ${band['ceiling']:,.0f}"),
@@ -228,12 +233,19 @@ class MonitorHardwarePlugin(HardwarePlugin):
         if assessment.key not in self.pc_details:
             if band := self.card_price_watches.get(assessment.key):
                 item = assessment.detail
+                stock = self.card_stock.get(assessment.key)
+                stock_facts = ()
+                if stock is not None:
+                    stock_facts = (stock.get("availability_note") or "Item stock has not been verified",)
+                    if stock.get("availability_checked_at"):
+                        stock_facts += ("Stock checked: " + pacific_time(stock["availability_checked_at"]),)
                 return Card(item.part.name, item.url, f"${item.unit_price:,.2f}",
                             "CARD PRICE WATCH" + (" · STANDOUT PRICE" if assessment.target_override and item.unit_price <= band["urgent"] else ""),
                             "Listed price meets your watch limit" if assessment.target_override else "Outside the new-card alert criteria",
                             "Price notice; not a sold-price valuation or a claim of increased model capacity.",
                             (item.title, f"via {item.source}; {item.condition}",
                              f"Alert through ${band['ceiling']:,.0f}; strong price ${band['target']:,.0f}; standout ${band['urgent']:,.0f}.",
+                             *stock_facts,
                              "Verify seller, availability, shipping and checkout total before buying."),
                             ("Confirm card clearance and power cabling for the existing tower.",),
                             priority=5 if item.part.key == "rtx_5090" and assessment.target_override or item.unit_price <= band["urgent"] else 4 if item.unit_price <= band["target"] else 3)

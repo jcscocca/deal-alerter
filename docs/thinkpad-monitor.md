@@ -71,6 +71,24 @@ search hits share one check, and unchecked items remain unconfirmed. Existing
 API backoff still applies. Successful alert activity retains the stock result
 and check time rather than replacing them with a later receipt projection.
 
+The 5070 Ti/5080/5090 card price watches also require fresh exact-item stock
+verification for every eBay alert, including Best Match search results that
+are eligible for the asking-price log. An unknown, failed, deferred or more
+than 20-minute-old check cannot notify. Either a zero available quantity or
+zero remaining quantity rules out stock. A confirmed unavailable quote is
+excluded from price history. Card notifications include the stock-check time,
+and delivery activity retains that evidence with the original receipt.
+
+The October 14, 2026 false alert for Newegg's AORUS 5090 (item 800402829841)
+exposed two independent gaps: description text mentioning stickers and a water
+block installation guide was treated as an accessory title, skipping the
+lookup; the card rule then accepted the loggable search result without stock
+proof. Source verification now scopes title and body exactly as the main
+matcher does, and eBay card eligibility always requires the exact-item check.
+The API returned OUT_OF_STOCK with zero available and remaining quantity for
+this listing. The recorded title/body/price and delivery behavior are covered
+by tests/test_ebay_card_availability.py.
+
 Newegg confirmation uses its public `window.__initialState__.ItemDetail` and
 `PropertyCollection.SelectedProperty`. Product identity includes the selected
 seller item, configuration and condition. A 5080 selected under a family page

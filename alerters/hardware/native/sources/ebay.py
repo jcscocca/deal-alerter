@@ -239,7 +239,7 @@ class EbaySource:
         out = []
         requests_used = 0
 
-        def identity(title):
+        def identity(title, body=""):
             if key := memory_configuration(title):
                 return key
             if self.display_limits:
@@ -249,14 +249,17 @@ class EbaySource:
             if not self.card_limits:
                 return None
             from ..match import match
-            result = match(title)
+            # Match the advertised title just as HardwarePlugin.prepare does.
+            # Bodies may veto absence, but instructions/accessories included
+            # with a real card must not be interpreted as the sale's title.
+            result = match(title, body=body)
             if (not result.junk and result.part and result.part.key in self.card_limits
                     and result.quantity == 1 and not result.is_system and not result.is_bundle):
                 return result.part.key
             return None
 
         for listing in listings:
-            key = identity(listing.title + "\n" + listing.body)
+            key = identity(listing.title, listing.body)
             if not key or listing.sold:
                 out.append(listing)
                 continue
@@ -304,6 +307,7 @@ class EbaySource:
                         risk, note = _seller_risk(item)
                         listing = replace(listing, title=item["title"], price=price, body="",
                                           condition_hint=_condition_of(item), seller_risk=risk, seller_note=note,
+                                          loggable=listing.loggable and available is not False,
                                           extra={**listing.extra, "seller": (item.get("seller") or {}).get("username", ""),
                                                  "shopping": verified_shopping})
                     else:
@@ -501,9 +505,11 @@ def _availability_of(item: dict, now: datetime) -> bool | None:
             return None
         if status in ("OUT_OF_STOCK", "TEMPORARILY_UNAVAILABLE"):
             return False
-        if "estimatedAvailableQuantity" in entry:
+        for field in ("estimatedAvailableQuantity", "estimatedRemainingQuantity"):
+            if field not in entry:
+                continue
             try:
-                quantity = float(entry["estimatedAvailableQuantity"])
+                quantity = float(entry[field])
             except (TypeError, ValueError):
                 return None
             if not math.isfinite(quantity) or quantity < 0 or not quantity.is_integer():
