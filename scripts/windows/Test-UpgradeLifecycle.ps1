@@ -23,12 +23,15 @@ $holder=$null
 try {
     New-Item -ItemType Directory -Path $testRoot | Out-Null
     $lockPath=Join-Path $testRoot 'writer lock'
-    $holderCode="import sys,time; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from dealcore.locking import WriterLock; lock=WriterLock(Path(sys.argv[2])); lock.__enter__(); print('READY',flush=True); time.sleep(4); lock.__exit__()"
+    # Keep the lock until the test releases it. A fixed sleep can expire before
+    # a loaded runner finishes launching the contention probe.
+    $holderCode="import sys; from pathlib import Path; sys.path.insert(0,sys.argv[1]); from dealcore.locking import WriterLock; lock=WriterLock(Path(sys.argv[2])); lock.__enter__(); print('READY',flush=True); sys.stdin.readline(); lock.__exit__()"
     $start=New-Object Diagnostics.ProcessStartInfo
     $start.FileName=$PythonExe
     $start.Arguments='-c "'+$holderCode+'" "'+$checkout+'" "'+$lockPath+'"'
     $start.UseShellExecute=$false
     $start.CreateNoWindow=$true
+    $start.RedirectStandardInput=$true
     $start.RedirectStandardOutput=$true
     $start.RedirectStandardError=$true
     $holder=[Diagnostics.Process]::Start($start)
@@ -36,6 +39,11 @@ try {
     $holderId=$holder.Id
     $probe=Invoke-WriterLockProbe $PythonExe $checkout $lockPath
     if ($probe.exit_code -ne 75 -or $probe.diagnostic) { throw 'Busy lock must be a quiet, retryable exit status.' }
+    $failed=$false
+    try { Wait-MonitorStopped @('DealAlerter-Hardware','DealAlerter-Watchdog') $holderId $PythonExe $checkout $lockPath -Attempts 2 -RetrySeconds 0 } catch { $failed=$_.Exception.Message -like 'Hardware writer/tasks did not stop*' }
+    if (-not $failed -or $holder.HasExited) { throw 'Updater must exhaust its retries while the writer still holds its lock.' }
+    $holder.StandardInput.WriteLine('release')
+    $holder.StandardInput.Flush()
     Wait-MonitorStopped @('DealAlerter-Hardware','DealAlerter-Watchdog') $holderId $PythonExe $checkout $lockPath -Attempts 10 -RetrySeconds 1
     if (-not $holder.HasExited) { throw 'Updater proceeded while the original writer still existed.' }
     $probe=Invoke-WriterLockProbe $PythonExe $checkout $lockPath
