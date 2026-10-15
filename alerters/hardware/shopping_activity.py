@@ -28,4 +28,6 @@ def judgments(plugin, result, options, receipts, now):
             records[item.key]["price_history"] = plugin.pc_history.evidence(offer, now)
         if item.key in getattr(plugin, "sodimm_stock", {}):
             records[item.key]["stock_evidence"] = plugin.sodimm_stock[item.key]
+        if item.key in getattr(plugin, "card_stock", {}):
+            records[item.key]["stock_evidence"] = plugin.card_stock[item.key]
     return records
