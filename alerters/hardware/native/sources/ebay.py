@@ -152,6 +152,7 @@ class EbaySource:
         price_floors: dict[str, float] | None = None,
         memory_limits: dict[str, float] | None = None,
         card_limits: dict[str, float] | None = None,
+        display_limits: dict[str, float] | None = None,
     ) -> None:
         self.name = "ebay"
         self.queries = queries
@@ -162,6 +163,7 @@ class EbaySource:
         self.price_floors = price_floors or {}
         self.memory_limits = memory_limits or {}
         self.card_limits = card_limits or {}
+        self.display_limits = display_limits or {}
         self.client_id = client_id
         self.client_secret = client_secret
         self.limit_per_query = limit_per_query
@@ -227,7 +229,7 @@ class EbaySource:
         return self._verify_memory_stock(listings)
 
     def _verify_memory_stock(self, listings: list[Listing]) -> list[Listing]:
-        """Verify explicit memory/card price watches against exact-item evidence.
+        """Verify explicit memory/card/display watches against exact-item evidence.
 
         Bound extra requests to affordable watched modules, with one lookup per
         item per fetch. Neither errors nor the request limit imply availability.
@@ -240,6 +242,10 @@ class EbaySource:
         def identity(title):
             if key := memory_configuration(title):
                 return key
+            if self.display_limits:
+                from ...displays import configuration
+                if key := configuration(title):
+                    return key
             if not self.card_limits:
                 return None
             from ..match import match
@@ -257,13 +263,13 @@ class EbaySource:
             shopping = {**listing.extra.get("shopping", {}), "available": None,
                         "stock": "unknown", "availability_note": "Item stock has not been verified"}
             listing = replace(listing, extra={**listing.extra, "shopping": shopping})
-            limit = self.memory_limits.get(key, self.card_limits.get(key))
+            limit = self.memory_limits.get(key, self.card_limits.get(key, self.display_limits.get(key)))
             if (limit is None or listing.price is None or not 0 < listing.price <= limit
                     or listing.multi_variant or listing.seller_risk != "low"
                     or listing.condition_hint not in ("new", "open_box", "used", "refurbished")):
                 out.append(listing)
                 continue
-            if key in self.card_limits and listing.condition_hint != "new":
+            if key in (self.card_limits | self.display_limits) and listing.condition_hint != "new":
                 out.append(listing)
                 continue
             if listing.listing_id in checked:

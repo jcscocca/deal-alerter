@@ -800,6 +800,16 @@ PARTS += tuple(Part(key, f"DDR5 {'UDIMM' if key in DESKTOP_LAYOUTS else 'SO-DIMM
                     if key in DESKTOP_LAYOUTS else "ThinkPad P16 Gen 2 memory; verify exact module compatibility.")
                for key, (count, size, limit) in MEMORY_LAYOUTS.items())
 
+from ..displays import WATCHES as DISPLAY_WATCHES
+
+# A display category has a purchase ceiling, not comparable per-model history.
+# These representative retail asks remain estimates; the explicit price-watch
+# judgment never labels them sold value or records mixed models in the log.
+PARTS += tuple(Part(key, row["name"], Kind.PRODUCT, 0, 0, 0,
+                    row["benchmark"], 2026, "Display",
+                    note="27-inch class; native 4K at 144Hz or faster; DisplayPort required.")
+               for key, row in DISPLAY_WATCHES.items())
+
 BY_KEY: dict[str, Part] = {part.key: part for part in PARTS}
 
 

@@ -32,6 +32,8 @@ def _query_for(part: Part) -> str:
     key off identical strings.
     """
     query = part.name.split("(")[0].strip()
+    if part.key.startswith("monitor_4k_27_"):
+        return "27 4K OLED monitor" if part.key.endswith("_oled") else "27 4K monitor"
     if part.key.startswith(("ddr5_sodimm_", "ddr5_udimm_")):
         return query
     for suffix in (" 24GB", " 32GB", " 48GB", " 96GB", " 16GB"):
@@ -179,9 +181,8 @@ class Config:
                 seen.setdefault(_query_for(part), None)
             for query in hunt.queries:
                 seen.setdefault(query, None)
-        # The expanded watchlist fits 32 queries, retaining existing product,
-        # datacenter and ThinkPad watches alongside desktop RAM and 5080 cards.
-        return tuple(list(seen)[:32])
+        # Retain all existing GPU/RAM searches plus the two display searches.
+        return tuple(list(seen)[:36])
 
     @property
     def query_price_floors(self) -> dict[str, float]:

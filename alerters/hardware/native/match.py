@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 from .catalog import PARTS, Part, BY_KEY
 from ..memory import configuration as sodimm_configuration, standalone_memory, SKUS, LAYOUTS
+from ..displays import candidate as display_candidate, specifications as display_specifications
 
 # Phrases that mean the listing is not the thing itself. Checked first, because
 # "RTX 3090 box only" matches the 3090 aliases perfectly well.
@@ -764,6 +765,8 @@ def find_all_parts(text: str) -> list[Part]:
     attaching it to the 4090 would be a guess. Bundles stay visible -- they are
     often where the good deals are -- but never reach the price log.
     """
+    if display := display_specifications(text):
+        return [BY_KEY[display.key]]
     haystack = _normalize(text)
     found: dict[str, Part] = {}
 
@@ -790,6 +793,8 @@ def find_all_parts(text: str) -> list[Part]:
 
 def find_part(text: str) -> tuple[Part | None, str]:
     """Best catalog match for a listing title, plus the term that matched."""
+    if display := display_specifications(text):
+        return BY_KEY[display.key], display.model or display.summary
     haystack = _normalize(text)
 
     # Token matching first: it is strictly more specific than a single alias,
@@ -921,6 +926,13 @@ def match(
 
     # On have/want boards, match only against what's actually for sale.
     sale_text, is_swap = split_have_want(title)
+    if display_candidate(sale_text):
+        display = display_specifications(sale_text)
+        if display is None or multi_variant or is_swap or detect_quantity(sale_text) != 1:
+            return MatchResult(None, None, "unknown", 0, junk=True)
+        return MatchResult(BY_KEY[display.key], price if price is not None else extract_price(title),
+                           detect_condition(title + "\n" + body), 0, junk=False,
+                           matched_on=display.model or display.summary)
     # A kit's price buys the whole kit, not one module. Resolve memory before
     # GPU quantity/capacity heuristics and reject ambiguous module menus.
     if standalone_memory(sale_text) or any(sku in sale_text.lower() for sku in SKUS):
