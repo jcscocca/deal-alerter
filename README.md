@@ -117,8 +117,9 @@ are named by key and never swept up by a `class = "any"` catch-all.
 
 [4K monitor price watches](docs/4k-monitor-watch.md) require a 27-inch-class
 panel, native 3840x2160 at 144Hz or faster, and a separate DisplayPort input.
-OLED is optional. Standard and OLED watches start at $299.99 and $599.99,
-using editable representative retail benchmarks in `config/monitor-watch.toml`.
+OLED is optional. Alerts require at least 25% below the exact model's dated
+retail benchmark in `config/monitor-watch.toml`; models without a benchmark
+cannot borrow another monitor's price limit.
 Ports appear as a compact fact in alerts and shopping cards. Community prices
 remain unverified leads; eBay needs a fresh exact-item stock/price check.
 

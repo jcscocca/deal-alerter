@@ -243,9 +243,9 @@ class EbaySource:
             if key := memory_configuration(title):
                 return key
             if self.display_limits:
-                from ...displays import configuration
-                if key := configuration(title):
-                    return key
+                from ...displays import specifications
+                if (display := specifications(title)) and display.model in self.display_limits:
+                    return display.model
             if not self.card_limits:
                 return None
             from ..match import match
@@ -305,7 +305,8 @@ class EbaySource:
                                                  stock="in_stock" if available is True else "out_of_stock" if available is False else "unknown",
                                                  availability_note="eBay item detail: " + ("in stock" if available is True else "unavailable" if available is False else "stock unknown"))
                         risk, note = _seller_risk(item)
-                        listing = replace(listing, title=item["title"], price=price, body="",
+                        listing = replace(listing, title=item["title"], price=price,
+                                          body=listing.body if key in self.display_limits else "",
                                           condition_hint=_condition_of(item), seller_risk=risk, seller_note=note,
                                           loggable=listing.loggable and available is not False,
                                           extra={**listing.extra, "seller": (item.get("seller") or {}).get("username", ""),

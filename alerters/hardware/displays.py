@@ -1,7 +1,7 @@
 """Conservative 27-inch 4K display identity and explicit purchase-price watches.
 
 Specifications may come from an exact documented model or the listing title.
-Prices across models are purchase limits, never a common market-value history.
+Each priced model has its own dated benchmark, never a common value history.
 """
 from __future__ import annotations
 
@@ -21,8 +21,12 @@ MODEL_PATTERN = re.compile("|".join(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9
 DISCOUNT = Decimal(str(CONFIG["pricing"]["discount_percent"]))
 if not 0 < DISCOUNT < 100:
     raise ValueError("Monitor discount_percent must be between 0 and 100")
-LIMITS = {key: float((Decimal(str(row["benchmark"])) * (1 - DISCOUNT / 100))
-                     .quantize(Decimal("0.01"), rounding=ROUND_DOWN)) for key, row in WATCHES.items()}
+PRICES = {row["aliases"][0]: row for row in MODELS if row.get("benchmark")}
+LIMITS = {model: float((Decimal(str(row["benchmark"])) * (1 - DISCOUNT / 100))
+                       .quantize(Decimal("0.01"), rounding=ROUND_DOWN)) for model, row in PRICES.items()}
+# Search floors only: neither category is a comparable price-history cohort.
+SEARCH_REFERENCES = {key: min(row["benchmark"] for row in PRICES.values()
+                             if ("OLED" in row["panel"]) == key.endswith("_oled")) for key in WATCHES}
 
 ACCESSORY = re.compile(
     r"\b(?:replacement|protector|screen\s+panel|panel\s+only|stand\s+only|"
@@ -155,7 +159,7 @@ def judge_display(plugin, candidate):
         fresh = 0 <= (now - datetime.fromisoformat(shopping.get("availability_checked_at"))).total_seconds() <= 1200
     except (TypeError, ValueError):
         fresh = False
-    verified = (listing.source == "ebay" and shopping.get("verified_price_watch") == display.key
+    verified = (listing.source == "ebay" and shopping.get("verified_price_watch") == display.model
                 and shopping.get("available") is True and fresh)
     community = listing.source in ("slickdeals", "reddit/buildapcsales") and listing.loggable
     text = listing.title + "\n" + listing.body
@@ -163,43 +167,56 @@ def judge_display(plugin, candidate):
                            r"members?[- ]only|student[- ]only|sold\s+out|out\s+of\s+stock|expired)\b", text, re.I)
     broken_port = DP_FAULT.search(text)
     absent = re.search(r"\b(?:monitor|display|screen)\s+(?:is\s+)?not\s+included\b|\b(?:stand|mount|cable|panel)\s+only\b", text, re.I)
-    watch = WATCHES[display.key]
-    limit = candidate.hunt.target if candidate.hunt.target is not None else LIMITS[display.key]
+    watch = PRICES.get(display.model)
+    limit = LIMITS.get(display.model)
+    if limit is not None and candidate.hunt.target is not None:
+        limit = min(limit, candidate.hunt.target)
     # Keep the existing hard plausibility floor, seller/condition/variant vetoes,
     # and require fresh exact-item evidence for eBay's selected search results.
     eligible = (candidate.condition == REQUIREMENTS["condition"] and not listing.sold
                 and not listing.multi_variant and listing.seller_risk == "low"
                 and not result.is_system and not result.is_bundle and result.quantity == 1
-                and price >= watch["benchmark"] * plugin.cfg.thresholds.min_price_ratio
+                and watch is not None and price >= watch["benchmark"] * plugin.cfg.thresholds.min_price_ratio
                 and shopping.get("available") is not False and not restricted and not broken_port and not absent
                 and (verified or community))
-    hit = bool(eligible and price <= limit)
+    hit = bool(eligible and limit is not None and price <= limit)
     verdict = plugin.bands.STRONG if hit else plugin.bands.GOOD
-    reason = ("Explicit monitor purchase-price watch; different models are not comparable sold-value history. "
+    price_reason = (("Price is " if hit else "Alert requires ")
+                    + f"at least {DISCOUNT}% below this model's recorded retail benchmark "
+                    f"of ${watch['benchmark']:,.2f} (checked {watch['checked_on']}). "
+                    if watch else "Exact-model retail benchmark is missing; no discount alert. ")
+    reason = (price_reason
               + ("Community-quoted price; retailer stock, shipping and checkout are unverified."
                  if community else str(shopping.get("availability_note") or "Availability has not been verified") + "."))
     detail = NativeAssessment(listing.listing_id, listing.source, result.part, listing.title, listing.url,
                               price, 1, candidate.condition, listing.posted_at, verdict,
-                              "Within your 4K monitor alert limit" if hit else "Outside the monitor alert criteria",
+                              "Within this model's 4K monitor alert limit" if hit else "Outside the monitor alert criteria",
                               reason, 0, target_price=limit, target_hit=hit, loggable=False,
                               reference_trusted=False, seller_risk=listing.seller_risk,
                               unlock=display.summary, confidence="price_watch")
     assessment = Assessment(plugin.key(listing), price, verdict, detail, rank=(-price,),
                             alertable=hit, target_override=hit, loggable=False,
-                            axes=(("cheapness", f"Monitor alert limit ${limit:,.2f}"),
-                                  ("value", "Purchase-price notice; not a per-model discount claim"),
+                            axes=(("cheapness", f"Model alert limit ${limit:,.2f}" if limit is not None else "Model benchmark needed"),
+                                  ("value", "Discount against a dated exact-model retail quote; not sold-price value"),
                                   ("capability", display.summary)))
     plugin.display_watches[assessment.key] = (display, community)
+    if listing.source == "ebay":
+        plugin.display_stock[assessment.key] = {name: shopping.get(name) for name in
+                                              ("available", "stock", "availability_checked_at", "availability_note")}
     return assessment
 
 
 def display_card(plugin, assessment):
     from dealcore.types import Card
+    from .prebuilt import pacific_time
     display, community = plugin.display_watches[assessment.key]
     item = assessment.detail
+    price_fact = f"Alert limit ${item.target_price:,.2f}" if item.target_price is not None else "Model benchmark needed"
+    stock = item.source == "ebay" and getattr(plugin, "display_stock", {}).get(assessment.key)
+    stock_facts = ("Stock checked: " + pacific_time(stock["availability_checked_at"]),) if stock and stock.get("availability_checked_at") else ()
     return Card(display.model or item.part.name, item.url, f"${item.unit_price:,.2f}",
                 "4K MONITOR PRICE WATCH" + (" · COMMUNITY LEAD" if community else ""),
                 item.headline, item.reason,
                 (item.title, display.summary, "Ports: " + display.ports,
-                 f"Alert limit ${item.target_price:,.2f}; via {item.source}; {item.condition}"),
+                 f"{price_fact}; via {item.source}; {item.condition}") + stock_facts,
                 ("Verify retailer checkout, delivery and warranty before buying.",), priority=3)

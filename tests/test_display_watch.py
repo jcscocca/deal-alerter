@@ -1,17 +1,21 @@
 """Actual 4K monitor delivery: requirements, price, stock and quiet port facts."""
 from dataclasses import replace
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
-from alerters.hardware.displays import LIMITS, WATCHES, specifications
+from alerters.hardware.displays import LIMITS, PRICES, WATCHES, specifications
 from alerters.hardware.native.catalog import BY_KEY
 from alerters.hardware.native.config import Config, _query_for
 from alerters.hardware.native.match import find_part, match
 from alerters.hardware.native.sources import build_sources
 from alerters.hardware.native.sources.ebay import EbaySource
+from alerters.hardware.prebuilt_plugin import MonitorHardwarePlugin
+from alerters.hardware.shopping_activity import judgments
 from alerters.techscout.facets import attributes
+from dealcore.state import AlertState
 from dealcore.report import render_html, render_text
 from tests.test_5070_ti_watch import NOW, ROOT, card, execute
 from tests.test_ebay_stock import detail
@@ -82,26 +86,66 @@ def test_other_sizes_slow_modes_missing_ports_accessories_and_lots_never_match(t
     assert result.part is None or result.junk
 
 
-@pytest.mark.parametrize("title,key", [
-    ('Alienware AW2725QF', "monitor_4k_27_standard"),
-    ('Alienware AW2725Q', "monitor_4k_27_oled"),
+@pytest.mark.parametrize("title,model", [
+    ('Alienware AW2725QF', "AW2725QF"),
+    ('Alienware AW2725Q', "AW2725Q"),
+    ('ASUS XG27UCS', "XG27UCS"),
+    ('MSI MPG272URX QD-OLED', "MPG 272URX"),
 ])
-def test_actual_push_at_limit_with_ports_and_without_pooled_value_history(tmp_path, title, key):
-    row = replace(monitor(), title=title, price=LIMITS[key])
+def test_actual_push_at_limit_with_ports_and_without_pooled_value_history(tmp_path, title, model):
+    row = replace(monitor(), title=title, price=LIMITS[model])
     sent, result = execute(tmp_path, row)
     assert len(sent) == 1 and result.assessments[0].target_override
     notice = sent[0].buys[0]
     assert notice.badge == "4K MONITOR PRICE WATCH · COMMUNITY LEAD"
     assert sum(fact.startswith("Ports: ") for fact in notice.facts) == 1
     for rendered in (render_text(sent[0]), render_html(sent[0])):
-        assert "Ports: DP 1.4" in rendered
+        assert "Ports: DP" in rendered
+        assert "25% below this model" in rendered
+        assert f"${PRICES[model]['benchmark']:,.2f}" in rendered
     assert "unverified" in notice.reason
     assert not result.assessments[0].loggable
     assert not result.assessments[0].detail.reference_trusted
     assert not (tmp_path / "hardware/US/prices.jsonl").read_text().strip()
-    assert not execute(tmp_path / "over", replace(row, price=LIMITS[key]+.01))[0]
+    assert not execute(tmp_path / "over", replace(row, price=LIMITS[model]+.01))[0]
     # Existing receipts suppress duplicate delivery.
     assert not execute(tmp_path, row)[0]
+
+
+@pytest.mark.parametrize("title", [
+    'LG 27GR93U-B 27" 4K 144Hz monitor DP',
+    'MSI MAG 274UPF E2 27" 4K 160Hz monitor DP',
+    'New Brand 27" 4K 144Hz IPS monitor DP',
+])
+def test_missing_exact_model_benchmark_cannot_borrow_a_category_limit(tmp_path, title):
+    sent, result = execute(tmp_path, replace(monitor(), title=title, price=200))
+    assert not sent
+    assert result.assessments and not result.assessments[0].target_override
+    assert result.assessments[0].detail.target_price is None
+    assert "benchmark is missing" in result.assessments[0].detail.reason
+
+
+def test_different_models_use_their_own_thresholds(tmp_path):
+    assert LIMITS["AW2725Q"] == 599.99
+    assert LIMITS["MPG 272URX"] == 674.99
+    sent, result = execute(tmp_path / "alienware", replace(monitor(), title='Alienware AW2725Q', price=650))
+    assert not sent
+    assert "Alert requires at least 25%" in result.assessments[0].detail.reason
+    assert execute(tmp_path / "msi", replace(monitor(), title='MSI MPG 272URX QD-OLED', price=650))[0]
+
+
+def test_watchlist_budget_cannot_raise_the_model_discount_limit(tmp_path):
+    plugin = MonitorHardwarePlugin(ROOT / "config/hardware.toml", tmp_path, now=NOW)
+    try:
+        candidate = plugin.prepare(monitor(price=350))
+        candidate = replace(candidate, hunt=replace(candidate.hunt, target=500))
+        item = plugin.judge(candidate, plugin.read_history(candidate))
+        assert not item.alertable and item.detail.target_price == 299.99
+        candidate = replace(candidate, listing=monitor(price=275), hunt=replace(candidate.hunt, target=250))
+        item = plugin.judge(candidate, plugin.read_history(candidate))
+        assert not item.alertable and item.detail.target_price == 250
+    finally:
+        plugin.close()
 
 
 @pytest.mark.parametrize("changes", [
@@ -135,11 +179,72 @@ def test_ebay_search_is_not_stock_and_exact_check_includes_shipping(tmp_path):
         checked = replace(checked, extra={"shopping": {**checked.extra["shopping"], "availability_checked_at": NOW.isoformat()}})
         sent, result = execute(tmp_path / "verified", checked)
         assert len(sent) == 1 and "COMMUNITY" not in sent[0].buys[0].badge
+        assert any(fact.startswith("Stock checked: ") for fact in sent[0].buys[0].facts)
         assert not result.assessments[0].loggable
         stale = {**checked.extra["shopping"], "availability_checked_at": (NOW-timedelta(hours=1)).isoformat()}
         assert not execute(tmp_path / "stale", replace(checked, extra={"shopping": stale}))[0]
     finally:
         source.session.close()
+
+
+@pytest.mark.parametrize("body", [
+    'DP 1.4 does not work; HDMI works', 'Monitor not included; stand only',
+    'Only this price after trade-in rebate', 'Out of stock',
+])
+def test_exact_item_verification_retains_negative_search_description(tmp_path, body):
+    source, row, _ = checked_monitor()
+    try:
+        checked = source._verify_memory_stock([replace(row, body=body)])[0]
+        checked = replace(checked, extra={"shopping": {**checked.extra["shopping"], "availability_checked_at": NOW.isoformat()}})
+        assert not execute(tmp_path, checked)[0]
+    finally:
+        source.session.close()
+
+
+@pytest.mark.parametrize("loggable", [False, True])
+def test_best_match_and_unavailable_exact_stock_cannot_alert(tmp_path, loggable):
+    source, row, item = checked_monitor()
+    try:
+        row = replace(row, loggable=loggable)
+        assert not execute(tmp_path / "search", row)[0]
+        source.session.get.return_value.json = lambda: item | {"estimatedAvailabilities": [{
+            "deliveryOptions": ["SHIP_TO_HOME"], "estimatedAvailabilityStatus": "OUT_OF_STOCK",
+            "estimatedRemainingQuantity": 0}]}
+        checked = source._verify_memory_stock([row])[0]
+        checked = replace(checked, extra={"shopping": {**checked.extra["shopping"], "availability_checked_at": NOW.isoformat()}})
+        assert checked.extra["shopping"]["available"] is False
+        assert not execute(tmp_path / "unavailable", checked)[0]
+    finally:
+        source.session.close()
+
+
+def test_exact_lookup_cannot_switch_models_within_the_same_panel_category(tmp_path):
+    source, row, item = checked_monitor()
+    try:
+        source.session.get.return_value.json = lambda: item | {"title": "ASUS XG27UCS", "price": {"value": "200", "currency": "USD"}}
+        checked = source._verify_memory_stock([row])[0]
+        checked = replace(checked, extra={"shopping": {**checked.extra["shopping"], "availability_checked_at": NOW.isoformat()}})
+        assert not execute(tmp_path, checked)[0]
+    finally:
+        source.session.close()
+
+
+def test_saved_delivery_judgment_retains_stock_evidence(tmp_path):
+    source, row, _ = checked_monitor()
+    plugin = MonitorHardwarePlugin(ROOT / "config/hardware.toml", tmp_path, now=NOW)
+    try:
+        checked = source._verify_memory_stock([row])[0]
+        checked = replace(checked, extra={"shopping": {**checked.extra["shopping"], "availability_checked_at": NOW.isoformat()}})
+        candidate = plugin.prepare(checked)
+        item = plugin.judge(candidate, plugin.read_history(candidate))
+        assert item.alertable
+        records = judgments(plugin, SimpleNamespace(assessments=[item], decisions=[]), plugin.options,
+                            AlertState(plugin.state_dir / "alerts.json", plugin.normalise_key), NOW)
+        stock = records[item.key]["stock_evidence"]
+        assert stock["available"] is True and stock["availability_checked_at"] == NOW.isoformat()
+    finally:
+        source.session.close()
+        plugin.close()
 
 
 @pytest.mark.parametrize("changes", [

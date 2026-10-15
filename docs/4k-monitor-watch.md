@@ -8,20 +8,26 @@ or a screen with only HDMI/USB-C does not qualify. USB-C DP Alt Mode alone
 does not establish the required DisplayPort input.
 
 `config/monitor-watch.toml` owns the requirements, documented models, ports,
-and price limits. The initial limits carry over the 25% discount preference:
+and exact-model benchmarks. Alerts require at least 25% below the recorded
+retail quote for that specific model:
 
-| Watch | Representative retail benchmark | Alert ceiling |
+| Model | Recorded retail benchmark | Alert ceiling |
 | --- | --- | --- |
-| Standard panel / panel not specified | Alienware AW2725QF: $399.99 | $299.99 |
-| OLED | Alienware AW2725Q: $799.99 | $599.99 |
+| Alienware AW2725QF | $399.99 | $299.99 |
+| Alienware AW2725Q | $799.99 | $599.99 |
+| ASUS XG27UCS | $399.00 | $299.25 |
+| MSI MPG 272URX | $899.99 | $674.99 |
+| MSI MAG 274UPF E2 / LG 27GR93U-B | No verified current purchasable US quote | Alerts withheld |
 
-Both benchmarks were read from Dell's US product pages on October 14, 2026;
-their source URLs are saved in the configuration. Use the current selling
-price, rather than Dell's higher “Estimated Value.” Shipping, tax and delivery
-were not checked. These are representative purchase limits, not proof that a
-particular model is 25% off, a sold-price valuation, or an absolute purchase
-budget supplied by the user. Benchmarks are manually maintained; they do not
-automatically follow later price changes. Cents round down.
+Quotes were checked on October 14, 2026 against the Dell, ASUS and MSI US
+product/store pages linked in the configuration. Use the quoted selling
+price, rather than MSRP or Dell's higher “Estimated Value.” The MSI MAG page
+is out of stock; LG's accessible product page does not give a current price.
+Their specs remain recognized but they cannot inherit another model's limit.
+Benchmarks are manually maintained and do not automatically follow later
+price changes. The alert quotes its model's benchmark and check date, so the
+discount is explicitly against that recorded quote, not a live market-price
+claim or sold-price valuation. Cents round down; tax is excluded.
 
 The documented models are Alienware AW2725QF and AW2725Q, ASUS XG27UCS,
 MSI MAG 274UPF E2 and MPG 272URX, and LG 27GR93U-B. Each has a manufacturer
@@ -31,10 +37,11 @@ model. Explicit contradictory size/resolution/speed or broken DisplayPort
 evidence prevents an alert. Known dual-mode models use their 4K refresh rate,
 not the faster 1080p mode. These spec records do not assert current stock.
 
-Other brands/models can qualify when the title explicitly states the required
-size, 4K resolution, refresh rate and DisplayPort input. An unknown product
-with missing or ambiguous specs stays out. A panel whose type is unstated
-uses the lower standard ceiling and does not claim to be LCD or OLED.
+Other brands/models can be recognized when the title explicitly states the
+required size, 4K resolution, refresh rate and DisplayPort input. An unknown
+product with missing or ambiguous specs stays out. Recognized products with
+no exact model and recorded benchmark cannot send discount alerts. A panel
+whose type is unstated does not claim to be LCD or OLED.
 Accessories, broken panels, multiple-model menus, whole-PC bundles and lots
 do not qualify. New condition is required; used/open-box/refurbished listings
 do not inherit new-monitor price limits. Conditional rebate, cashback,
@@ -49,11 +56,15 @@ direct poller for each store.
 Community pushes say **COMMUNITY LEAD** and state that retailer stock, shipping
 and checkout are unverified. An eBay search hit alone cannot alert: an exact
 item lookup must confirm its current identity, new condition, seller, fixed
-USD price, known shipping and purchasable stock. Verification must be no more
+USD price, known shipping and purchasable stock. The model must agree between
+the search and exact item, and negative search descriptions remain available
+to veto broken ports, excluded screens and conditional prices. Verification must be no more
 than 20 minutes old. Item lookups share the existing 20-request budget and
 rate-limit handling with RAM/cards; a deferred lookup cannot alert.
 
 Each alert has one `Ports:` fact, e.g. `DP 1.4; 2x HDMI 2.1; USB hub`.
+eBay alerts also show the stock-check time, and saved delivery activity keeps
+the availability evidence for later audits.
 Shopping cards show the same information in the existing small specification
 strip. USB-C charging, hub and video capabilities are distinguished where the
 manufacturer documents them. Monitor categories never enter the hardware

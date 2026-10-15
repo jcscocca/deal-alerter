@@ -68,6 +68,7 @@ class HardwarePlugin:
         self.watched = self.cfg.all_watched_parts()
         self.seen = self.matched = 0
         self.display_watches = {}
+        self.display_stock = {}
         # Rebuild from the committed authority, never from a possibly newer,
         # uncommitted SQLite cache. Even import/maintenance is private to this run.
         self.temporary = TemporaryDirectory(prefix="hardware-history-")

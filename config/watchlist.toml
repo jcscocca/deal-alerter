@@ -175,7 +175,7 @@ name = "Desktop DDR5 UDIMM 64GB sticks"
 parts = ["ddr5_udimm_64"]
 target = 937.49
 
-# Display requirements and separate standard/OLED price limits are in
+# Display requirements and exact-model 25% discount limits are in
 # monitor-watch.toml. Different models never share a market-value history.
 [[hunt]]
 name = "27-inch 4K gaming monitors with DisplayPort"
