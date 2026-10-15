@@ -67,6 +67,8 @@ class HardwarePlugin:
                                   include_others=True)
         self.watched = self.cfg.all_watched_parts()
         self.seen = self.matched = 0
+        self.display_watches = {}
+        self.display_stock = {}
         # Rebuild from the committed authority, never from a possibly newer,
         # uncommitted SQLite cache. Even import/maintenance is private to this run.
         self.temporary = TemporaryDirectory(prefix="hardware-history-")
@@ -123,6 +125,9 @@ class HardwarePlugin:
         return sold if sold.trustworthy else self.log.stats(candidate.match.part.key, candidate.condition, **args)
 
     def judge(self, candidate: Candidate, stats) -> Assessment | None:
+        from .displays import WATCHES, judge_display
+        if candidate.match.part.key in WATCHES:
+            return judge_display(self, candidate)
         listing, result, hunt = candidate.listing, candidate.match, candidate.hunt
         item = self.verdict.assess(listing_id=listing.listing_id, source=listing.source,
             part=result.part, title=listing.title, url=listing.url, unit_price=result.unit_price,
@@ -266,6 +271,9 @@ class HardwarePlugin:
         return [lifted.get(item.key, item) for item in assessments]
 
     def card(self, assessment: Assessment, signal: str | None = None) -> Card:
+        if assessment.key in getattr(self, "display_watches", {}):
+            from .displays import display_card
+            return display_card(self, assessment)
         item = assessment.detail
         signal = signal or getattr(self, "signals", {}).get(assessment.key)
         product = item.part.is_product

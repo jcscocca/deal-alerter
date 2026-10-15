@@ -6,6 +6,7 @@ import re
 from alerters.hardware.native.catalog import Kind
 from alerters.hardware.native.match import find_all_parts
 from alerters.hardware.memory import standalone_memory, configuration as sodimm_configuration, LAYOUTS, layout_label
+from alerters.hardware.displays import specifications as display_specifications
 from .research import cpu_model
 
 UNKNOWN = "Not established"
@@ -63,6 +64,8 @@ def storage(title):
 def product_type(title):
     if standalone_memory(title) or sodimm_configuration(title):
         return "Memory"
+    if display_specifications(title):
+        return "Monitors"
     for label, pattern in (
         ("Accessories", r"\b(?:backpack|sleeve|case for|cover for|bag|insect bite|screen protector)\b|\b(?:iPad|tablet|laptop)\s+(?:case|cover|stand)\b"),
         ("Docks & hubs", r"\b(?:dock|docking|hub|KVM)\b"),
@@ -105,4 +108,5 @@ def attributes(row):
         "storage": one(storage(title) for title in titles) or UNKNOWN,
         "condition": condition,
         "memory_layout": one(layout_label(title) for title in titles) or UNKNOWN,
+        "ports": one(display.ports for title in titles if (display := display_specifications(title))) or UNKNOWN,
     }

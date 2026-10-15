@@ -18,6 +18,7 @@ import pytest
 from alerters.hardware.native.catalog import PARTS, BY_KEY, Kind
 from alerters.hardware.native.match import find_all_parts, find_part
 from alerters.hardware.memory import LAYOUTS, configuration
+from alerters.hardware.displays import WATCHES as DISPLAY_WATCHES, configuration as display_configuration
 
 ADDED = [
     ("radeon_pro_w7900", "AMD Radeon PRO W7900 48GB Workstation Graphics Card"),
@@ -125,6 +126,9 @@ class TestCatalogInvariants:
             # value. Their dedicated parser validates module counts and type.
             assert part.reference_basis == "estimate"
             assert configuration(part.name) == part.key
+        elif part.key in DISPLAY_WATCHES:
+            assert part.reference_basis == "estimate"
+            assert display_configuration(part.name) == part.key
         else:
             assert part.reference_basis == "list"
             assert part.require_all and part.excludes

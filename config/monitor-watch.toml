@@ -1,0 +1,85 @@
+# 27-inch-class 4K gaming monitors. OLED is optional; DisplayPort is required.
+# OLED panels sold as 27-inch may have a 26.5/26.7-inch viewable diagonal.
+[requirements]
+size_class_inches = 27
+min_refresh_hz = 144
+resolution = [3840, 2160]
+displayport_required = true
+condition = "new"
+
+# Alert only at least 25% below the exact model's recorded retail quote.
+# Benchmarks are dated selling prices, not MSRP or sold-price valuations.
+# Missing benchmarks disable alerts for that model. Refresh quotes manually.
+[pricing]
+discount_percent = 25
+
+[[watch]]
+key = "monitor_4k_27_standard"
+name = "27-inch 4K 144Hz+ DisplayPort monitors"
+
+[[watch]]
+key = "monitor_4k_27_oled"
+name = "27-inch 4K 144Hz+ DisplayPort OLED monitors"
+
+# Exact model specifications fill missing title fields; they never prove stock.
+# Unknown models can be recognized from explicit specs; alerts need a benchmark.
+[[model]]
+aliases = ["AW2725QF"]
+benchmark = 399.99
+checked_on = "2026-10-14"
+price_source = "https://www.dell.com/en-us/shop/monitors/apd/alienware-27-4k-dualresolution-gaming-monitor-aw2725qf/aw2725qf_monitor/-"
+panel = "IPS"
+refresh_hz = 180
+dual_mode = true
+ports = "DP 1.4; 2x HDMI 2.1; USB hub / USB-C downstream"
+source = "https://www.dell.com/en-us/shop/monitors/apd/alienware-27-4k-dualresolution-gaming-monitor-aw2725qf/aw2725qf_monitor/-"
+
+[[model]]
+aliases = ["AW2725Q"]
+benchmark = 799.99
+checked_on = "2026-10-14"
+price_source = "https://www.dell.com/en-us/shop/monitors/apd/alienware-27-4k-qdoled-gaming-monitor-aw2725q/aw2725q_monitor/-"
+panel = "QD-OLED"
+refresh_hz = 240
+ports = "DP 1.4 (DSC); 2x HDMI 2.1; USB hub / USB-C downstream"
+source = "https://www.dell.com/en-us/shop/monitors/apd/alienware-27-4k-qdoled-gaming-monitor-aw2725q/aw2725q_monitor/-"
+
+[[model]]
+aliases = ["XG27UCS"]
+benchmark = 399.00
+checked_on = "2026-10-14"
+price_source = "https://rog.asus.com/us/monitors/27-to-31-5-inches/rog-strix-xg27ucs/"
+panel = "IPS"
+refresh_hz = 160
+ports = "DP 1.4; HDMI 2.1; USB-C (DP Alt Mode, 15W)"
+source = "https://rog.asus.com/us/monitors/27-to-31-5-inches/rog-strix-xg27ucs/spec/"
+
+[[model]]
+aliases = ["MAG 274UPF E2", "MAG274UPF E2", "MAG274UPFE2"]
+panel = "IPS"
+refresh_hz = 160
+ports = "DP 1.4a; 2x HDMI 2.1; USB-C (DP Alt Mode, 15W)"
+source = "https://us.msi.com/Monitor/MAG-274UPF-E2/Specification"
+price_source = "https://us-store.msi.com/MAG-274UPF-E2"
+checked_on = "2026-10-14"
+benchmark_note = "MSI lists $399.99 but out of stock; no verified purchasable US quote. Discount alerts withheld."
+
+[[model]]
+aliases = ["MPG 272URX", "MPG272URX"]
+benchmark = 899.99
+checked_on = "2026-10-14"
+price_source = "https://us-store.msi.com/Monitors/Gaming-Monitors/MPG-Series-Monitor/MPG-272URX-QD-OLED"
+panel = "QD-OLED"
+refresh_hz = 240
+ports = "DP 2.1a (UHBR20); 2x HDMI 2.1; USB-C (DP Alt Mode, 98W); USB hub"
+source = "https://storage-asset.msi.com/datasheet/monitor/us/MPG-272URX-QD-OLED.pdf"
+
+[[model]]
+aliases = ["27GR93U-B", "27GR93U"]
+panel = "IPS"
+refresh_hz = 144
+ports = "DisplayPort; 2x HDMI 2.1; USB hub; headphone out"
+source = "https://www.lg.com/us/monitors/lg-27gr93u-b-gaming-monitor"
+price_source = "https://www.bestbuy.com/product/lg-ultragear-27-ips-uhd-1-ms-freesync-and-g-sync-compatible-monitor-with-hdr-display-port-hdmi-black/6555704"
+checked_on = "2026-10-14"
+benchmark_note = "No current price exposed by LG; Best Buy says no longer available new. Discount alerts withheld."

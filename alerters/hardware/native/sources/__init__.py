@@ -29,6 +29,7 @@ def build_sources(cfg) -> list[Source]:
     and the rest of the run proceeds. Only Reddit-without-credentials is worth
     warning about, since it will work intermittently rather than not at all.
     """
+    from ...displays import LIMITS as DISPLAY_LIMITS, configuration as display_configuration
     sources: list[Source] = [
         RedditSource(
             subreddits=cfg.reddit_subs,
@@ -51,6 +52,9 @@ def build_sources(cfg) -> list[Source]:
                                if key.startswith(("ddr5_sodimm_", "ddr5_udimm_")) and hunt.target is not None},
                 card_limits={key: hunt.target for key, hunt in cfg.all_watched_parts().items()
                              if key in ("rtx_5070_ti", "rtx_5080", "rtx_5090") and hunt.target is not None},
+                display_limits={model: min(limit, hunt.target) if hunt.target is not None else limit
+                                for model, limit in DISPLAY_LIMITS.items()
+                                if (hunt := cfg.all_watched_parts().get(display_configuration(model)))},
             )
         )
     # HARDWARE_SOURCES narrows a run to some of them, so Reddit's throttled
