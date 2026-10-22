@@ -1,16 +1,7 @@
 {
   "version": 2,
-  "updated_at": "2026-10-21T21:50:26+00:00",
+  "updated_at": "2026-10-22T21:45:25+00:00",
   "alerts": {
-    "steam:2057760": {
-      "deliveries": {
-        "email": {
-          "price": 18.74,
-          "verdict": 5,
-          "alerted_at": "2026-10-01T22:47:00+00:00"
-        }
-      }
-    },
     "steam:2501600": {
       "deliveries": {
         "email": {
@@ -26,15 +17,6 @@
           "price": 27.99,
           "verdict": 5,
           "alerted_at": "2026-10-21T21:50:26+00:00"
-        }
-      }
-    },
-    "steam:3509230": {
-      "deliveries": {
-        "email": {
-          "price": 9.74,
-          "verdict": 5,
-          "alerted_at": "2026-10-01T22:47:00+00:00"
         }
       }
     }
