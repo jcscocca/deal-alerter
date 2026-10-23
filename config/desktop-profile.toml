@@ -1,4 +1,5 @@
-# Retained prebuilt purchase watch. The completed build is
+# Archived prebuilt purchase watch; active parts notices use parts-watch.toml.
+# Retained for historical parsing/regression compatibility. The completed build is
 # recorded in desktop-inventory.toml and already allocates the Corsair pair.
 # This profile still watches factory 32GB/64GB PCs; it is not current inventory.
 # Prices are PC totals before tax. Mixing compatibility remains unverified.

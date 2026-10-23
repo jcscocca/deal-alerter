@@ -62,9 +62,9 @@ FEED_UA = (
     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 )
 
-# Flairs worth reading. buildapcsales tags everything; anything not in here is
-# a monitor, a case or a keyboard and can be skipped before parsing.
-INTERESTING_FLAIRS = {"gpu", "cpu", "ssd", "ram", "prebuilt", "laptop", "psu"}
+# Component and display feeds; complete-machine purchase plans are retired.
+INTERESTING_FLAIRS = {"gpu", "cpu", "ssd", "ram", "psu", "monitor", "motherboard",
+                      "case", "cooler", "fan", "keyboard", "mouse", "accessory", "cable"}
 
 
 class RedditSource:

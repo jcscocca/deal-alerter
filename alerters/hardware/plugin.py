@@ -38,6 +38,8 @@ class SourceAdapter:
 class HardwarePlugin:
     name, axes, default_mode = "hardware", ("cheapness", "value", "capability"), "full"
     normalise_key = staticmethod(normalise_key)
+    track_complete_systems = True
+    require_capacity_upgrade = True
 
     def __init__(self, config_path: Path, state_root: Path, *, daily: bool = True) -> None:
         try:
@@ -89,6 +91,8 @@ class HardwarePlugin:
 
     def prepare(self, listing: Listing) -> Candidate | None:
         self.seen += 1
+        if not self.track_complete_systems and listing.extra.get("prebuilt_offer"):
+            return None
         # A manual entry is a standing instruction rather than a search hit:
         # you typed it in deliberately and it stays until you delete the line.
         # Ageing it out would quietly stop watching a listing you asked to watch.
@@ -97,6 +101,8 @@ class HardwarePlugin:
         result = self.matcher(listing.title, body=listing.body, price=listing.price,
                               multi_variant=listing.multi_variant)
         if result.junk or result.part is None or result.unit_price is None:
+            return None
+        if not self.track_complete_systems and (result.is_system or result.part.kind.value == "unified"):
             return None
         hunt = self.watched.get(result.part.key)
         if hunt is None:
@@ -135,13 +141,14 @@ class HardwarePlugin:
             stats=stats, thresholds=self.cfg.thresholds, mining_risk=result.mining_risk,
             seller_risk=listing.seller_risk, seller_note=listing.seller_note, loggable=listing.loggable,
             is_system=result.is_system, is_bundle=result.is_bundle, multi_variant=listing.multi_variant,
-            target_price=hunt.target, hunt_name=hunt.name, psu_headroom_w=self.cfg.psu_headroom_w)
+            target_price=hunt.target, hunt_name=hunt.name, psu_headroom_w=self.cfg.psu_headroom_w,
+            require_capacity_upgrade=self.require_capacity_upgrade)
         if item is None:
             return None
         # A product is bought for itself, so growing the VRAM pool is not the
         # question. Its trust still comes from the anchor, like everything else.
         product = result.part.is_product
-        upgrade = product or item.vram_after > item.vram_before + 1
+        upgrade = not self.require_capacity_upgrade or product or item.vram_after > item.vram_before + 1
         if not upgrade:
             # The original target promotion ran AFTER this cap and could undo it.
             # Keep the claimed invariant independent of configurable alert floors.

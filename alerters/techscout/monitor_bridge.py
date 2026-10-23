@@ -1,7 +1,6 @@
 """Read-only bridge from the installed monitor's public shopping export."""
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -9,12 +8,11 @@ import math
 import re
 from urllib.parse import urlsplit, urlunsplit
 
-from alerters.hardware.desktop_profile import DEFAULT_PROFILE, DesktopProfile
-from alerters.hardware.prebuilt import Offer, exact_desktop, gpu_model
+from alerters.hardware.prebuilt import gpu_model
 from alerters.hardware.native.match import extract_price
 from .research import cpu_model
-from alerters.hardware.prebuilt_specs import public_specs
-from alerters.hardware.memory import standalone_memory, configuration as sodimm_configuration
+from .scope import allowed_title, categories
+from .facets import product_type
 
 LABELS = {"newegg": "Newegg", "ebay": "eBay", "apple-refurb": "Apple Refurbished",
           "slickdeals": "Slickdeals", "hp": "HP", "reddit": "Reddit",
@@ -71,76 +69,45 @@ def safe_url(value, source):
         return None
 
 
-def categories(title, is_system=False):
-    if not is_system and (standalone_memory(title) or sodimm_configuration(title)):
-        return {"memory"}
-    if re.search(r"\biPad\b|\btablet\b|Galaxy Tab", title, re.I):
-        return {"tablets"}
-    if is_system or exact_desktop(title) or re.search(r"\b(?:Mac mini|Mac Studio|Mac Pro|MacBook|laptop|notebook|desktop|mini pc)\b", title, re.I):
-        return {"computers", "desktop-memory"} if exact_desktop(title) else {"computers"}
-    if re.search(r"\b(?:DDR[345]|DIMM|memory kit)\b", title, re.I) and not re.search(r"\bGDDR\d\b", title, re.I):
-        return {"memory"}
-    return {"supplies"}
-
-
-def public_row(raw, source, checked, expires, problems, now, profile):
+def public_row(raw, source, checked, expires, problems, now):
     from .integration import judgment
-    is_offer = raw.get("type") == "offer"
-    data = raw.get("offer") if is_offer else raw
-    if not isinstance(data, dict):
+    # The old complete-PC projection stays in recovery files, never in the feed.
+    if raw.get("type") == "offer":
         return None
+    data = raw
     title, url = data.get("title"), safe_url(data.get("url"), source)
-    if not isinstance(title, str) or not title.strip() or len(title) > 1500 or not url:
+    if not isinstance(title, str) or len(title) > 1500 or not url or data.get("is_system") is True or not allowed_title(title):
         return None
     reasons, warnings = list(problems), []
-    fit, total, price, shipping = {}, None, None, None
+    total, price, shipping = None, None, None
     community = source in ("slickdeals", "reddit")
     seller = data.get("seller") or ("Apple" if source == "apple-refurb" else "Not published")
     raw_condition = data.get("condition") if isinstance(data.get("condition"), str) else ""
     condition = {"new": "New", "used": "Used", "open_box": "Open box", "refurbished": "Refurbished"}.get(raw_condition, "Not published")
     available, stock = False, "unknown"
     cost_note = "price + shipping · before tax"
-    if is_offer:
-        try:
-            offer = Offer.from_json(data)
-            if offer.retailer != source or offer.announcement:
-                return None
-            fit = asdict(profile.assess_memory(offer))
-            price, shipping = number(offer.base_price), number(offer.shipping)
-            total = number(offer.total(datetime.fromtimestamp(now, timezone.utc)))
-            available = offer.confirmed is True and offer.sale_status(datetime.fromtimestamp(now, timezone.utc)) == "live"
-            stock = stock_state(offer.stock)
-            if not offer.confirmed and source in ("ibuypower", "skytech", "cyberpowerpc") and offer.evidence:
-                reasons.append(offer.evidence[:500])
-            if offer.coupon and offer.coupon.active(datetime.fromtimestamp(now, timezone.utc)):
-                cost_note = "with confirmed coupon + shipping · before tax"
-                warnings.append("Coupon: " + offer.coupon.instructions)
-            if offer.required_accessories or offer.coupon and offer.coupon.required_accessories:
-                cost_note = "including required extras + shipping · before tax"
-            identity = offer.key
-        except (ValueError, TypeError, KeyError, ArithmeticError, AttributeError):
-            return None
-    else:
-        identity = str(data.get("id", ""))
-        shopping = data.get("shopping") if isinstance(data.get("shopping"), dict) else {}
-        price = number(shopping.get("item_price")) if source == "ebay" else number(data.get("price"))
-        shipping = number(shopping.get("shipping"))
-        available = shopping.get("available") is True if source == "ebay" else source == "apple-refurb"
-        if source == "ebay":
-            stock = stock_state(shopping.get("stock"))
-        if price is not None and shipping is not None:
-            total = round(price + shipping, 2)
-        if exact_desktop(title):
-            fit = asdict(profile.assess_memory(Offer(source, identity, title, url, str(seller), condition,
-                                                    {}, price, shipping, "unknown", False, checked)))
-        if data.get("multi_variant"):
-            reasons.append("Selected variant is unverified")
-        if data.get("quantity", 1) != 1:
-            reasons.append("Multiple-item lot; compare quantity before purchase")
-        if data.get("seller_risk", "low") != "low":
-            reasons.append("Seller needs review")
-        if isinstance(data.get("seller_note"), str) and data["seller_note"]:
-            warnings.append(data["seller_note"][:500])
+    identity = str(data.get("id", ""))
+    shopping = data.get("shopping") if isinstance(data.get("shopping"), dict) else {}
+    price = number(shopping.get("item_price")) if source == "ebay" else number(data.get("price"))
+    shipping = number(shopping.get("shipping"))
+    available = shopping.get("available") is True if source == "ebay" else False
+    if source == "ebay":
+        stock = stock_state(shopping.get("stock"))
+        # A search result alone is not current inventory evidence.
+        checked_stock = stamp(shopping.get("availability_checked_at"))
+        if checked_stock is None or not 0 <= now - checked_stock <= 1200:
+            available = False
+            reasons.append("Exact-item stock needs a fresh check")
+    if price is not None and shipping is not None:
+        total = round(price + shipping, 2)
+    if data.get("multi_variant"):
+        reasons.append("Selected variant is unverified")
+    if data.get("quantity", 1) != 1:
+        reasons.append("Multiple-item lot; compare quantity before purchase")
+    if data.get("seller_risk", "low") != "low":
+        reasons.append("Seller needs review")
+    if isinstance(data.get("seller_note"), str) and data["seller_note"]:
+        warnings.append(data["seller_note"][:500])
     if community:
         total, shipping, available = None, None, False
         reasons.append("Community lead; retailer price and availability unverified")
@@ -157,22 +124,18 @@ def public_row(raw, source, checked, expires, problems, now, profile):
             reasons.append("Seller or condition unknown")
     storage = re.findall(r"\b\d+(?:\.\d+)?\s*(?:TB|GB)\s*(?:Gen[345]\s+)?(?:NVMe\s+)?SSD\b", title, re.I)
     kinds = categories(title, data.get("is_system", False))
-    product_group = (f"Desktops · RTX {gpu_model(title)} · {fit.get('installed_gb') or '?'}GB" if fit else
-                     ("Computers" if "computers" in kinds else "Components") + " · " + str(data.get("product_group") or "Other tech")[:150])
+    product_group = product_type(title)
     return {"id": source + ":" + hashlib.sha256(identity.encode()).hexdigest()[:24], "judgment": judgment(raw.get("judgment")),
             "price_history": raw.get("judgment", {}).get("price_history") if isinstance(raw.get("judgment"), dict) else None,
-            "build_specs": public_specs(data.get("specs")) if is_offer else {},
             "first_seen": raw.get("first_seen") if stamp(raw.get("first_seen")) is not None else None,
             "title": title, "url": url, "source": source, "retailer": LABELS[source],
             "seller": str(seller)[:250], "condition": condition, "price": price, "shipping": shipping,
             "total": total, "cost_note": cost_note, "available": available, "stock": stock, "gpu": gpu_model(title),
             "cpu": cpu_model(title) or "Not established", "storage": storage[0] if len(storage) == 1 else "Not established",
-            "ram": fit.get("installed_gb"), "potential": fit.get("potential_gb"), "eligible": fit.get("eligible", False),
-            "fit": fit.get("status", "Not assessed"), "fit_summary": fit.get("summary", ""),
-            "layout_documented": fit.get("status") == "POSSIBLE REUSE", "warnings": warnings,
+            "ram": None, "warnings": warnings,
             "rank": None, "reasons": reasons, "checked_at": checked, "expires_at": expires,
             "lead": community, "categories": sorted(kinds), "product_group": product_group,
-            "is_system": data.get("is_system") is True or bool(exact_desktop(title)),
+            "is_system": False,
             "merchant": "Amazon" if community and re.search(r"\bat Amazon\b|\[Amazon\]|\(Amazon\)", title, re.I) else None}
 
 
@@ -192,11 +155,13 @@ def read_monitor(runtime, category, now):
         return result
     heartbeat = number(data.get("heartbeat"))
     alive = heartbeat is not None and 0 <= now - heartbeat <= 90 and data.get("dry_run") is False
-    profile, sources, selected = DesktopProfile(DEFAULT_PROFILE), {}, {}
+    sources, selected = {}, {}
     for batch in data["sources"]:
         if not isinstance(batch, dict) or batch.get("source") not in LABELS:
             continue
         source = batch["source"]
+        if source not in ("ebay", "reddit", "slickdeals"):
+            continue
         checked = stamp(batch.get("observed_at"))
         interval = number(batch.get("interval"))
         lifetime = max(900, min(interval or 900, 3600) + 90)
@@ -223,7 +188,7 @@ def read_monitor(runtime, category, now):
             if not isinstance(raw, dict):
                 continue
             row = public_row(raw, source, batch.get("observed_at"), min(expires, heartbeat + 90) if alive else 0,
-                             problems, now, profile)
+                             problems, now)
             if not row:
                 continue
             previous = selected.get(row["id"])
@@ -236,20 +201,15 @@ def read_monitor(runtime, category, now):
                 continue
         elif category != "monitor" and category not in row["categories"]:
             continue
-        if "desktop-memory" in row["categories"] and (not row["eligible"] or row["ram"] not in (32, 64) or not row["gpu"]):
-            row["preference_reasons"] = [row["fit_summary"] or "Desktop configuration needs verification"]
-        else:
-            row["preference_reasons"] = []
         row["verification_reasons"] = list(row["reasons"])
-        if category == "desktop-memory":
-            row["reasons"] += row["preference_reasons"]
         result["rows"].append(row)
     result["sources"] = list(sources.values())
     for info in result["sources"]:
         info["status"] = ("Monitor heartbeat stale" if not alive else "Current" if info["ready"] == info["jobs"] else
                           "Some checks need attention" if info["ready"] else "Checks need attention" if info["checked_at"] else "No successful check yet")
     # Absent jobs must never look enabled (eBay can be disabled for missing credentials).
-    for source, label in LABELS.items():
+    for source in ("ebay", "reddit", "slickdeals"):
+        label = LABELS[source]
         if source not in sources:
             result["sources"].append({"source": source, "label": label, "jobs": 0, "ready": 0,
                                       "count": 0, "checked_at": None, "truncated": False, "status": "Not enabled"})

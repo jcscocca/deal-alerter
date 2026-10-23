@@ -5,25 +5,25 @@
   const dollars=value=>value==null ? 'Unknown' : new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value);
   const date=value=>value ? new Date(value).toLocaleString([],{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}) : 'No successful check';
   const rowFresh=B.fresh, token=document.querySelector('meta[name="techscout-token"]').content;
-  const categoryNames={'desktop-memory':'Desktops',tablets:'Tablets',computers:'Computers',supplies:'Tech supplies',memory:'Memory',amazon:'Amazon deals',monitor:'All deals'};
-  const allLabels={kind:'All product types',gpu:'All GPUs',ram:'Any included RAM',memory_layout:'Any memory layout',cpu:'All CPUs',storage:'All storage',condition:'All conditions'};
+  const categoryNames={monitor:'All finds',parts:'PC parts',monitors:'Monitors',memory:'Memory',supplies:'Accessories',amazon:'Amazon reports'};
+  const allLabels={kind:'All product types',gpu:'All GPUs',ram:'Any memory capacity',memory_layout:'Any memory layout',cpu:'All CPUs',storage:'All storage',condition:'All conditions'};
   let category='monitor',view='list',state=null,related=[],pending=false,poll=null,version=0;
-  let savedViews={},prefs=B.defaults(),picks=new Set(),expanded=new Set(),expandedReports=new Set(),limits={current:12,other:12,similar:6};
+  let savedViews={},prefs=B.defaults(),picks=new Set(),expanded=new Set(),expandedReports=new Set(),limits={current:12,other:12,reports:12,similar:6};
   try {
-    const saved=JSON.parse(localStorage.getItem('techscout-browsing') || '{}');
+    const saved=JSON.parse(localStorage.getItem('techscout-deals-v2') || '{}');
     if(Object.hasOwn(categoryNames,saved.category))category=saved.category;
     for(const key of Object.keys(categoryNames))if(saved.views?.[key])savedViews[key]=B.restore(saved.views[key]);
-    const ids=JSON.parse(localStorage.getItem('techscout-shortlist') || '[]');
+    const ids=JSON.parse(localStorage.getItem('techscout-deals-shortlist-v2') || '[]');
     if(Array.isArray(ids))picks=new Set(ids.filter(id=>typeof id==='string' && /^(?:\d{1,20}|[a-z-]+:[a-f0-9]{24})$/.test(id)).slice(0,3));
   } catch(_) {}
-  function defaults(){return {...B.defaults(),reuse:category==='desktop-memory'};}
-  function saveView(){savedViews[category]=prefs;try{localStorage.setItem('techscout-browsing',JSON.stringify({category,views:savedViews}));}catch(_) {}}
-  function remember(){try{localStorage.setItem('techscout-shortlist',JSON.stringify([...picks]));}catch(_) {}}
+  function defaults(){return {...B.defaults(),quality:category==='amazon' ? 'all' : 'standout'};}
+  function saveView(){savedViews[category]=prefs;try{localStorage.setItem('techscout-deals-v2',JSON.stringify({category,views:savedViews}));}catch(_) {}}
+  function remember(){try{localStorage.setItem('techscout-deals-shortlist-v2',JSON.stringify([...picks]));}catch(_) {}}
   function notice(message){el('notice').textContent=message;el('notice').hidden=!message;}
   function rows(){return state ? B.rowsOf(state.snapshot) : [];}
   function candidates(){return B.unique([...rows(),...related]);}
   function activeFilters(){return prefs.quality!=='all' || prefs.source!=='all' || prefs.budget!=null || Object.values(prefs.filters).some(Boolean);}
-  function changed(){limits={current:12,other:12,similar:6};saveView();render();}
+  function changed(){limits={current:12,other:12,reports:12,similar:6};saveView();render();}
   function resetFilters(){prefs.filters={};prefs.source='all';prefs.budget=null;prefs.quality='all';changed();}
   function renderFilters(){
     const data=rows();
@@ -45,16 +45,16 @@
       return `<option value="${escape(s.source)}" ${prefs.source===s.source ? 'selected' : ''}>${escape(s.label)} · ${count}</option>`;
     }).join('');
     if(document.activeElement!==el('budget'))el('budget').value=prefs.budget ?? '';
-    el('quality-select').value=prefs.quality;el('sort-select').value=prefs.sort;el('reuse').checked=prefs.reuse;
-    el('sort-select').querySelector('[value="recommended"]').textContent=prefs.reuse ? 'RAM evidence, then price' : 'Default · known total';
-    el('reuse-option').hidden=!['desktop-memory','computers','monitor'].includes(category);
+    el('quality-select').value=prefs.quality;el('sort-select').value=prefs.sort;
     el('reset-filters').disabled=!activeFilters();
     const chips=Object.entries(prefs.filters).filter(([,v])=>v).map(([key,value])=>[key,`${B.labels[key]}: ${value}`]);
     if(prefs.source!=='all')chips.push(['source',sources.find(s=>s.source===prefs.source).label]);
     if(prefs.quality!=='all')chips.push(['quality',el('quality-select').selectedOptions[0].textContent]);
     if(prefs.budget!=null)chips.push(['budget',`Up to ${dollars(prefs.budget)}`]);
-    el('filter-chips').innerHTML=chips.length ? chips.map(([key,label])=>`<button class="chip" data-remove="${key}" aria-label="Remove ${escape(label)} filter">${escape(label)} <span aria-hidden="true">×</span></button>`).join('') : '<span class="small muted">All configurations</span>';
-    el('filter-summary').textContent=`${data.filter(row=>B.matches(row,prefs)).length} of ${data.length} products match. Included RAM is what comes with the product; your 64GB kit is separate. Budget uses the known total, or item price / highest publisher quote when the total is unknown. Shipping may add to the cost.`;
+    el('filter-chips').innerHTML=chips.length ? chips.map(([key,label])=>`<button class="chip" data-remove="${key}" aria-label="Remove ${escape(label)} filter">${escape(label)} <span aria-hidden="true">×</span></button>`).join('') : '<span class="small muted">All finds</span>';
+    const matchCount=data.filter(row=>B.matches(row,prefs)).length;
+    el('filter-current-summary').textContent=`${prefs.quality==='standout' ? 'Standout' : el('quality-select').selectedOptions[0].textContent} · ${matchCount} match${matchCount===1 ? '' : 'es'}`;
+    el('filter-summary').textContent=`${data.filter(row=>B.matches(row,prefs)).length} of ${data.length} products match. Budget uses the known total, or item price / highest publisher quote when the total is unknown. Shipping may add to the cost.`;
   }
   function price(row) {
     const context=B.priceContext(row);
@@ -71,22 +71,12 @@
     return `<details class="source-reports" data-report-id="${escape(row.id)}" ${expandedReports.has(row.id) ? 'open' : ''}><summary>${row.reports.length} source report${row.reports.length === 1 ? '' : 's'}${row.sources.length > 1 ? ` · ${row.sources.length} publishers` : ''}</summary><p class="small muted">${escape(row.match_basis)}. Each publisher's price and requirements remain separate.</p>${row.reports.map(r=>`<div class="source-report"><a href="${escape(r.url)}" target="_blank" rel="noopener noreferrer">${escape(r.retailer)} ↗</a><strong>${dollars(r.price)} quoted</strong><p class="small muted">${r.published_at ? `Posted ${escape(date(r.published_at))} · ` : ''}Checked ${escape(date(r.checked_at))}${rowFresh(r) ? '' : ' · Needs a new check'}</p><p>${escape(r.title)}</p>${(r.terms || []).map(t=>`<span class="badge">${escape(t)}</span>`).join('')}${r.description ? `<p class="publisher-text">${escape(r.description)}</p>` : ''}</div>`).join('')}</details>`;
   }
 
-  function priceEvidence(row){
-    const v=row.prebuilt_value;if(!v)return '';
-    const h=v.history,p=v.peers,current=rowFresh(row) && row.available && row.stock==='in_stock' && !B.verification(row).length;
-    const historyLabel=current || !h.tracked ? h.label : (h.low ? 'Saved price history' : 'Collecting exact-build history');
-    const peerLabel=current ? p.label : 'Peer rating needs a current offer';
-    const difference=current && p.difference_pct!=null ? ` · ${Math.abs(p.difference_pct)}% ${p.difference_pct<0 ? 'below' : p.difference_pct>0 ? 'above' : 'from'} median` : '';
-    return `<div class="price-evidence"><p class="small"><strong>Price:</strong> ${escape(peerLabel)}${escape(difference)}</p><p class="small muted">${escape(historyLabel)}</p><details data-detail="evidence:${escape(row.id)}" ${expanded.has('evidence:'+row.id) ? 'open' : ''}><summary>Price evidence &amp; build details</summary><h4>Similar available PCs</h4>${p.configuration ? `<p class="small">${escape(p.configuration)}</p>` : ''}<p class="small">${p.count} other offers · ${p.sellers} sellers · ${escape(current ? p.confidence : 'Recheck required')}</p>${p.median ? `<p class="small">Sample median ${dollars(p.median)} · range ${dollars(p.low)}–${dollars(p.high)}</p>` : ''}${p.notes.map(n=>`<p class="small muted">${escape(n)}</p>`).join('')}${p.offers.map(o=>`<div class="peer-offer"><a href="${escape(o.url)}" target="_blank" rel="noopener noreferrer">${escape(o.title)} ↗</a><p class="small">${dollars(o.total)} · ${escape(o.retailer)} · ${escape(o.seller)} · checked ${escape(date(o.checked_at))}</p><p class="small muted">${Object.entries(o.build_details).map(([k,v])=>escape(k+': '+v)).join(' · ')}</p></div>`).join('')}<h4>Exact-build history</h4>${h.notes.map(n=>`<p class="small muted">${escape(n)}</p>`).join('')}${h.first_at ? `<p class="small muted">Prior observations: ${escape(date(h.first_at))} to ${escape(date(h.last_at))}</p>` : ''}<h4>This build</h4>${Object.entries(v.build_details).map(([k,value])=>`<p class="small"><strong>${escape(k)}:</strong> ${escape(value)}</p>`).join('')}${v.variable_parts ? '<p class="small muted">The seller states component brands or parts may vary.</p>' : ''}<p class="small muted">These details are not assigned a dollar premium. RAM reuse and budget targets are assessed separately.</p></details></div>`;
-  }
-
   function specStrip(row){return ['gpu','cpu','ram','storage','ports'].filter(key=>B.value(row,key)!==B.unknown).map(key=>`<span><small>${key==='ports' ? 'Ports' : B.labels[key]}</small>${escape(B.value(row,key))}</span>`).join('');}
   function rowCard(row){
     const status=B.status(row,prefs),title=row.product_name || row.title;
     const short=title.length>110 ? title.slice(0,107).replace(/\s+\S*$/,'')+'…' : title;
-    const preferences=B.preferenceReasons(row),checks=B.verification(row),reuse=prefs.reuse ? B.ramReuse(row) : null;
-    const concerns=row.lead ? row.reasons : [...(prefs.reuse ? preferences : []),...checks];
-    return `<article class="deal ${status.tone} verdict-${B.recommendation(row).tone}" data-product-id="${escape(row.id)}"><div class="deal-main"><div class="card-meta">${window.TechScoutWorkspace.recommendationBadge(row)}</div><div class="card-meta"><span class="badge ${status.tone}">${status.label}</span><span>${escape(row.retailer)} · ${escape(row.condition)}</span></div><h3 class="deal-title">${escape(short)}</h3><div class="spec-strip">${specStrip(row)}</div>${row.differences?.length ? `<p class="differences">${row.differences.map(escape).join(' · ')}</p>` : ''}${reuse ? `<div class="ram-reuse"><p class="small"><strong>${escape(reuse.total)}</strong></p><p class="small muted">${escape(reuse.check)}</p></div>` : ''}${priceEvidence(row)}${window.TechScoutWorkspace.judgmentCard(row)}${concerns.length ? `<p class="concern">${escape(concerns[0])}${concerns.length>1 ? ` (+${concerns.length-1} more in details)` : ''}</p>` : ''}<p class="small muted">Sold by ${escape(row.seller)}</p></div><div class="price">${price(row)}</div><div class="card-actions">${selectButton(row)}<button data-watch-product="${escape(row.id)}">Watch product</button><a href="${escape(row.url)}" target="_blank" rel="noopener noreferrer">${row.lead ? 'Read source' : 'View listing'} ↗</a></div><details class="listing-details" data-detail="${escape(row.id)}" ${expanded.has(row.id) ? 'open' : ''}><summary>Listing details${row.why ? ' & ranking' : ''}</summary><p>${escape(row.title)}</p>${row.fit_summary ? `<p>RAM reuse: ${escape(row.fit_summary)}</p>` : ''}${[...new Set([...checks,...preferences,...(row.warnings || [])])].map(w=>`<p class="small muted">${escape(w)}</p>`).join('')}${row.why ? `<p class="small muted">Original group rank ${row.rank}: ${escape(row.why)}</p>` : ''}<p class="small muted">Item ${dollars(row.price)} · shipping ${dollars(row.shipping)} · tax excluded</p></details>${reports(row)}</article>`;
+    const checks=B.verification(row),concerns=row.lead ? (row.reasons || []) : checks;
+    return `<article class="deal ${status.tone} verdict-${B.recommendation(row).tone}" data-product-id="${escape(row.id)}"><div class="deal-main"><div class="card-meta">${window.TechScoutWorkspace.recommendationBadge(row)}</div><div class="card-meta"><span class="badge ${status.tone}">${status.label}</span><span>${escape(row.retailer)} · ${escape(row.condition)}</span></div><h3 class="deal-title">${escape(short)}</h3><div class="spec-strip">${specStrip(row)}</div>${row.differences?.length ? `<p class="differences">${row.differences.map(escape).join(' · ')}</p>` : ''}${window.TechScoutWorkspace.judgmentCard(row)}${concerns.length ? `<p class="concern">${escape(concerns[0])}${concerns.length>1 ? ` (+${concerns.length-1} more in details)` : ''}</p>` : ''}<p class="small muted">Sold by ${escape(row.seller)}</p></div><div class="price">${price(row)}</div><div class="card-actions">${selectButton(row)}<button data-watch-product="${escape(row.id)}">Watch product</button><a href="${escape(row.url)}" target="_blank" rel="noopener noreferrer">${row.lead ? 'Read source' : 'View listing'} ↗</a></div><details class="listing-details" data-detail="${escape(row.id)}" ${expanded.has(row.id) ? 'open' : ''}><summary>Listing details</summary><p>${escape(row.title)}</p>${[...new Set([...checks,...(row.warnings || [])])].map(w=>`<p class="small muted">${escape(w)}</p>`).join('')}<p class="small muted">Item ${dollars(row.price)} · shipping ${dollars(row.shipping)} · tax excluded</p></details>${reports(row)}</article>`;
   }
   function sectionCards(id,list){
     const limit=limits[id];el(`${id}-cards`).innerHTML=list.slice(0,limit).map(rowCard).join('');
@@ -94,7 +84,7 @@
   }
   function renderCompare(){
     const selected=candidates().filter(row=>picks.has(row.id));el('compare-count').textContent=picks.size;
-    el('comparison').innerHTML=selected.length ? selected.map(row=>`<article class="compare-card verdict-${B.recommendation(row).tone}"><div class="card-meta">${window.TechScoutWorkspace.recommendationBadge(row)}</div><h2>${escape(row.product_name || row.title)}</h2><div class="price">${price(row)}</div><p class="badge ${B.status(row,prefs).tone}">${B.status(row,prefs).label}</p>${[['Source',row.retailer],...B.keys.filter(k=>k!=='kind').map(k=>[B.labels[k],B.value(row,k)]),['Potential with your kit',row.potential ? `${row.potential}GB if compatible` : B.unknown]].map(([label,value])=>`<div class="spec"><span>${label}</span>${escape(value)}</div>`).join('')}<p class="small muted">${escape(row.fit_summary)}</p>${priceEvidence(row)}${window.TechScoutWorkspace.judgmentCard(row)}<div class="card-actions">${selectButton(row)}${link(row)}</div>${reports(row)}</article>`).join('') : '<p class="empty">Save up to three products to compare their specifications here. Filters will not hide your saved comparisons.</p>';
+    el('comparison').innerHTML=selected.length ? selected.map(row=>`<article class="compare-card verdict-${B.recommendation(row).tone}"><div class="card-meta">${window.TechScoutWorkspace.recommendationBadge(row)}</div><h2>${escape(row.product_name || row.title)}</h2><div class="price">${price(row)}</div><p class="badge ${B.status(row,prefs).tone}">${B.status(row,prefs).label}</p>${[['Source',row.retailer],...B.keys.filter(k=>k!=='kind').concat('ports').map(k=>[B.labels[k],B.value(row,k)])].filter(([,value])=>value!==B.unknown).map(([label,value])=>`<div class="spec"><span>${label}</span>${escape(value)}</div>`).join('')}${window.TechScoutWorkspace.judgmentCard(row)}<div class="card-actions">${selectButton(row)}${link(row)}</div>${reports(row)}</article>`).join('') : '<p class="empty">Save up to three products to compare their specifications here. Filters will not hide your saved comparisons.</p>';
     if(picks.size>selected.length)el('comparison').innerHTML+='<p class="empty">Some saved products are outside the loaded categories or no longer appear in the latest results. <button data-clear-picks>Clear saved choices</button></p>';
   }
   function render(){
@@ -105,27 +95,31 @@
     if([...picks].some(id=>!remapped.has(id))){picks=remapped;remember();}
     const data=state.snapshot,results=B.partition(rows(),related,prefs,category);
     window.TechScoutWorkspace.update({category,prefs,rows:candidates(),snapshot:data});
-    renderFilters();renderCompare();sectionCards('current',results.current);sectionCards('other',results.other);
+    renderFilters();renderCompare();sectionCards('current',results.current);sectionCards('other',results.other);sectionCards('reports',results.reports);
     el('current-empty').hidden=Boolean(results.current.length);
-    el('current-empty').textContent=results.other.length ? 'No current offers meet all preferences. Continue below for other matching products.' : 'No exact matches right now. Nearby alternatives appear below when available.';
-    el('current-section').hidden=category==='amazon' && !results.current.length && Boolean(results.other.length);
-    el('other-section').hidden=!results.other.length;el('other-heading').textContent=category==='amazon' ? 'Published deal reports' : 'Other matching products';
-    const unavailable=results.other.filter(row=>!row.lead && row.stock==='out_of_stock').length;
-    const outside=results.other.filter(row=>B.status(row,prefs).tone==='preference').length,publisher=results.other.filter(row=>row.lead).length;
-    el('other-note').textContent=`${unavailable} out of stock at last check · ${outside} outside build preferences · ${results.other.length-outside-publisher-unavailable} need verification · ${publisher} publisher reports. These match your filters; check the status on each card.`;
+    const standout=prefs.quality==='standout';
+    el('current-title').textContent=standout ? 'Standout deals' : 'Current retailer offers';
+    el('current-empty').textContent=standout ? 'No verified standout deals match right now. Browse all finds to see ordinary offers and unverified reports.' : 'No current retailer offers match. Saved offers and unverified reports appear separately below when available.';
+    el('current-section').hidden=category==='amazon' && !results.current.length && Boolean(results.reports.length);
+    el('other-section').hidden=!results.other.length;el('reports-section').hidden=!results.reports.length;
+    const unavailable=results.other.filter(row=>row.stock==='out_of_stock').length;
+    el('other-note').textContent=`${unavailable} out of stock at last check · ${results.other.length-unavailable} need a fresh price, stock or listing check. Saved assessments are not current deals.`;
     el('similar-section').hidden=!results.similar.length;el('similar-count').textContent=results.similarCount;
     el('similar-cards').hidden=!prefs.similar;el('similar-cards').innerHTML=prefs.similar ? results.similar.slice(0,limits.similar).map(rowCard).join('') : '';
     el('similar-more').hidden=!prefs.similar || results.similarCount<=limits.similar;
     el('similar-more').textContent=`Show ${Math.min(6,results.similarCount-limits.similar)} more alternatives`;
     el('toggle-similar').textContent=prefs.similar ? 'Hide alternatives' : 'Show alternatives';el('toggle-similar').setAttribute('aria-expanded',String(prefs.similar));
     el('similar-note').textContent=`${prefs.similar ? Math.min(limits.similar,results.similarCount) : 0} of ${results.similarCount} nearby options shown. Differences are labeled; your budget, source and product type stay in effect.`;
-    el('status').innerHTML=`<a href="#current-section" ${category==='amazon' ? 'hidden' : ''}>${results.current.length} current offers</a><a href="#other-section" ${results.other.length ? '' : 'hidden'}>${results.other.length} other matches</a><a href="#similar-section" ${results.similar.length ? '' : 'hidden'}>${results.similarCount} alternatives</a>${data.zip_code ? `<span>Walmart ZIP ${escape(data.zip_code)}</span>` : ''}`;
+    const currentLabel=standout ? (results.current.length===1 ? 'standout deal' : 'standout deals') : (results.current.length===1 ? 'current offer' : 'current offers');
+    el('status').innerHTML=`<a href="#current-section" ${category==='amazon' ? 'hidden' : ''}>${results.current.length} ${currentLabel}</a><a href="#other-section" ${results.other.length ? '' : 'hidden'}>${results.other.length} saved offers</a><a href="#reports-section" ${results.reports.length ? '' : 'hidden'}>${results.reports.length} unverified reports</a><a href="#similar-section" ${results.similar.length ? '' : 'hidden'}>${results.similarCount} alternatives</a>${data.zip_code ? `<span>Walmart ZIP ${escape(data.zip_code)}</span>` : ''}`;
     el('results').hidden=view!=='list';el('comparison').hidden=view!=='compare';el('compare-note').hidden=view!=='compare';
     el('list-view').setAttribute('aria-pressed',String(view==='list'));el('compare-view').setAttribute('aria-pressed',String(view==='compare'));
-    el('refresh').disabled=pending || Boolean(state.running);el('refresh').textContent=['monitor','amazon'].includes(category) ? 'Reload saved results' : state.running ? 'Checking Walmart…' : 'Check Walmart now';
-    el('heading').textContent=category==='amazon' ? 'Amazon deals, sources combined' : category==='monitor' ? 'Deals across your sources' : `${categoryNames[category]} worth a closer look`;
-    el('purpose').textContent=category==='amazon' ? 'Published discoveries · original quotes and requirements stay on each card' : prefs.reuse ? 'Your build preference: reuse your 64GB kit · aim for 96–128GB' : 'Browse complete products · compare the exact variant, seller and condition';
-    el('ranking-note').textContent=prefs.sort==='best' ? 'Existing notification priority first, then known total. Prebuilt price evidence is assessed separately.' : prefs.sort==='newest' ? 'Newest checks first within each section. A recent publisher check does not confirm retailer stock.' : prefs.sort==='recommended' && prefs.reuse ? 'Documented RAM layouts first, then known total within each section. Mixed-kit compatibility still needs verification.' : 'Lowest known totals first, then item or publisher quotes where totals are unknown. Different models can differ in performance and value.';
+    el('refresh').disabled=pending || Boolean(state.running);el('refresh').textContent=['monitor','amazon'].includes(category) ? 'Reload' : state.running ? 'Checking Walmart…' : 'Check Walmart now';
+    el('refresh').title=['monitor','amazon'].includes(category) ? 'Reload saved results without new retailer requests' : state.running ? 'A Walmart check is running; results update automatically' : 'Run this category’s preset Walmart searches';
+    el('browse-all').hidden=prefs.quality==='all';
+    el('heading').textContent=category==='amazon' ? 'Amazon deal reports' : standout ? (category==='monitor' ? 'Standout deals' : `Standout deals · ${categoryNames[category]}`) : (category==='monitor' ? 'All parts & monitor finds' : categoryNames[category]);
+    el('purpose').textContent=category==='amazon' ? 'Publisher discoveries · verify offers at the retailer' : standout ? 'Exceptional prices, with current stock checks.' : 'Parts, monitors and useful accessories.';
+    el('ranking-note').textContent=prefs.sort==='best' ? 'Verified standout evidence first, then other qualifying price evidence. Targets stay separate from deal value; price breaks ties within each evidence tier.' : prefs.sort==='newest' ? 'Newest checks first within each section. A recent publisher check does not confirm retailer stock.' : 'Lowest known totals first. Different models can differ in performance and quality.';
     el('coverage').innerHTML='<p>Saved results update every 15 seconds. Publisher feeds update every 15 minutes while the dashboard runs. The Walmart button checks only this category’s preset searches. Browsing, filtering and alternatives do not start retailer searches or send alerts.</p>'+data.coverage.map(c=>`<p>Walmart ${escape(c.query)}: ${escape(c.returned)} of ${escape(c.total ?? 'unknown')} results inspected</p>`).join('')+data.problems.map(p=>`<p>${escape(p)}</p>`).join('');
   }
   async function load(){
@@ -142,7 +136,7 @@
   }
   function chooseCategory(value){
     if(!Object.hasOwn(categoryNames,value))return;
-    category=value;prefs=savedViews[value] ? B.restore(savedViews[value]) : defaults();saveView();state=null;related=[];limits={current:12,other:12,similar:6};expanded.clear();expandedReports.clear();clearTimeout(poll);notice('');
+    category=value;prefs=savedViews[value] ? B.restore(savedViews[value]) : defaults();saveView();state=null;related=[];limits={current:12,other:12,reports:12,similar:6};expanded.clear();expandedReports.clear();clearTimeout(poll);notice('');
     el('heading').textContent=categoryNames[value];el('purpose').textContent='Loading saved results…';el('status').textContent='Loading…';
     el('results').hidden=true;el('comparison').hidden=true;el('refresh').disabled=true;el('category-select').value=value;
     document.querySelectorAll('[data-category]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.category===value)));load();
@@ -159,14 +153,13 @@
   el('quality-select').addEventListener('change',event=>{prefs.quality=event.target.value;changed();});
   el('source-select').addEventListener('change',event=>{prefs.source=event.target.value;changed();});
   el('sort-select').addEventListener('change',event=>{prefs.sort=event.target.value;changed();});
-  el('reuse').addEventListener('change',event=>{prefs.reuse=event.target.checked;changed();});
   el('budget').addEventListener('input',event=>{if(!event.target.validity.valid)return;prefs.budget=event.target.value==='' ? null : event.target.valueAsNumber;changed();});
   el('budget').addEventListener('change',event=>event.target.reportValidity());
   el('reset-filters').addEventListener('click',resetFilters);
+  el('browse-all').addEventListener('click',()=>{prefs.quality='all';changed();});
   el('toggle-similar').addEventListener('click',()=>{prefs.similar=!prefs.similar;saveView();render();});
   el('list-view').addEventListener('click',()=>{view='list';render();});el('compare-view').addEventListener('click',()=>{view='compare';render();});
   el('status').addEventListener('click',event=>{if(event.target.closest('a')){view='list';render();}});
-  el('edit-filters').addEventListener('click',()=>{el('filters').open=true;el('filters').scrollIntoView({block:'start'});});
   document.querySelector('main').addEventListener('click',event=>{
     const chip=event.target.closest('[data-remove]');if(chip){const key=chip.dataset.remove;if(key==='quality')prefs.quality='all';else if(key==='source')prefs.source='all';else if(key==='budget')prefs.budget=null;else delete prefs.filters[key];changed();return;}
     const more=event.target.closest('[data-more]');if(more){limits[more.dataset.more]+=more.dataset.more==='similar' ? 6 : 12;render();return;}
@@ -174,8 +167,8 @@
     const button=event.target.closest('[data-pick]');if(!button)return;const id=button.dataset.pick;
     if(picks.has(id))picks.delete(id);else if(picks.size<3)picks.add(id);else{notice('Three finalists are saved. Remove one before adding another.');return;}remember();notice('');render();
   });
-  window.addEventListener('techscout:open-product',event=>{view='list';chooseCategory('monitor');prefs={...defaults(),reuse:false};limits={current:2500,other:2500,similar:6};window.TechScoutWorkspace.focusId=event.detail;});
-  window.addEventListener('techscout:browse-watch',event=>{const w=event.detail;view='list';chooseCategory(w.category);prefs={...defaults(),filters:{...w.filters},source:w.source,budget:w.budget,reuse:w.reuse};if(w.product_id){limits={current:2500,other:2500,similar:6};window.TechScoutWorkspace.focusId=w.product_id;}});
+  window.addEventListener('techscout:open-product',event=>{view='list';chooseCategory('monitor');prefs={...defaults(),quality:'all'};saveView();limits={current:2500,other:2500,reports:2500,similar:6};window.TechScoutWorkspace.focusId=event.detail;});
+  window.addEventListener('techscout:browse-watch',event=>{const w=event.detail;view='list';chooseCategory(Object.hasOwn(categoryNames,w.category) ? w.category : 'monitor');prefs={...defaults(),quality:'all',filters:{...w.filters},source:w.source,budget:w.budget};saveView();if(w.product_id){limits={current:2500,other:2500,reports:2500,similar:6};window.TechScoutWorkspace.focusId=w.product_id;}});
   // Reclassify expired offers even if the local server stops responding.
   setInterval(()=>{if(state)render();},15000);
   if(window.matchMedia('(max-width:760px)').matches)el('filters').open=false;

@@ -11,7 +11,6 @@ from pathlib import Path
 from dealcore.state import atomic_write
 from .research import PRESETS, research
 from .walmart import Credentials, WalmartClient, validate_zip
-from .price_history import record_research
 
 
 def local_directory() -> Path:
@@ -20,10 +19,10 @@ def local_directory() -> Path:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="TechScout: on-demand Walmart research with local prebuilt price history; no alerts.")
-    parser.add_argument("--category", choices=PRESETS, default="desktop-memory")
+    parser = argparse.ArgumentParser(description="TechScout: standout tech deals and on-demand Walmart parts research.")
+    parser.add_argument("--category", choices=PRESETS, default="parts")
     parser.add_argument("--query", action="append", help="Replace preset searches; repeat up to four times")
-    parser.add_argument("--item-id", action="append", help="Replace saved candidate IDs; repeat up to 20 times")
+    parser.add_argument("--item-id", action="append", help="Research explicit product IDs; repeat up to 20 times")
     parser.add_argument("--limit", type=int, default=10, help="Results per search, 1-25 (default 10)")
     parser.add_argument("--settings", type=Path, default=local_directory() / "settings.json")
     parser.add_argument("--zip-code", help="Override the ZIP in local settings")
@@ -68,8 +67,7 @@ def main(argv=None) -> int:
         stem = args.output / ("latest-" + args.category)
         atomic_write(stem.with_suffix(".html"), result.html())
         atomic_write(stem.with_suffix(".json"), json.dumps(result.document(), indent=2, ensure_ascii=False))
-        record_research(args.output, result)
-        # Request receipts remain per-session; price evidence is stored separately.
+        # Research snapshots and sanitized receipts never enter monitor price history.
         atomic_write(stem.with_suffix(".requests.json"), json.dumps(events, indent=2))
         print(f"{len(result.products)} product cards; {client.requests} API calls. Report: {stem.with_suffix('.html')}")
         if result.problems or not result.products:

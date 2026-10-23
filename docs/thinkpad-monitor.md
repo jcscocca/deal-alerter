@@ -340,17 +340,17 @@ clearing/restoring `HARDWARE_WRITER`. Remove the local owner manifest only after
 the local tasks are stopped. Keep the runtime backup for recovery. This rollback
 requires approval because it changes live schedules.
 
-For upgrades, stop the two tasks, retain the live state/receipts, replace only
-the reviewed application snapshot and dependencies, then restart and inspect
-health. Do not rerun the initial cutover installer over an existing owner; it
-intentionally refuses to seed stale GitHub hardware state over local history.
+For upgrades, retain live hardware history and delivery receipts, replace the
+reviewed application snapshot, then accept the hardware monitor and the per-user
+TechScout backend separately. Do not rerun the initial cutover installer over an
+existing owner: it refuses to seed stale GitHub state over local history.
 
-For a release with unchanged dependencies, use the reviewed maintenance helper:
+For unchanged dependencies, prepare and validate the maintenance release:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Prepare-Monitor.ps1 -OutputDirectory .local/upgrade
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Update-Monitor.ps1 -PreparedDirectory .local/upgrade -ValidateOnly
-# Run the apply command in an elevated Windows session after validation:
+# Apply from an elevated Windows session after validation:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Update-Monitor.ps1 -PreparedDirectory .local/upgrade -ApproveUpgrade
 ```
 
@@ -365,23 +365,69 @@ ThinkPad; it prompts without echoing and leaves the file readable only by you:
 $d = Join-Path $env:USERPROFILE '.deal-alerter'; $u = '*' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value; New-Item -ItemType Directory -Force -Path $d | Out-Null; icacls $d /inheritance:r /grant:r "${u}:(OI)(CI)F" | Out-Null; $s = Read-Host -AsSecureString 'Read-only GitHub token'; [IO.File]::WriteAllText((Join-Path $d 'github-variables.token'), [Net.NetworkCredential]::new('', $s).Password.Trim()); icacls (Join-Path $d 'github-variables.token') /inheritance:r /grant:r "${u}:F" | Out-Null; 'Saved ' + (Join-Path $d 'github-variables.token')
 ```
 
-The helper verifies a clean merged package, the installed owner and closed
-GitHub hardware gates before disabling the watchdog and hardware tasks. It
-backs up application/state/owner/task definitions without copying secrets,
-verifies the writer lock is released, installs hashed files, applies the
-audited history repair and approved titleless-row quarantine, then restarts
-the tasks and requires a fresh heartbeat. It keeps live receipts and records
-`installed_commit` in the owner manifest. On failure it restores the old
-application and enabled tasks while retaining all history and delivery receipts.
-It refuses dependency changes rather than modifying the active environment.
+The updater validates the clean merged package, installed owner, dependency hashes
+and closed GitHub hardware gates. It recognizes a dashboard only after checking
+its `-m alerters.techscout --serve` command, native Windows working directory,
+executable, matching per-user settings/output paths and owner SID. Windows venv
+wrapper/base-Python children also need a matching `pyvenv.cfg` and scoped parent.
+A listener on port 8768 alone never authorizes stopping a process. An unrecognized
+installed-app backend fails closed for manual shutdown by its owner.
 
-The lock probe returns a quiet retry status for ordinary contention, including
-under Windows PowerShell 5.1. It separately rejects unexpected I/O/import errors.
-Maintenance waits for the prior PID and scheduled task instances to exit as
-well as for the writer lock to become available before copying application
-files. Success and rollback both start hardware first and require its new
-heartbeat before starting the watchdog. Failed upgrades record a separate
-`recovery_status` so a failed restart cannot masquerade as a completed rollback.
+Before copying, the updater places `ui/upgrade-in-progress.json`, updates the
+recognized per-user launcher to honor that marker, stops the scoped dashboard,
+and disables the watchdog before stopping hardware. It waits for both task/PID
+exit and the OS writer lock. It then backs up application/state/owner/task files,
+per-user launchers and `ui/watches.json`. If preferences did not exist, an explicit
+`ui/watches.absent` backup marker records that fact. Secrets are not copied.
+The dashboard is stopped before preferences are backed up or application files
+are changed.
+
+After hashed-file installation and the audited history repair/quarantine, hardware
+starts first; its new heartbeat is required before watchdog restart. Startup
+acceptance also verifies the expected Reddit/Slickdeals/eBay job kinds, rejects
+retired jobs, requires the `watches-v3` capability, and reads controls through the
+installed schema with no error. A heartbeat alone cannot mark this release ready.
+`upgrade-result.json` records source-cycle status separately: a real successful
+source cycle in the new process is still required for final operational acceptance.
+An unavailable source does not cause an unbounded update wait.
+
+The elevated updater deliberately leaves TechScout stopped. Its result records
+`dashboard_restart_required` and the original data directory, SID and session.
+Restart that copied `Start-TechScout.ps1` from the same normal signed-in account,
+without elevation or SYSTEM. The launcher compares the running backend's cached
+version/instance/PID with the installed app and proves its process identity; it
+restarts a stale backend only in that account's scoped environment.
+
+For an already signed-in owner, the approved helper can dispatch that launcher
+through a temporary **Interactive / Limited** task without a stored password:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Restart-TechScoutInteractive.ps1 -UpgradeResult .local/upgrade/upgrade-result.json -DataDirectory 'THE_RECORDED_DATA_DIRECTORY' -ExpectedUserSid 'THE_RECORDED_OWNER_SID' -ApproveRestart
+# Run after at least one real source cycle; this is read-only acceptance:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Test-DeploymentAcceptance.ps1 -DataDirectory 'THE_RECORDED_DATA_DIRECTORY' -ExpectedUserSid 'THE_RECORDED_OWNER_SID' -RequireSourceCycle
+```
+
+The temporary restart task is removed after the bounded attempt. Acceptance checks
+the expected version, unique instance, actual process/owner/session, watch schema,
+workspace support, controls and source-cycle proof. If the owner is not signed in,
+leave the dashboard stopped until that account can launch it; do not substitute
+an elevated or SYSTEM backend.
+
+On failure, the updater first stops any scoped new dashboard and hardware writer,
+then restores the exact old application, owner, original preferences (or original
+absence) and per-user launchers. This restores a schema the old app understands.
+It retains live history and every delivery receipt, since a new process may have
+already sent a real alert. Enabled hardware/watchdog tasks are restored and a new
+old-app heartbeat is required. A failed recovery keeps the maintenance marker so
+new launchers remain blocked, and reports `recovery_status`/`recovery_error`
+separately. After a successful rollback, use the restored launcher from its normal
+owner account; current-version acceptance applies only to a successful upgrade.
+
+The quiet lock probe distinguishes expected contention from I/O/import failures
+under Windows PowerShell 5.1. `Test-UpgradeLifecycle.ps1` also runs the dashboard
+lifecycle regression: scoped process selection, native Windows cwd/venv proof,
+preference backup/absence restoration, task ordering and release acceptance all
+run against temporary fixtures without changing live tasks or services.
 
 ## Approved physical recovery acceptance
 

@@ -134,7 +134,7 @@ def test_non_amazon_reports_survive_restart_without_leaking_into_amazon_tab(tmp_
     (tmp_path/'deal-feeds.json').write_text(json.dumps(data))
     collector = DealFeeds(tmp_path)
     assert collector.snapshot("monitor", NOW)["rows"][0]["merchant"] == "CyberPowerPC"
-    assert collector.snapshot("supplies", NOW)["rows"]
+    assert collector.snapshot("parts", NOW)["rows"]
     assert not collector.snapshot("amazon", NOW)["rows"]
 
 

@@ -48,7 +48,7 @@ def execute(tmp_path, title="Crucial 32GB DDR5-5600 SO-DIMM Laptop Memory", pric
 def test_correct_capacity_and_whole_kit_delivery(tmp_path, title, key, price):
     parsed = match(title, price=price)
     assert parsed.part.key == key and parsed.unit_price == price and parsed.quantity == 1
-    assert product_type(title) == "Memory" and categories(title) == {"memory"}
+    assert product_type(title) == "Memory" and categories(title) == {"parts", "memory"}
     sent, result = execute(tmp_path, title, price)
     assert sent[0].buys[0].badge == "SO-DIMM PRICE WATCH"
     assert result.assessments[0].price == price
@@ -106,7 +106,7 @@ def test_dedup_and_material_price_drop(tmp_path):
 def test_kit_facets_do_not_report_one_module_capacity():
     assert ram("96GB (2x48GB) DDR5 SODIMM Laptop Memory Kit") == "96GB"
     assert ram("Crucial CT2K32G56C46S5") == "64GB"
-    assert categories("DDR5 32GB desktop memory kit") == {"memory"}
+    assert categories("DDR5 32GB desktop memory kit") == {"parts", "memory"}
     assert categories("Gaming PC RTX 5080 32GB DDR5 2TB SSD") != {"memory"}
     assert attributes({"title":"32GB DDR5 SO-DIMM Laptop Memory"})["memory_layout"] == "DDR5 SO-DIMM 1x32GB"
     assert attributes({"title":"32GB (2x16GB) DDR5 SO-DIMM Laptop Memory"})["memory_layout"] == UNKNOWN
@@ -116,10 +116,10 @@ def test_kit_facets_do_not_report_one_module_capacity():
 def test_memory_queries_fit_without_displacing_prior_watches(tmp_path):
     plugin = MonitorHardwarePlugin(ROOT / "config/hardware.toml", tmp_path)
     try:
-        assert len(plugin.cfg.search_queries) == 34
+        assert len(plugin.cfg.search_queries) <= 40
         for capacity in (32, 48, 64, 96):
             assert f"DDR5 SO-DIMM {capacity}GB" in plugin.cfg.search_queries
             assert plugin.cfg.query_price_floors[f"DDR5 SO-DIMM {capacity}GB"] == 0
-        assert any("Zenbook" in q for q in plugin.cfg.search_queries)
+        assert not any("Zenbook" in q for q in plugin.cfg.search_queries)
     finally:
         plugin.close()

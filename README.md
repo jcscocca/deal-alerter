@@ -1,22 +1,20 @@
 # Deal alerter
 
-Tells you when something you want is actually cheap, measured against its own
-price history rather than the discount badge a store put on it.
+Find unusually good deals on computer parts and monitors, with optional watches
+for products you want. Steam wishlist alerts continue as a separate lane.
 
-It watches two very different markets:
-
-| | Steam | Hardware |
+| | TechScout / hardware | Steam |
 |---|---|---|
-| **Watches** | Games on your Steam wishlist | GPUs, unified-memory machines and products on your watchlist |
-| **Evidence** | IsThereAnyDeal's full Steam price history | A price log this tool collects for itself |
-| **Asks** | Is this the price to buy at? | Is it cheap, is it good value, does it help *you*? |
-| **Verdicts** | `WAIT` up to `ALL_TIME_LOW` | `PASS` up to `GRAIL` |
-| **Tells you** | Daily email | Hourly push, daily email digest |
+| **Focus** | Standout component and monitor deals, plus useful peripherals | Games on your Steam wishlist |
+| **Evidence** | Exact-part history and dated model-specific references where supported | IsThereAnyDeal's Steam price history |
+| **Browse** | Local dashboard with product filters, saved comparisons and source status | Daily report |
+| **Notify** | Current verified standout deals through push and daily email; target notices opt in | Daily email |
 
-Both run through one core, `dealcore/`: fetch, judge, deduplicate, notify, save
-state. Judgment never crosses over. The two verdict ladders are separate enums
-that the core refuses to compare, because a Steam band must never satisfy a
-hardware threshold.
+Complete computers, laptops and tablets are outside the hardware shopping scope.
+The completed desktop no longer drives a buying project: prebuilt tracking,
+whole-build comparisons, RAM completion and owned-kit reuse preferences are
+retired from the active experience. RAM capacity and type remain useful filters
+for buying individual memory kits.
 
 ## Steam: is this the price to buy at?
 
@@ -51,138 +49,69 @@ Why email: there is no API for notifying your own Steam account, and a bot
 account that friend-messages you breaks the subscriber agreement and trips Steam
 Guard from every fresh CI runner. Email is boring and it works.
 
-## Hardware: cheap, good value, and useful to you?
+## Hardware: standout parts and monitor deals
 
-A listing says "$749" without saying whether that is good for a 3090, whether it
-is really a 3090, or whether 24GB changes anything about what your machines can
-run. There is no IsThereAnyDeal for GPUs. For each listing that matches a hunt:
+Start the local dashboard:
 
-| Question | How |
-|---|---|
-| **Is it cheap?** | Percentile against every price logged for that exact part and condition, cross-checked against a sold-price reference |
-| **Is it good value?** | $/GB of VRAM, and $/GB-TB/s -- capacity times bandwidth -- against its class |
-| **Does it help *you*?** | What it changes about the largest model your machines can hold (`rig.py`) |
-
-The third question is the point. A cheap card that does not grow the memory pool
-is capped below the alert floor however cheap it gets.
-
-### The price log
-
-Nothing like ITAD exists for hardware, so the tool logs what it sees to
-`state/hardware/US/prices.jsonl` and grows its own answer.
-
-- **Until a part has 8 observations spanning 14 days,** it is judged against the
-  catalog's reference price, labelled provisional, and capped at `EXCEPTIONAL`.
-  An unverified or stale reference is shown as `WATCH / UNVERIFIED`, capped at
-  `GOOD`, and excluded from buy recommendations and notifications.
-- **Used, refurbished and new never pool.** Once a part has enough confirmed
-  sales, those replace asking prices as what it is judged against.
-- **One listing gets one vote.** A listing seen every hour for a month is one
-  observation. A price change on it is another, because that is information.
-- **Being shown and being recorded are separate bars.** Prebuilts, bundles,
-  for-parts cards, bait-priced listings, untrusted sellers and eBay's
-  price-sorted search results are shown to you with the reason, and kept out of
-  the log. `docs/hardware-judgment.md` has the real listings behind each rule.
-
-`--stats` shows what the log knows so far.
-
-### Hunts
-
-`config/watchlist.toml` is what to hunt. A hunt is a rule, not a SKU list -- you
-want any 24GB Ampere card under $700, whoever is selling:
-
-```toml
-[[hunt]]
-name = "RTX 3090 (pair up)"
-parts = ["rtx_3090", "rtx_3090_ti"]
-target = 700.0
-quantity_wanted = 2
+```bash
+python -m alerters.techscout --serve
 ```
 
-At or under `target` a trusted listing can alert, but inclusion, risk, and
-reference-quality vetoes still apply. A part with no
-hunt is matched and then never judged. Specs and reference prices live in
-`alerters/hardware/native/catalog.py`; used-market references decay, so retune
-them against sold data now and then. Your machines live in `rig.py`.
+Open [TechScout on this computer](http://127.0.0.1:8768/). The home feed puts
+qualifying, current component and monitor deals first. Ordinary offers and
+publisher/community reports stay available to browse with their evidence and
+verification status. Target-only notices stay amber in broader browsing; meeting
+a price target alone is not standout deal evidence.
 
-**Products** are the exception to all of the memory math. A `PRODUCT` part in
-the catalog -- the first is the 2026 Zenbook Duo with the Core Ultra X9 388H --
-is something bought for itself, so it is judged on price alone: its own log,
-and its retail list price until the log can rank. There is no $/GB, model
-ladder, fit check or upgrade cap, and the laptop and whole-system vetoes that
-protect the GPU catalog do not apply. The bait, seller and target rules do. A
-list price is only a fair question for a new or open-box unit, so used and
-refurbished listings stay `WATCH` until their own history builds up. Products
-are named by key and never swept up by a `class = "any"` catch-all.
+- **Price evidence stays specific.** Component verdicts use the exact part and
+  condition, with historical observations or a dated reference. Monitor alerts
+  require a benchmark for that exact model. Generic retail list prices and
+  publisher discount badges do not establish a standout deal.
+- **Offer checks remain separate.** Seller risk, selected variant, condition,
+  shipping, stock and freshness can hold a tempting listing out of recommendations
+  and alerts. New, used and refurbished prices do not pool.
+- **Your interests can narrow delivery.** Watching saves product searches and
+  price targets using existing monitor coverage. A watch does not start a new
+  retailer query or make an unassessed product alertable. Parts without supported
+  price evidence remain research candidates.
+- **Notifications default to verified standouts.** Both hardware push and digest
+  require current verified offers with independent standout price evidence.
+  Inherited purchase targets do not notify by default. In Watching, **Include
+  verified price-target notices** is off until explicitly enabled; it still
+  requires a verified retailer offer and obeys the selected notification mode.
+- **The completed rig is no longer a gate.** Individual parts can be interesting
+  without increasing its memory capacity. Hardware inventory can remain a
+  historical reference without restricting the discovery feed.
 
-[4K monitor price watches](docs/4k-monitor-watch.md) require a 27-inch-class
-panel, native 3840x2160 at 144Hz or faster, and a separate DisplayPort input.
-OLED is optional. Alerts require at least 25% below the exact model's dated
-retail benchmark in `config/monitor-watch.toml`; models without a benchmark
-cannot borrow another monitor's price limit.
-Ports appear as a compact fact in alerts and shopping cards. Community prices
-remain unverified leads; eBay needs a fresh exact-item stock/price check.
+The catalog and enabled hunts define assessed component coverage; the broader
+feed can also discover CPUs, storage, motherboards, memory and peripherals that
+have no automatic verdict yet. The monitor's
+[4K display watch](docs/4k-monitor-watch.md) still has its own explicit display
+and exact-model benchmark requirements. Browser filters do not broaden that
+collector or its alert criteria.
 
-### Beyond search results
+Public publisher feeds provide leads across retailers and never establish stock,
+seller, shipping or checkout price. Unverified community and publisher reports
+are browse-only and do not send deal notifications. On-demand Walmart checks use
+a selected ZIP and create browse-only research snapshots for **parts**,
+**monitors**, **memory** and **supplies**. They do not send alerts or write whole-PC history. See
+[TechScout setup, evidence and limits](docs/techscout-shopping.md).
 
-- **Listings you found yourself.** `--add URL --price 640 --title "..."` records
-  one in `state/hardware/US/manual.jsonl` and says immediately whether the title
-  matched a part and a hunt. The URL is stored, never fetched, and `--sold`
-  records a sale you witnessed. Manual entries do not age out: delete the line to
-  delete the entry. Commit and push the file, or the scheduled runs never see it.
-- **Prebuilts asking less than the card inside them** are flagged in the report.
-  An asking-price gap is not profit; neither side has sold.
-- **Not only NVIDIA.** AMD pro cards, the 7900 XTX, the Arc Pro B60, older Mac
-  Studio Ultras and 64GB unified boxes are in the catalog as reference estimates.
+The hardware price log records eligible observations at
+`state/hardware/US/prices.jsonl` (or the installed runtime's equivalent). A part
+needs at least 8 observations spanning 14 days before its own history can rank
+it. Earlier assessments use supported references and remain provisional;
+unverified or stale references cannot produce buy recommendations. `--stats`
+shows the collected coverage. Manual component listings can be added with
+`--add URL --price 640 --title "..."`; the URL is stored without being fetched.
+`--sold` records a witnessed sale. See
+[hardware judgment](docs/hardware-judgment.md) for the underlying evidence rules.
 
-### Where listings come from
-
-eBay, Slickdeals, Apple's refurbished Mac store, and r/buildapcsales. Publisher
-feeds add tech deal reports across retailers; those reports are unverified leads.
-
-The optional [ThinkPad monitor](docs/thinkpad-monitor.md) adds direct HP OMEN
-and Newegg product checks, plus fixed CyberPowerPC/Skytech direct prebuilts,
-with exact configuration validation,
-separate PC history and stock/sale events. See its dry-run coverage report before
-cutover: dynamic HP configurations and blocked feeds cannot be treated as
-confirmed offers. It preserves the $5,000 RTX 5090 target.
-
-The completed MSI desktop is recorded in `config/desktop-inventory.toml`:
-9950X3D, 128GB DDR5, internal RTX 5090 and separately powered OCuLink RTX 5070 Ti.
-Capacity scoring uses the largest device (32GB), without assuming pooled VRAM.
-New-card price watches for the 5070 Ti/5080/5090 operate independently of that
-capacity cap; qualifying 5090 cards and prebuilt target hits use maximum push
-priority. Desktop 96GB (2x48GB) UDIMM kits and single 64GB UDIMMs have separate
-price watches; the existing ThinkPad SO-DIMM watches remain independent.
-
-The earlier [desktop upgrade watch](docs/desktop-upgrade-watch.md) extends that monitor
-to RTX 5080 prebuilts and a 96GB/128GB RAM goal. It distinguishes documented
-layout from unverified mixed-kit compatibility, reusing the owned Corsair 64GB
-kit where possible. Rules live in `config/desktop-profile.toml`; checkout changes
-need deployment through the existing release procedure before they become live.
-
-Other direct retailers were investigated on 2026-09-28:
-
-- **Best Buy.** The developer API refuses sign-ups from free email and `.edu`
-  addresses, so there is no key to be had. Worth revisiting only with an
-  address on your own domain.
-- **CyberPowerPC / Skytech.** Fixed 5080/5090 prebuilt product checks are available
-  through the local monitor. Conflicting stock signals remain unconfirmed.
-- **iBUYPOWER.** RDY catalog quotes are discovery only; individual product access
-  returned HTTP 403 during the October 7 check. No inventory alerts or price
-  averages use those unconfirmed quotes.
-- **B&H / Adorama.** Direct access returned HTTP 403 during the October 7 check;
-  coverage remains through publisher reports. Costco is not enabled.
-- **Walmart.** Signed affiliate API lookup was verified on October 6, 2026.
-  [TechScout shopping research](docs/techscout-shopping.md) now provides on-demand
-  desktop/memory, tablet, computer and tech-supply reports. It uses localized
-  product lookups after search discovery. The unified dashboard also shows
-  monitor verdicts, saved watches, alert history and source health. Run `python -m alerters.techscout --serve` for the local ranked shortlist
-  and comparison dashboard, with manual Walmart checks and optional Windows
-  desktop/startup shortcuts. Walmart results remain browse-only. API access does not
-  establish approval of every downstream use.
-
-Community sources remain useful for discovery and advance sale notices.
+Repository changes must go through the existing
+[ThinkPad Prepare/Update procedure](docs/thinkpad-monitor.md) to reach the installed
+monitor and shortcuts. Editing or testing this checkout does not deploy it.
+Legacy prebuilt/profile modules, saved history and dated investigation documents
+remain for reference; they do not define the active shopping scope.
 
 ## Running it
 
@@ -245,7 +174,7 @@ writer; they are inactive while the ThinkPad owns hardware state:
 |---|---|---|---|
 | 18:22 daily | Steam | `ENABLE_STEAM` | `STEAM_ID`, `ITAD_API_KEY`, SMTP |
 | 02:52 daily | Hardware digest | `ENABLE_HARDWARE` | SMTP, and eBay keys unless you can do without eBay |
-| :00, :15, :30, :45 | Hardware push: eBay, Slickdeals, Apple refurb | External scheduler | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
+| :00, :15, :30, :45 | Hardware push: eBay and Slickdeals | External scheduler | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
 | Every 5 minutes, from :01 | Hardware push: r/buildapcsales | External scheduler | `NTFY_TOPIC` or `DISCORD_WEBHOOK` |
 
 ```bash
@@ -288,7 +217,7 @@ and `X-GitHub-Api-Version: 2022-11-28`:
 
 | Minutes | Body |
 |---|---|
-| `0,15,30,45` | `{"ref":"main","inputs":{"domain":"hardware","mode":"fast","dry_run":"false","sources":"ebay,slickdeals,apple-refurb"}}` |
+| `0,15,30,45` | `{"ref":"main","inputs":{"domain":"hardware","mode":"fast","dry_run":"false","sources":"ebay,slickdeals"}}` |
 | `1-56/5` | `{"ref":"main","inputs":{"domain":"hardware","mode":"fast","dry_run":"false","sources":"reddit"}}` |
 
 A success is `204 No Content`. The token is a fine-grained personal access

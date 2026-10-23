@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 from dealcore.state import atomic_write
 from .deal_overlap import amazon_asin
 from .monitor_bridge import categories, number, stamp
+from .scope import allowed_title, in_scope
 
 INTERVAL = 900
 MAX_AGE = 72 * 3600
@@ -26,7 +27,6 @@ USER_AGENT = "TechScout-feed-evaluation/1.0"
 SOURCES = {
     "bensbargains": {"label": "Ben's Bargains", "host": "bensbargains.com",
                     "feeds": ["https://bensbargains.com/s/amazon/rss/",
-                              "https://bensbargains.com/c/desktop-computers/rss/",
                               "https://bensbargains.com/c/memory/rss/"]},
     "dealnews": {"label": "DealNews", "host": "www.dealnews.com",
                  "feeds": ["https://www.dealnews.com/c39/Computers/?rss=1", "https://www.dealnews.com/?rss=1&sort=time"]},
@@ -105,6 +105,8 @@ def cached_row(raw, source):
     for key, limit in (("title", 1500), ("description", 24000)):
         if not isinstance(raw.get(key), str) or len(raw[key]) > limit:
             return None
+    if not in_scope(raw):
+        return None
     if stamp(raw.get("published_at")) is None or stamp(raw.get("checked_at")) is None:
         return None
     row = {key: raw[key] for key in ("id", "source", "url", "title", "description", "published_at", "checked_at")}
@@ -115,8 +117,7 @@ def cached_row(raw, source):
                expires_at=number(raw.get("expires_at")) or 0, price=number(raw.get("price")),
                source=source, retailer=SOURCES[source]["label"], merchant=merchant, lead=True,
                total=None, shipping=None, available=False, seller="Not established", condition="Not published",
-               gpu=None, ram=None, potential=None, cpu="Not established", storage="Not established",
-               fit="Not assessed", fit_summary="", layout_documented=False, warnings=[], rank=None,
+               gpu=None, ram=None, cpu="Not established", storage="Not established", warnings=[], rank=None,
                categories=sorted(categories(raw["title"])), reasons=["Publisher quote; retailer price and availability unverified"])
     row["terms"] = [term for term in raw.get("terms", []) if isinstance(term, str) and len(term) <= 150][:10] if isinstance(raw.get("terms"), list) else []
     return row
@@ -149,7 +150,7 @@ def parse_feed(body, source, now):
         # All feeds are discovery. Keep tech from any retailer; unknown merchant
         # attribution stays unknown instead of guessing from comparison prices.
         merchant = reported_merchant(fields, title, description)
-        if not TECH.search(title):
+        if not TECH.search(title) or not allowed_title(title):
             continue
         price = None
         if fields.get("price"):
@@ -183,8 +184,7 @@ def parse_feed(body, source, now):
                      "terms": terms, "categories": sorted(categories(title)),
                      "lead": True, "total": None, "shipping": None, "available": False,
                      "seller": "Not established", "condition": "Not published", "gpu": None,
-                     "ram": None, "potential": None, "cpu": "Not established", "storage": "Not established",
-                     "fit_summary": "", "fit": "Not assessed", "layout_documented": False,
+                     "ram": None, "cpu": "Not established", "storage": "Not established",
                      "rank": None, "warnings": [], "reasons": ["Publisher quote; retailer price and availability unverified"]})
     return rows
 

@@ -160,6 +160,7 @@ def assess(
     target_price: float | None = None,
     hunt_name: str = "",
     psu_headroom_w: int = 150,
+    require_capacity_upgrade: bool = True,
 ) -> Assessment | None:
     """Score one listing. Returns None when the price is implausible."""
     # What "implausible" is measured against. The catalog constant is a guess
@@ -249,6 +250,7 @@ def assess(
         target_price=target_price,
         condition=condition,
         reference_trusted=reference_trusted,
+        require_capacity_upgrade=require_capacity_upgrade,
     )
     reason = " ".join(reason.split())
 
@@ -311,6 +313,7 @@ def _decide(
     target_price: float | None,
     condition: str,
     reference_trusted: bool,
+    require_capacity_upgrade: bool = True,
 ) -> tuple[Verdict, str, str, Verdict]:
     """The actual call, plus the sentences explaining it."""
 
@@ -390,7 +393,7 @@ def _decide(
     # its own field so the report can place it next to the VRAM bar instead of
     # burying it at the end of a paragraph. A product grows no pool by design,
     # so the rule cannot apply to it.
-    if not part.is_product and after <= before + 1:
+    if require_capacity_upgrade and not part.is_product and after <= before + 1:
         verdict = min(verdict, Verdict.GOOD)
         promotion_ceiling = min(promotion_ceiling, verdict)
         reason += (

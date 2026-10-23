@@ -4,6 +4,7 @@ import json
 import pytest
 
 from alerters.hardware import monitor
+from alerters.hardware.monitor_health import LISTING_UNVERIFIED
 from dealcore.notify import Channel
 
 
@@ -162,7 +163,7 @@ def test_v2_job_receipts_migrate_without_replaying_coverage_alert(health_watchdo
 
 def test_listing_uncertainty_and_known_coverage_limits_never_push(health_watchdog):
     _, clock, sent, check = health_watchdog
-    jobs = {f"skytech-{i}": failed_job(monitor.LISTING_UNVERIFIED, kind="skytech") for i in range(19)}
+    jobs = {f"skytech-{i}": failed_job(LISTING_UNVERIFIED, kind="skytech") for i in range(19)}
     jobs["reddit"] = failed_job("Path disallowed by robots.txt", kind="reddit")
     result = mature(clock, check, jobs=jobs, problems=[monitor.SLICKDEALS_COVERAGE])
     assert len(result["problems"]) == 21
@@ -232,7 +233,7 @@ def test_unmatured_incident_is_not_marked_delivered_with_another_alert(health_wa
     assert len(sent) == 2 and "Newegg" in sent[1].buys[0].reason
 
 
-@pytest.mark.parametrize("error", ["Host is backing off", monitor.LISTING_UNVERIFIED,
+@pytest.mark.parametrize("error", ["Host is backing off", LISTING_UNVERIFIED,
                                   "Path disallowed by robots.txt"])
 def test_old_notes_or_recovered_connections_do_not_hide_overdue_jobs(health_watchdog, error):
     _, clock, sent, check = health_watchdog

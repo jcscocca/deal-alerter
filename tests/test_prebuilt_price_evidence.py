@@ -112,8 +112,8 @@ def test_walmart_capture_is_available_only_and_dashboard_get_is_read_only(tmp_pa
     assert len(history.rows) == 1 and history.rows[0]["key"] == walmart_key(asdict(product), "94105")
     (tmp_path / "latest-desktop-memory.json").write_text(json.dumps(research.document()))
     before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
-    for category in ("desktop-memory", "monitor"):
+    # Recovery history remains intact; the active feed never reads it as a deal.
+    for category in ("parts", "monitor"):
         result = snapshot(tmp_path, category, now=NOW.timestamp())
-        rows = [r for g in result["groups"] for r in g["rows"]] + result["held"]
-        assert next(r for r in rows if r["id"] == "123")["prebuilt_value"]["history"]["observed_days"] == 1
+        assert result["count"] == 0 and not result["groups"] and not result["held"]
     assert before == {p.name: p.read_bytes() for p in tmp_path.iterdir()}

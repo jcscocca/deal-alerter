@@ -5,6 +5,7 @@ param(
     [switch]$ValidateOnly
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'TechScout-Lifecycle.ps1')
 function Invoke-WriterLockProbe([string]$Python,[string]$PackageApp,[string]$LockPath) {
     # Expected contention must not emit stderr: Windows PowerShell 5.1 promotes
     # native stderr to NativeCommandError under ErrorActionPreference=Stop.
@@ -125,7 +126,9 @@ if ($gates.HARDWARE_WRITER -ne 'thinkpad' -or $gates.ENABLE_HARDWARE -ne 'false'
 }
 & $python -m pip check
 if ($LASTEXITCODE -ne 0) { throw 'Installed dependencies are inconsistent.' }
-if ($ValidateOnly) { Write-Output 'Merged package and installed runtime validated; no live changes.'; return }
+$dashboardBackends = @(Get-TechScoutBackends $python $packageApp $app)
+if (-not $release.acceptance -or $release.acceptance.watch_schema_version -ne 3) { throw 'Reprepare this release with current deployment acceptance metadata.' }
+if ($ValidateOnly) { Write-Output "Merged package, installed runtime and $($dashboardBackends.Count) scoped dashboard processes validated; no live changes."; return }
 $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Windows administrator elevation is required to update the protected runtime and tasks.' }
 $tasks = @{}
@@ -136,17 +139,39 @@ foreach ($name in @('DealAlerter-Hardware','DealAlerter-Watchdog')) {
 $before = Get-Content -Raw -LiteralPath (Join-Path $runtime 'health.json') | ConvertFrom-Json
 $backup = Join-Path $runtime ('backups\upgrade-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ') + '-' + [Guid]::NewGuid().ToString('N'))
 $copied = $false
+$controlsBackedUp = $false
+$launcherBackups = @()
+$maintenance = Join-Path $runtime 'ui\upgrade-in-progress.json'
+if (Test-Path -LiteralPath $maintenance) { throw 'A previous dashboard maintenance marker remains. Review its recorded upgrade before proceeding.' }
 try {
+    New-Item -ItemType Directory -Path $backup | Out-Null
+    New-Item -ItemType Directory -Force -Path (Split-Path $maintenance) | Out-Null
+    @{backup=$backup;started_at=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content -Encoding UTF8 $maintenance
+    # Replace recognized per-user launchers before stopping backends. New
+    # launches now honor the maintenance marker; no elevated dashboard is started.
+    New-Item -ItemType Directory -Path (Join-Path $backup 'launchers') | Out-Null
+    foreach ($backend in @($dashboardBackends | Sort-Object data_directory -Unique)) {
+        $launcher = Join-Path $backend.data_directory 'Start-TechScout.ps1'
+        $savedLauncher = Join-Path $backup ('launchers\' + $launcherBackups.Count + '.ps1')
+        $present = Test-Path -LiteralPath $launcher
+        if ($present) { Copy-Item -LiteralPath $launcher -Destination $savedLauncher }
+        $launcherBackups += @{path=$launcher;saved=$savedLauncher;present=$present}
+        Copy-Item -LiteralPath (Join-Path $packageApp 'scripts\windows\Start-TechScout.ps1') -Destination $launcher -Force
+    }
+    $dashboardBackends | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $backup 'dashboard-restart.json')
+    Stop-TechScoutBackends $dashboardBackends $python $packageApp $app
+    if (@(Get-TechScoutBackends $python $packageApp $app).Count) { throw 'A dashboard backend restarted during maintenance; application was not replaced.' }
     # Stop the watchdog first so it cannot restart hardware midway through copying.
     foreach ($name in @('DealAlerter-Watchdog','DealAlerter-Hardware')) {
         Disable-ScheduledTask -TaskName $name | Out-Null
         Stop-ScheduledTask -TaskName $name
     }
     Wait-MonitorStopped @('DealAlerter-Hardware','DealAlerter-Watchdog') $before.pid $python $packageApp (Join-Path $state 'hardware\.writer.lock')
-    New-Item -ItemType Directory -Path $backup | Out-Null
     Copy-Item -LiteralPath $app -Destination (Join-Path $backup 'app') -Recurse
     Copy-Item -LiteralPath $state -Destination (Join-Path $backup 'state') -Recurse
     Copy-Item -LiteralPath $ownerPath -Destination (Join-Path $backup 'owner.json')
+    Backup-TechScoutControls $runtime $backup
+    $controlsBackedUp = $true
     foreach ($name in $tasks.Keys) {
         Export-ScheduledTask -TaskName $name | Set-Content -Encoding Unicode (Join-Path $backup ($name+'.xml'))
     }
@@ -167,34 +192,47 @@ try {
     $owner | ConvertTo-Json | Set-Content -Encoding UTF8 $ownerTemporary
     Move-Item -LiteralPath $ownerTemporary -Destination $ownerPath -Force
     $health = Start-EnabledMonitorTasks $tasks $runtime $before.pid
-    $result = @{status='complete';commit=$upstream;backup=$backup;pid=$health.pid}
-    $result | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $PreparedDirectory 'upgrade-result.json')
-    Write-Output 'Monitor updated and restarted; live history repaired, receipts retained and secrets untouched.'
+    $acceptance = if ($tasks['DealAlerter-Hardware'].enabled) { Test-MonitorReleaseAcceptance $runtime $python $app -RequiredKinds @($release.acceptance.job_kinds) -Capabilities @($release.acceptance.capabilities) } else { @{status='monitor-was-disabled'} }
+    Remove-Item -LiteralPath $maintenance -Force
+    $restart = @($dashboardBackends | Sort-Object data_directory -Unique | Select-Object data_directory,owner_sid,session_id)
+    $result = @{status='monitor-updated';commit=$upstream;backup=$backup;pid=$health.pid;acceptance=$acceptance;dashboard_restart_required=[bool]$restart.Count;dashboard_restart=$restart}
+    $result | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 (Join-Path $PreparedDirectory 'upgrade-result.json')
+    Write-Output 'Monitor updated and startup acceptance passed; history and receipts retained. Restart any recorded TechScout dashboard from its normal owning account, then run deployment acceptance.'
 } catch {
     $failure = $_.Exception.Message
     $recovery = 'failed'
     $recoveryError = ''
-    $failedWriter = (Get-Content -Raw -LiteralPath (Join-Path $runtime 'health.json') | ConvertFrom-Json).pid
+    $failedWriter = $before.pid
+    try { $failedWriter = (Get-Content -Raw -LiteralPath (Join-Path $runtime 'health.json') | ConvertFrom-Json).pid } catch {}
     foreach ($name in @('DealAlerter-Watchdog','DealAlerter-Hardware')) {
         Disable-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue | Out-Null
         Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
     }
     try {
+        $retryBackends = @(Get-TechScoutBackends $python $packageApp $app)
+        Stop-TechScoutBackends $retryBackends $python $packageApp $app
         Wait-MonitorStopped @('DealAlerter-Hardware','DealAlerter-Watchdog') $failedWriter $python $packageApp (Join-Path $state 'hardware\.writer.lock')
         if ($copied) {
-            Copy-Item -Path (Join-Path $backup 'app\*') -Destination $app -Recurse -Force
+            Move-Item -LiteralPath $app -Destination (Join-Path $backup 'failed-app')
+            Copy-Item -LiteralPath (Join-Path $backup 'app') -Destination $app -Recurse
             Copy-Item -LiteralPath (Join-Path $backup 'owner.json') -Destination $ownerPath -Force
+        }
+        if ($controlsBackedUp) { Restore-TechScoutControls $runtime $backup }
+        foreach ($launcher in $launcherBackups) {
+            if ($launcher.present) { Copy-Item -LiteralPath $launcher.saved -Destination $launcher.path -Force }
+            elseif (Test-Path -LiteralPath $launcher.path) { Remove-Item -LiteralPath $launcher.path -Force }
         }
         # Never roll back history/receipts after a task may have sent a real alert.
         $health = Start-EnabledMonitorTasks $tasks $runtime $failedWriter
         $recovery = 'complete'
+        if (Test-Path -LiteralPath $maintenance) { Remove-Item -LiteralPath $maintenance -Force }
     } catch {
         $recoveryError = $_.Exception.Message
         foreach ($name in @('DealAlerter-Hardware','DealAlerter-Watchdog')) {
             if ($tasks[$name].enabled) { Enable-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue | Out-Null }
         }
     }
-    @{status='failed';reason=$failure;backup=$backup;recovery_status=$recovery;recovery_error=$recoveryError} | ConvertTo-Json |
+    @{status='failed';reason=$failure;backup=$backup;recovery_status=$recovery;recovery_error=$recoveryError;dashboard_restart_required=[bool]$dashboardBackends.Count;dashboard_restart=@($dashboardBackends | Select-Object data_directory,owner_sid,session_id)} | ConvertTo-Json -Depth 6 |
         Set-Content -Encoding UTF8 (Join-Path $PreparedDirectory 'upgrade-result.json')
     throw "Upgrade failed: $failure Recovery: $recovery $recoveryError"
 }

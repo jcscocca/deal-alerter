@@ -403,7 +403,7 @@ def test_restart_preserves_server_backoff(tmp_path, monkeypatch):
     assert restarted.jobs[next(iter(mon.jobs))]["next"] == 9999999999
 
 
-def test_monitor_exports_real_decisions_and_watch_pause_preserves_receipts(tmp_path, monkeypatch, offer):
+def test_monitor_exports_real_decisions_and_watch_pause_preserves_receipts(tmp_path, monkeypatch):
     from alerters.hardware import monitor as module
     from alerters.hardware.monitor_sources import Batch
     from alerters.hardware.shopping_controls import defaults
@@ -413,32 +413,34 @@ def test_monitor_exports_real_decisions_and_watch_pause_preserves_receipts(tmp_p
     monkeypatch.setattr(module, "channels", lambda **_: (Channel("ntfy", "push", sent.append),))
     runtime = tmp_path / "runtime"
     mon = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", runtime, dry_run=False)
-    key = mon.add_product(URL)
-    mon.process(key, Batch(offers=[offer]))
+    key = next(k for k, job in mon.jobs.items() if job["kind"] == "slickdeals")
+    part = Listing("card", "ebay", "NVIDIA RTX 3090 24GB graphics card", URL,
+                   datetime.now(timezone.utc), price=850, condition_hint="new", extra={"seller": "EstablishedStore", "shopping": {
+                       "available": True, "stock": "in_stock", "item_price":850, "shipping":0,
+                       "availability_checked_at":datetime.now(timezone.utc).isoformat(), "verified_price_watch":"rtx_3090"}})
+    mon.process(key, Batch(listings=[part]))
     row = mon.shopping.batches[key]["rows"][0]
     assert len(sent) == 1 and row["judgment"]["eligible"]
     assert row["judgment"]["decisions"][0]["status"] == "sent"
-    assert row["judgment"]["price_history"]["observed_days"] == 1
+    assert row["type"] == "listing" and not row["is_system"]
     assert len(activity(runtime)) == 1
     first_seen = row["first_seen"]
     mon.write_health()
     mon.shopping = ShoppingExport(runtime)
-    mon.process(key, Batch(offers=[offer]))
+    mon.process(key, Batch(listings=[part]))
     row = mon.shopping.batches[key]["rows"][0]
     assert row["first_seen"] == first_seen
     assert row["judgment"]["decisions"][0]["status"] == "unchanged"
     (runtime / "ui").mkdir()
     mon.controls_path.write_text(json.dumps({**defaults(), "mode": "paused"}))
-    mon.process(key, Batch(offers=[replace(offer, base_price=3500)]))
+    mon.process(key, Batch(listings=[replace(part, price=750)]))
     row = mon.shopping.batches[key]["rows"][0]
     assert row["judgment"]["decisions"][0]["status"] == "watch-filtered"
     assert len(sent) == 1 and len(activity(runtime)) == 1
-    assert row["judgment"]["deliveries"][0]["price"] == offer.base_price
+    assert row["judgment"]["deliveries"][0]["price"] == part.price
 
 
-def test_start_recheck_preserves_backoff(tmp_path):
-    from alerters.hardware.monitor import job_id
-    from alerters.hardware.retailers import canonical_product
+def test_retired_start_announcements_remain_archival(tmp_path):
     mon = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", tmp_path / "runtime", dry_run=True)
     now = datetime.now(timezone.utc)
     announcement = Offer("community", "start", "HP OMEN desktop RTX 5090", URL, "unknown", "unknown", {},
@@ -447,13 +449,11 @@ def test_start_recheck_preserves_backoff(tmp_path):
     store = OfferState(tmp_path / "state/hardware/US")
     store.observe(announcement, now)
     store.save()
-    key = job_id("newegg", canonical_product(URL))
-    mon.jobs[key].update(failures=1,next=9999999999)
+    jobs = set(mon.jobs)
+    original = store.path.read_text()
     mon.recheck_starts()
-    assert mon.jobs[key]["next"] == 9999999999
-    mon.jobs[key].update(failures=0)
-    mon.recheck_starts()
-    assert mon.jobs[key]["next"] < 9999999999
+    assert set(mon.jobs) == jobs
+    assert store.path.read_text() == original
 
 
 def test_watchdog_restarts_even_when_ntfy_is_offline(tmp_path, monkeypatch):

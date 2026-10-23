@@ -1,4 +1,4 @@
-# Fast local hardware monitor. Nothing starts until the Windows cutover is approved.
+# Parts and display monitor. Runtime activation follows the existing release procedure.
 [monitor]
 retailer_seconds = 120
 feed_seconds = 300
@@ -7,91 +7,9 @@ legacy_seconds = 900
 heartbeat_seconds = 15
 stale_seconds = 600
 max_backoff_seconds = 3600
-# Keep room for 5070 Ti discovery alongside the existing 5080/5090 products.
+# Retained scheduler bounds; complete-PC product and discovery jobs are retired.
 max_products_per_retailer = 64
 workers = 6
 # Keep the existing hardware email digest under the same local writer.
 # The installed service reports missing SMTP credentials as degraded health.
 digest_utc = "02:52"
-
-[hp_browser]
-# Experimental: interactive access works, fresh headless access is unverified.
-# Install requirements-browser.txt and pass the documented unattended probe
-# before opting in. The shipped/live configuration keeps the current transport.
-enabled = false
-channel = "msedge"
-
-[[seed]]
-kind = "hp"
-url = "https://www.hp.com/us-en/shop/pdp/omen-by-hp-45l-gaming-desktop-gt22-3090"
-
-[[seed]]
-kind = "hp"
-url = "https://www.hp.com/us-en/shop/pdp/omen-35l-gaming-desktop-gt16-1085m-pc"
-
-[[seed]]
-kind = "newegg"
-url = "https://www.newegg.com/p/3D5-000Z-002C6?Item=9SIA1HJKEB7401"
-
-[[seed]]
-kind = "newegg"
-url = "https://www.newegg.com/p/3D5-000Z-003H2?Item=9SIA1HJKP24777"
-
-[[discovery]]
-kind = "discover-hp"
-url = "https://www.hp.com/us-en/shop/mdp/omen-45l-gaming-desktop"
-
-[[seed]]
-kind = "newegg"
-url = "https://www.newegg.com/p/N82E16883630088"
-
-[[discovery]]
-kind = "discover-newegg"
-url = "https://www.newegg.com/p/pl?d=RTX+5070+Ti+gaming+desktop&Order=1"
-
-[[discovery]]
-kind = "discover-newegg"
-url = "https://www.newegg.com/p/pl?d=RTX+5070+Ti+64GB+gaming+desktop&Order=1"
-
-[[discovery]]
-kind = "discover-hp"
-url = "https://www.hp.com/us-en/shop/mdp/desktops/omen-max-45l-gaming-desktop"
-
-[[discovery]]
-kind = "discover-newegg"
-# Includes unavailable products so a later restock can be detected.
-url = "https://www.newegg.com/p/pl?N=100897483+601468634"
-
-[[discovery]]
-kind = "discover-newegg"
-url = "https://www.newegg.com/p/pl?d=ABS+RTX+5090+gaming+desktop"
-
-[[discovery]]
-kind = "discover-newegg"
-url = "https://www.newegg.com/p/pl?N=100897483+601468633&Order=1"
-
-[[discovery]]
-kind = "discover-newegg"
-# Dedicated 64GB search prevents cheaper 32GB PCs from crowding out this route.
-url = "https://www.newegg.com/p/pl?N=100897483+601468633+601399480&Order=1"
-
-# Optional [[coupon]] entries require exact retailer + sku, code, instructions,
-# discount (dollars), required_accessories (dollars), eligibility_confirmed,
-# starts_at/ends_at (ISO with offset). The code must still appear on that page.
-# Membership/student/card offers are never presumed eligible.
-
-[[catalog]]
-# RDY catalog discovery only: product-page access failed, so no confirmed stock,
-# delivered totals, historical observations or stock alerts from these quotes.
-kind = "ibuypower"
-url = "https://www.ibuypower.com/gaming-pcs/prebuilt-gaming-pcs"
-
-[[discovery]]
-kind = "discover-cyberpowerpc"
-url = "https://www.cyberpowerpc.com/gaming-pcs/prebuilt/"
-
-[[discovery]]
-# Public exact-SKU sitemap, refreshed every six hours. Each discovered product
-# receives its own ten-minute check with the normal per-host throttle/backoff.
-kind = "discover-skytech"
-url = "https://skytechgaming.com/sitemap.xml"
