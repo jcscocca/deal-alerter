@@ -309,3 +309,28 @@ def test_dashboard_port_cannot_be_claimed_by_second_instance(tmp_path):
             duplicate.server_close()
     finally:
         server.server_close()
+
+
+def test_health_reports_loaded_build_and_process_instance(web, monkeypatch):
+    session, base, app, _ = web
+    loaded = session.get(base + "/health").json()
+    assert loaded["service"] == "TechScout" and loaded["status"] == "ok"
+    assert loaded["version"].startswith("standout-v3-") and loaded["watch_schema_version"] == 3
+    assert loaded["instance_id"] == app.instance_id and loaded["pid"] > 0
+    # Changing disk code must not make an old process claim it loaded that code.
+    monkeypatch.setattr("alerters.techscout.dashboard.app_version", lambda: "next-build")
+    assert session.get(base + "/health").json() == loaded
+    restarted = Dashboard(app.directory, lambda _: 0)
+    assert restarted.version == "next-build" and restarted.instance_id != app.instance_id
+
+
+def test_build_fingerprint_tracks_code_and_config_but_ignores_runtime_data(tmp_path):
+    from alerters.techscout.version import app_version
+    (tmp_path / "alerters").mkdir()
+    code = tmp_path / "alerters" / "app.py"
+    code.write_text("first")
+    first = app_version(tmp_path)
+    (tmp_path / "alerters" / "prices.json").write_text("private runtime data")
+    assert app_version(tmp_path) == first
+    code.write_text("second")
+    assert app_version(tmp_path) != first

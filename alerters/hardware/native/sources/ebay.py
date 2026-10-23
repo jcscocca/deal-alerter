@@ -24,6 +24,7 @@ import math
 import re
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from itertools import count
 from urllib.parse import quote
 
 import requests
@@ -35,12 +36,61 @@ OAUTH_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
 ITEM_URL = "https://api.ebay.com/buy/browse/v1/item/"
 MAX_STOCK_CHECKS = 20
+STOCK_ROTATION_SECONDS = 900
 INSIGHTS_URL = (
     "https://api.ebay.com/buy/marketplace_insights/v1_beta/item_sales/search"
 )
 SCOPE = "https://api.ebay.com/oauth/api_scope"
 TIMEOUT = 30
 MARKETPLACE = "EBAY_US"
+_STOCK_ROUNDS = count(int(datetime.now(timezone.utc).timestamp()) // STOCK_ROTATION_SECONDS)
+
+
+def _stock_rotation_slot() -> int:
+    # fetch_job recreates sources, while the single writer keeps this module.
+    # Advance on actual batches rather than elapsed wall-clock slots: a slow
+    # fetch or a recurring backoff must not keep selecting the same subset.
+    return next(_STOCK_ROUNDS)
+
+
+def _fair_stock_order(groups, budget):
+    """Share requests between categories and rotate stable identities each poll."""
+    groups = {name: sorted(rows, key=lambda row: row[0].listing_id)
+              for name, rows in groups.items() if rows}
+    if not groups or budget <= 0:
+        return []
+    names, slot = list(groups), _stock_rotation_slot()
+    if budget < len(names):
+        # Small budgets rotate categories, advancing a category only on its turn.
+        selected = []
+        for ticket in range(slot * budget, slot * budget + budget):
+            rows = groups[names[ticket % len(names)]]
+            selected.append(rows[(ticket // len(names)) % len(rows)])
+        return selected
+    quotas = {name: 0 for name in names}
+    remaining = budget
+    while remaining:
+        progress = False
+        for name in names:
+            if quotas[name] < len(groups[name]):
+                quotas[name] += 1
+                remaining -= 1
+                progress = True
+                if not remaining:
+                    break
+        if not progress:
+            break
+    selected = {}
+    for name, rows in groups.items():
+        # Advancing by the allocated count covers every stable candidate over
+        # consecutive batches, including oversized GPU groups.
+        offset = slot * quotas[name] % len(rows)
+        selected[name] = (rows[offset:] + rows[:offset])[:quotas[name]]
+    # Interleave requests as well as allocations; source backoff still stops
+    # immediately and does not always spend its early requests on one category.
+    return [selected[name][index] for index in range(max(quotas.values()))
+            for name in names if index < len(selected[name])]
+
 
 # eBay's condition IDs, mapped to the vocabulary match.py uses.
 CONDITION_MAP = {
@@ -239,9 +289,7 @@ class EbaySource:
         item per fetch. Neither errors nor the request limit imply availability.
         The monitor's rate-limit exceptions propagate to its existing backoff.
         """
-        checked: dict[str, Listing] = {}
-        out = []
-        requests_used = 0
+        planned, candidates = [], {}
 
         def identity(title, body=""):
             if key := memory_configuration(title):
@@ -265,28 +313,28 @@ class EbaySource:
         for listing in listings:
             key = identity(listing.title, listing.body)
             if not key or listing.sold:
-                out.append(listing)
+                planned.append((listing, key, False))
                 continue
             shopping = {**listing.extra.get("shopping", {}), "available": None,
                         "stock": "unknown", "availability_note": "Item stock has not been verified"}
             listing = replace(listing, extra={**listing.extra, "shopping": shopping})
             limit = self.memory_limits.get(key, self.card_limits.get(key, self.gpu_limits.get(key, self.display_limits.get(key))))
-            if (limit is None or listing.price is None or not 0 < listing.price <= limit
-                    or listing.multi_variant or listing.seller_risk != "low"
-                    or listing.condition_hint not in ("new", "open_box", "used", "refurbished")):
-                out.append(listing)
-                continue
-            if key in (self.card_limits | self.display_limits) and listing.condition_hint != "new":
-                out.append(listing)
-                continue
-            if listing.listing_id in checked:
-                out.append(checked[listing.listing_id])
-                continue
-            if requests_used >= MAX_STOCK_CHECKS:
-                shopping["availability_note"] = "Item stock check deferred by request limit"
-                out.append(listing)
-                continue
-            requests_used += 1
+            eligible = (limit is not None and listing.price is not None and 0 < listing.price <= limit
+                        and not listing.multi_variant and listing.seller_risk == "low"
+                        and listing.condition_hint in ("new", "open_box", "used", "refurbished")
+                        and (key not in (self.card_limits | self.display_limits) or listing.condition_hint == "new"))
+            planned.append((listing, key, eligible))
+            if eligible:
+                candidates.setdefault(listing.listing_id, (listing, key))
+
+        groups = {"gpu": [], "memory": [], "monitors": []}
+        for listing, key in candidates.values():
+            category = "memory" if key in self.memory_limits else "monitors" if key in self.display_limits else "gpu"
+            groups[category].append((listing, key))
+        selected = _fair_stock_order(groups, MAX_STOCK_CHECKS)
+        checked: dict[str, tuple[Listing, str]] = {}
+        for listing, key in selected:
+            shopping = listing.extra["shopping"]
             shopping["availability_checked_at"] = datetime.now(timezone.utc).isoformat()
             shopping["availability_note"] = "Item stock check failed; availability unknown"
             try:
@@ -319,7 +367,17 @@ class EbaySource:
                         shopping["availability_note"] = "Item identity, price or purchase option could not be verified"
             except (requests.RequestException, ValueError, TypeError, AttributeError):
                 pass
-            checked[listing.listing_id] = listing
+            checked[listing.listing_id] = (listing, key)
+        out = []
+        for listing, key, eligible in planned:
+            if eligible:
+                verified = checked.get(listing.listing_id)
+                if verified and verified[1] == key:
+                    listing = verified[0]
+                else:
+                    listing.extra["shopping"]["availability_note"] = (
+                        "Conflicting search item identity; availability unverified" if verified else
+                        "Item stock check deferred by request limit")
             out.append(listing)
         return out
 

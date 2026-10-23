@@ -10,7 +10,7 @@ from dealcore.state import atomic_write
 from alerters.hardware.shopping_controls import defaults, read_controls, validate
 
 STATUSES = {"sent": "Sent", "failed": "Send failed", "unchanged": "Already notified; no qualifying change",
-            "ineligible": "Below notification rules or evidence requirements", "watch-filtered": "Outside enabled watches / paused",
+            "ineligible": "Below notification rules or evidence requirements", "watch-filtered": "Outside verified alert policy, enabled watches, or paused",
             "dry-run": "Preview only", "pending": "Outcome unavailable"}
 CHANNELS = {"email", "ntfy", "discord", "desktop"}
 
@@ -89,7 +89,7 @@ class Workspace:
         data = read_public(self.runtime / "shopping-sources.json") if self.runtime else {}
         settings, error = read_controls(self.path) if self.runtime else (defaults(), "Monitor is not connected")
         return {"settings": settings, "revision": revision(settings), "error": error,
-                "supported": isinstance(data.get("capabilities"), list) and "watches-v2" in data["capabilities"], "activity": activity(self.runtime)}
+                "supported": isinstance(data.get("capabilities"), list) and "watches-v3" in data["capabilities"], "activity": activity(self.runtime)}
 
     def update(self, body):
         if not isinstance(body, dict) or set(body) != {"revision", "settings"}:
@@ -98,6 +98,8 @@ class Workspace:
             settings = validate(body["settings"])
         except (ValueError, TypeError, KeyError) as exc:
             return 400, {"error": text(str(exc), 120)}
+        if self.runtime and (self.runtime / "ui" / "upgrade-in-progress.json").exists():
+            return 503, {"error": "Application upgrade in progress; watch settings are temporarily read-only"}
         current = self.state()
         if not current["supported"]:
             return 409, {"error": "Update the installed monitor before changing notification watches"}

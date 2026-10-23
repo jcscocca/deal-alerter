@@ -150,9 +150,11 @@ def test_request_bound_leaves_unchecked_stock_unknown(monkeypatch):
     monkeypatch.setattr("alerters.hardware.native.sources.ebay.MAX_STOCK_CHECKS", 1)
     feed = source(detail(), items=[ITEM, ITEM | {"itemId": "v1|123|0"}])
     rows = feed.fetch()
-    assert rows[0].extra["shopping"]["available"] is True
-    assert rows[1].extra["shopping"]["available"] is None
-    assert "request limit" in rows[1].extra["shopping"]["availability_note"]
+    # Fair rotation may select either identity. Only one gets an attempted
+    # exact check; the deferred item never inherits a positive search status.
+    assert sum(bool(row.extra["shopping"].get("availability_checked_at")) for row in rows) == 1
+    deferred = [row for row in rows if "request limit" in row.extra["shopping"]["availability_note"]]
+    assert len(deferred) == 1 and deferred[0].extra["shopping"]["available"] is None
 
 
 @pytest.mark.parametrize("item", [ITEM | {"price": {"value": "301", "currency": "USD"}},

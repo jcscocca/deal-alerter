@@ -25,7 +25,7 @@ foreach ($relative in $files) {
 }
 $base = & git -C $Checkout rev-parse origin/main
 if ($LASTEXITCODE -ne 0) { throw 'origin/main is unavailable' }
-$manifest = @{ version = 1; checkout = $Checkout; base = $base; runtime = $RuntimeDirectory; hashes = $hashes }
+$manifest = @{ version = 2; checkout = $Checkout; base = $base; runtime = $RuntimeDirectory; hashes = $hashes; acceptance = @{job_kinds=@("reddit","slickdeals","legacy");capabilities=@("watches-v3");watch_schema_version=3} }
 $manifest | ConvertTo-Json -Depth 6 | Set-Content -Encoding utf8 (Join-Path $OutputDirectory 'release.json')
 $pythonw = [Security.SecurityElement]::Escape((Join-Path $RuntimeDirectory 'venv\Scripts\pythonw.exe'))
 $app = [Security.SecurityElement]::Escape((Join-Path $RuntimeDirectory 'app'))

@@ -145,3 +145,5 @@ dialog label {display:block;margin:16px 0;}
 dialog input:not([type=checkbox]) {display:block;width:100%;margin-top:7px;padding:10px;color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:6px;}
 #watch-error {color:var(--warn);}
 @media(max-width:760px){#workspace-nav{gap:4px;}#workspace-nav button{flex:1;padding:8px;}#watching-pane>label,#alerts-pane>label{align-items:stretch;flex-direction:column;}}
+
+#watching-pane>.notification-option {flex-direction:row;align-items:center;gap:9px;}

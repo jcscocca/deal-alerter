@@ -414,8 +414,10 @@ def test_monitor_exports_real_decisions_and_watch_pause_preserves_receipts(tmp_p
     runtime = tmp_path / "runtime"
     mon = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", runtime, dry_run=False)
     key = next(k for k, job in mon.jobs.items() if job["kind"] == "slickdeals")
-    part = Listing("card", "slickdeals", "NVIDIA RTX 3090 24GB graphics card", URL,
-                   datetime.now(timezone.utc), price=850, condition_hint="new")
+    part = Listing("card", "ebay", "NVIDIA RTX 3090 24GB graphics card", URL,
+                   datetime.now(timezone.utc), price=850, condition_hint="new", extra={"seller": "EstablishedStore", "shopping": {
+                       "available": True, "stock": "in_stock", "item_price":850, "shipping":0,
+                       "availability_checked_at":datetime.now(timezone.utc).isoformat(), "verified_price_watch":"rtx_3090"}})
     mon.process(key, Batch(listings=[part]))
     row = mon.shopping.batches[key]["rows"][0]
     assert len(sent) == 1 and row["judgment"]["eligible"]

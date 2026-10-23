@@ -47,12 +47,12 @@ def test_exact_filter_budget_and_source_never_broaden(tmp_path):
 
 
 @pytest.mark.parametrize("category", ["desktop-memory", "computers", "tablets"])
-def test_old_complete_machine_watches_are_disabled_during_v2_migration(tmp_path, category):
+def test_old_complete_machine_watches_are_disabled_during_migration(tmp_path, category):
     old = watch(category=category, reuse=True, product_id="ebay:" + "b"*24)
     path = tmp_path / "watches.json"
     path.write_text(json.dumps({"version":1, "mode":"watches", "watches":[old]}))
     data, error = read_controls(path)
-    assert error is None and data["version"] == 2 and data["mode"] == "watches"
+    assert error is None and data["version"] == 3 and data["mode"] == "watches"
     assert data["watches"][0]["category"] == "parts"
     assert data["watches"][0]["enabled"] is False
     assert "reuse" not in data["watches"][0]
@@ -65,7 +65,7 @@ def test_component_watch_migrates_without_ram_completion_restrictions():
     assert data["watches"][0]["filters"] == {"gpu":"RTX 3090"}
 
 
-def test_exact_monitor_watch_retains_precise_identity_during_v2_migration():
+def test_exact_monitor_watch_retains_precise_identity_during_migration():
     original = watch(category="monitor", filters={}, source="ebay", reuse=False,
                      name="My monitor", product_id="ebay:" + "c"*24)
     data = validate({"version":1, "mode":"watches", "watches":[original]})
@@ -75,7 +75,7 @@ def test_exact_monitor_watch_retains_precise_identity_during_v2_migration():
 
 
 def test_settings_revision_prevents_lost_edits_and_preserves_mode(tmp_path):
-    (tmp_path / "shopping-sources.json").write_text(json.dumps({"capabilities": ["watches", "watches-v2"]}))
+    (tmp_path / "shopping-sources.json").write_text(json.dumps({"capabilities": ["watches", "watches-v2", "watches-v3"]}))
     (tmp_path / "ui").mkdir()
     workspace = Workspace(tmp_path)
     original = workspace.state()
@@ -85,15 +85,16 @@ def test_settings_revision_prevents_lost_edits_and_preserves_mode(tmp_path):
     assert read_controls(workspace.path)[0] == settings
 
 
-def test_new_dashboard_cannot_write_v2_settings_to_older_monitor(tmp_path):
-    (tmp_path / "shopping-sources.json").write_text(json.dumps({"capabilities": ["watches"]}))
+@pytest.mark.parametrize("capabilities", [["watches"], ["watches", "watches-v2"]])
+def test_new_dashboard_cannot_write_v3_settings_to_older_monitor(tmp_path, capabilities):
+    (tmp_path / "shopping-sources.json").write_text(json.dumps({"capabilities": capabilities}))
     (tmp_path / "ui").mkdir()
     path = tmp_path / "ui" / "watches.json"
     original = json.dumps({"version": 1, "mode": "all", "watches": []})
     path.write_text(original)
     workspace = Workspace(tmp_path)
     state = workspace.state()
-    assert state["settings"]["version"] == 2 and not state["supported"]
+    assert state["settings"]["version"] == 3 and not state["supported"]
     status, result = workspace.update({"revision": state["revision"], "settings": defaults()})
     assert status == 409 and "Update the installed monitor" in result["error"]
     assert path.read_text() == original
@@ -132,3 +133,42 @@ def test_unpriced_announcement_receipt_is_not_a_free_product(tmp_path):
     restarted = ShoppingExport(tmp_path)
     assert len(restarted.events) == 1
     assert activity(tmp_path)[0]["price"] is None
+
+
+@pytest.mark.parametrize("version", [1, 2])
+@pytest.mark.parametrize("mode", ["all", "watches", "paused"])
+def test_migration_preserves_mode_and_requires_explicit_target_opt_in(version, mode):
+    old = watch(**({"reuse": False} if version == 1 else {}))
+    result = validate({"version": version, "mode": mode, "watches": [old]})
+    assert result["version"] == 3 and result["mode"] == mode
+    assert result["include_target_notices"] is False
+    assert result["watches"][0]["enabled"]
+
+
+@pytest.mark.parametrize("value", [None, 0, 1, "true"])
+def test_target_opt_in_requires_explicit_boolean(value):
+    with pytest.raises(ValueError, match="explicitly"):
+        validate({**defaults(), "include_target_notices": value})
+
+
+def test_filter_applies_policy_before_watch_subscription():
+    item = SimpleNamespace()
+    calls = []
+    plugin = SimpleNamespace(notification_allowed=lambda row, **kwargs: calls.append(kwargs) or kwargs["include_target_notices"])
+    assert not delivery_filter(defaults(), plugin)(item)
+    assert delivery_filter({**defaults(), "include_target_notices": True}, plugin)(item)
+    assert not delivery_filter({**defaults(), "mode": "paused", "include_target_notices": True}, plugin)(item)
+    assert len(calls) == 2
+    assert not delivery_filter({**defaults(), "mode": "watches", "include_target_notices": True}, plugin)(item)
+
+
+def test_upgrade_marker_prevents_writes_without_changing_preferences(tmp_path):
+    (tmp_path / "shopping-sources.json").write_text(json.dumps({"capabilities": ["watches-v3"]}))
+    (tmp_path / "ui").mkdir()
+    workspace = Workspace(tmp_path)
+    original = workspace.state()
+    marker = tmp_path / "ui" / "upgrade-in-progress.json"
+    marker.write_text("{}")
+    status, result = workspace.update({"revision": original["revision"], "settings": defaults()})
+    assert status == 503 and "upgrade in progress" in result["error"].lower()
+    assert not workspace.path.exists()

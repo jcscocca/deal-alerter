@@ -207,7 +207,7 @@ test('dashboard ignores retired local preferences and keeps broader browse one c
     crypto:require('node:crypto').webcrypto,setInterval(){},setTimeout(){},clearTimeout(){},
     matchMedia(){return {matches:false}},addEventListener(){},scrollTo(){},
     fetch:async url=>({ok:true,json:async()=>url==='/api/workspace'
-      ? {supported:true,revision:'test',settings:{version:2,mode:'all',watches:[]},activity:[]}
+      ? {supported:true,revision:'test',settings:{version:3,mode:'all',include_target_notices:false,watches:[]},activity:[]}
       : {snapshot,last_check:{status:'success'},running:false}})};
   context.window=context;vm.createContext(context);
   for(const name of ['browsing.js','workspace.js','dashboard.js'])vm.runInContext(fs.readFileSync(path.join(directory,name),'utf8'),context,{filename:name});
@@ -224,4 +224,56 @@ test('dashboard ignores retired local preferences and keeps broader browse one c
   assert.match(elements.get('reports-cards').innerHTML,/Unverified deal report/);
   assert.doesNotMatch(elements.get('current-cards').innerHTML,/Unverified deal report/);
   assert.doesNotMatch(html,/reuse your|RAM reuse|96–128|Potential with your kit|prebuilt/i);
+});
+
+test('target notices require an explicit saved opt-in and survive independent watch changes',async()=>{
+  const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+  const directory=path.resolve(__dirname,'../alerters/techscout/web');
+  const html=fs.readFileSync(path.join(directory,'index.html'),'utf8');
+  const elements=new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(([,id])=>[id,{id,checked:false,disabled:false,value:'',textContent:'',innerHTML:'',handlers:{},
+    addEventListener(type,handler){(this.handlers[type] ||= []).push(handler)},setAttribute(){}}]));
+  const main={handlers:{},addEventListener(type,handler){(this.handlers[type] ||= []).push(handler)}};
+  const posts=[];
+  let rejectNext=false,serverSettings={version:3,mode:'all',include_target_notices:false,watches:[{id:'a'.repeat(32),name:'GPU',enabled:true,category:'parts',filters:{},source:'all',budget:null,product_id:'',reuse:true}]};
+  const context={TechScoutBrowsing:B,structuredClone,document:{getElementById(id){assert.ok(elements.has(id),'missing DOM element '+id);return elements.get(id)},
+    querySelector(selector){return selector==='main' ? main : {content:'test-token'}},querySelectorAll(){return []}},
+    Intl,Date,Set,Map,setInterval(){},setTimeout(){},addEventListener(){},scrollTo(){},
+    fetch:async(url,options)=>{
+      if(url==='/api/watches') {
+        const body=JSON.parse(options.body);posts.push(body);
+        if(rejectNext){rejectNext=false;return {ok:false,json:async()=>({error:'Settings could not be saved'})}}
+        serverSettings=body.settings;return {ok:true,json:async()=>({revision:'saved',settings:structuredClone(serverSettings)})};
+      }
+      return {ok:true,json:async()=>url==='/api/workspace'
+        ? {supported:true,revision:'test',settings:structuredClone(serverSettings),activity:[]}
+        : {snapshot:{groups:[],held:[],leads:[],sources:[]}}};
+    }};
+  context.window=context;vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(directory,'workspace.js'),'utf8'),context,{filename:'workspace.js'});
+  await new Promise(setImmediate);
+  const checkbox=elements.get('include-target-notices'),mode=elements.get('notification-mode');
+  assert.equal(checkbox.checked,false);assert.equal(checkbox.disabled,false);
+  assert.match(elements.get('watch-status').textContent,/Price-target notices are off/);
+  mode.value='watches';
+  for(const handler of mode.handlers.change)await handler();
+  assert.equal(posts.at(-1).settings.version,3);assert.equal(posts.at(-1).settings.include_target_notices,false);
+  assert.equal(Object.hasOwn(posts.at(-1).settings.watches[0],'reuse'),false);
+  checkbox.checked=true;
+  for(const handler of checkbox.handlers.change)await handler();
+  assert.equal(posts.at(-1).settings.include_target_notices,true);assert.equal(posts.at(-1).settings.mode,'watches');
+  assert.equal(checkbox.checked,true);assert.equal(serverSettings.watches[0].enabled,true);
+  const toggle={dataset:{toggleWatch:'a'.repeat(32)}};
+  for(const handler of main.handlers.click)await handler({target:{closest(selector){return selector.includes('[data-edit-watch]') ? toggle : null}}});
+  assert.equal(posts.at(-1).settings.watches[0].enabled,false);
+  assert.equal(posts.at(-1).settings.include_target_notices,true);
+  checkbox.checked=false;
+  for(const handler of checkbox.handlers.change)await handler();
+  assert.equal(serverSettings.include_target_notices,false);assert.equal(checkbox.checked,false);
+  rejectNext=true;checkbox.checked=true;
+  for(const handler of checkbox.handlers.change)await handler();
+  assert.equal(serverSettings.include_target_notices,false,'a rejected save must not enable notices');
+  assert.equal(checkbox.checked,false,'the UI restores the saved off state');
+  assert.match(elements.get('workspace-notice').textContent,/could not be saved/);
+  assert.match(html,/Include verified price-target notices/);
+  assert.match(html,/Inherited purchase targets can trigger these notices without standout price evidence/);
 });

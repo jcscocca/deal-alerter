@@ -8,7 +8,7 @@ for products you want. Steam wishlist alerts continue as a separate lane.
 | **Focus** | Standout component and monitor deals, plus useful peripherals | Games on your Steam wishlist |
 | **Evidence** | Exact-part history and dated model-specific references where supported | IsThereAnyDeal's Steam price history |
 | **Browse** | Local dashboard with product filters, saved comparisons and source status | Daily report |
-| **Notify** | Qualifying monitored offers through push and daily email | Daily email |
+| **Notify** | Current verified standout deals through push and daily email; target notices opt in | Daily email |
 
 Complete computers, laptops and tablets are outside the hardware shopping scope.
 The completed desktop no longer drives a buying project: prebuilt tracking,
@@ -60,7 +60,8 @@ python -m alerters.techscout --serve
 Open [TechScout on this computer](http://127.0.0.1:8768/). The home feed puts
 qualifying, current component and monitor deals first. Ordinary offers and
 publisher/community reports stay available to browse with their evidence and
-verification status. A low price alone is not a recommendation.
+verification status. Target-only notices stay amber in broader browsing; meeting
+a price target alone is not standout deal evidence.
 
 - **Price evidence stays specific.** Component verdicts use the exact part and
   condition, with historical observations or a dated reference. Monitor alerts
@@ -73,6 +74,11 @@ verification status. A low price alone is not a recommendation.
   price targets using existing monitor coverage. A watch does not start a new
   retailer query or make an unassessed product alertable. Parts without supported
   price evidence remain research candidates.
+- **Notifications default to verified standouts.** Both hardware push and digest
+  require current verified offers with independent standout price evidence.
+  Inherited purchase targets do not notify by default. In Watching, **Include
+  verified price-target notices** is off until explicitly enabled; it still
+  requires a verified retailer offer and obeys the selected notification mode.
 - **The completed rig is no longer a gate.** Individual parts can be interesting
   without increasing its memory capacity. Hardware inventory can remain a
   historical reference without restricting the discovery feed.
@@ -85,9 +91,10 @@ and exact-model benchmark requirements. Browser filters do not broaden that
 collector or its alert criteria.
 
 Public publisher feeds provide leads across retailers and never establish stock,
-seller, shipping or checkout price. On-demand Walmart checks use a selected ZIP
-and create browse-only research snapshots for **parts**, **monitors**, **memory**
-and **supplies**. They do not send alerts or write whole-PC history. See
+seller, shipping or checkout price. Unverified community and publisher reports
+are browse-only and do not send deal notifications. On-demand Walmart checks use
+a selected ZIP and create browse-only research snapshots for **parts**,
+**monitors**, **memory** and **supplies**. They do not send alerts or write whole-PC history. See
 [TechScout setup, evidence and limits](docs/techscout-shopping.md).
 
 The hardware price log records eligible observations at

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import math
 import tomllib
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -33,6 +34,7 @@ class PartsHardwarePlugin(HardwarePlugin):
         super().__init__(*args, **kwargs)
         # The retained Apple adapter watches complete Mac systems only.
         self.sources = tuple(source for source in self.sources if source.name != "apple-refurb")
+        self._fixed_now = now is not None
         self.now = now or datetime.now(timezone.utc)
         self.card_prices = tomllib.loads((price_watches or DEFAULT_WATCHES).read_text(encoding="utf-8"))["price"]
         for band in self.card_prices.values():
@@ -41,6 +43,9 @@ class PartsHardwarePlugin(HardwarePlugin):
                 raise ValueError("Invalid component price thresholds")
         self.card_price_watches, self.card_stock = {}, {}
         self.sodimm_watches, self.sodimm_stock = {}, {}
+        self.verified_offers = {}
+        # CLI runs and monitor runs share the same verified-standout default.
+        self.options = replace(self.options, notify_filter=self.notification_allowed, include_others=False)
 
     def prepare(self, listing):
         from alerters.techscout.scope import allowed_title
@@ -56,6 +61,38 @@ class PartsHardwarePlugin(HardwarePlugin):
         return super().add_manual(**fields)
 
     def judge(self, candidate, stats):
+        if not self._fixed_now:
+            self.now = datetime.now(timezone.utc)
+        assessment = self._judge(candidate, stats)
+        if assessment is None:
+            return None
+        listing, detail = candidate.listing, assessment.detail
+        key = detail.part.key
+        if assessment.key in self.display_watches:
+            key = self.display_watches[assessment.key][0].model
+        shopping = listing.extra.get("shopping", {})
+        shipping, price = shopping.get("shipping"), shopping.get("item_price")
+        known_cost = (type(shipping) in (int, float) and math.isfinite(shipping) and shipping >= 0
+                      and type(price) in (int, float) and math.isfinite(price) and price > 0
+                      and abs(price + shipping - assessment.price) < 0.02)
+        self.verified_offers[assessment.key] = bool(
+            listing.source == "ebay" and fresh_item_stock(shopping, self.now, key)
+            and shopping.get("stock") == "in_stock" and known_cost
+            and listing.extra.get("seller") and listing.seller_risk == "low"
+            and detail.condition in ("new", "open_box", "used", "refurbished")
+            and detail.quantity == 1 and not listing.sold and not listing.multi_variant
+            and not detail.is_system and not detail.is_bundle)
+        return assessment
+
+    def notification_allowed(self, assessment, *, include_target_notices=False):
+        if not self.verified_offers.get(assessment.key, False):
+            return False
+        from .shopping_activity import standout_basis
+        if standout_basis(self, assessment, True):
+            return True
+        return include_target_notices and assessment.target_override
+
+    def _judge(self, candidate, stats):
         if candidate.match.part.key in SODIMM_LAYOUTS:
             return self.judge_sodimm(candidate)
         assessment = super().judge(candidate, stats)

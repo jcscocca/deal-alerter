@@ -40,16 +40,22 @@ rule. Saved comparisons hold up to three candidates in the browser.
 Standout deals require a qualifying `EXCEPTIONAL`/`GRAIL` price verdict, or a
 verified monitor offer at least 25% below its exact model’s dated retail quote,
 plus current retailer evidence. Each card names its evidence; a dated retail
-quote is not sold-market value. A target hit is identified separately. Exact part/model, condition,
-seller, positive price, shipping, stock and freshness matter; a price quote or
-retail discount badge alone does not establish a good deal.
+quote is not sold-market value. A target hit is identified separately. Exact
+part/model, condition, seller, positive price, shipping, stock and freshness
+matter; a price quote or retail discount badge alone does not establish a good deal.
+
+Hardware push and digest default to current verified standout deals. Inherited
+purchase targets do not send notices by default. Target-only offers remain amber
+in **All finds** and **Target price met**; a target does not establish independent
+standout evidence.
 
 The broader browse results include ordinary offers, unassessed research, stale or
 unavailable listings, and publisher leads. Each retains its evidence and status.
 Walmart product research is browse-only; generic MSRP is never treated as proof
 of a current discount. Unknown shipping remains unknown, and saved prices are
 not presented as current checkout totals. Community and publisher reports do not
-establish seller, condition, inventory or final price.
+establish seller, condition, inventory or final price. These unverified reports
+are browse-only and do not send deal notifications.
 
 The assessed component catalog and enabled hunts define automatic verdict
 coverage. Broader discovery can show CPUs, SSDs, motherboards, memory and other
@@ -61,21 +67,29 @@ capacity to be interesting.
 
 **Watching** saves up to 40 product/search preferences, price limits and filters.
 These narrow existing monitor coverage and do not start new retailer searches.
-**All exceptional deals & price-target notices** allows exceptional monitored
-deals and separately identified configured target hits;
+**Verified standout deals** allows current verified standouts without a saved watch;
 **Only enabled watches** narrows delivery to matching watches, and zero enabled
 watches means zero deal notifications. **Pause deal notifications** suspends deal
-delivery while collection continues. Source-health warnings remain separate.
+delivery while collection continues. **Include verified price-target notices**
+is an explicit opt-in, off by default. It adds verified configured target hits to
+the selected mode without turning them into standout recommendations. Both
+hardware push and digest use these controls. Source-health warnings remain
+separate.
 Changes apply when the monitor next reads preferences. The installed monitor
-must advertise watch-settings version 2 before the dashboard can save changes;
-an older installation remains readable without rewriting its settings. None of these choices
-relaxes evidence or engine qualification rules. Walmart and publisher-only finds
-remain browse-only.
+must advertise the `watches-v3` capability before the dashboard can save schema
+version 3 settings, including the boolean `include_target_notices`; an older
+installation remains readable without rewriting its settings. None of these
+choices relaxes verification or engine qualification rules. Walmart research and
+unverified community/publisher finds remain browse-only.
 
 The dashboard writes validated, non-secret preferences only to `ui/watches.json`
-in the selected runtime. An absent preferences file keeps the normal all-deals
-mode; a malformed one pauses deal delivery until repaired. Old desktop and tablet
-watch entries cannot reintroduce out-of-scope offers.
+in the selected runtime. An absent preferences file uses **Verified standout
+deals** with target notices off; a malformed one pauses deal delivery until
+repaired. Reading version 1 or 2 settings preserves the selected mode and watches,
+sets `include_target_notices` to false, and migrates them to version 3 in memory.
+Legacy RAM-reuse fields are removed, and old desktop, laptop and tablet purchase
+watches are disabled rather than becoming broad component watches. They cannot
+reintroduce out-of-scope offers.
 
 **Alerts** shows retained successful sends and failures, and the latest delivery
 decisions for loaded monitored offers. Sent means a transport accepted the
@@ -108,7 +122,7 @@ not identify a retailer. Matching product identifiers/names can combine publishe
 reports, while different configurations and conditions remain separate. Combined
 reports do not become inventory checks or market-price samples. Feed reports
 expire after 72 hours; failed or older checks keep their uncertainty visible.
-No publisher reports send alerts through the dashboard.
+No unverified publisher or community report sends deal notifications.
 
 ## Windows shortcut and automatic startup
 

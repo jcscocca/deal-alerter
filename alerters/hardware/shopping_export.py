@@ -95,7 +95,7 @@ class ShoppingExport:
                             "last_success": job.get("last_success", 0),
                             "failed": bool(job.get("error")), "interval": job["interval"],
                             **self.batches.get(key, {"observed_at": None, "rows": [], "truncated": False})})
-        atomic_write(self.path, json.dumps({"version": 1, "capabilities": ["judgments", "watches", "watches-v2"], "heartbeat": heartbeat,
+        atomic_write(self.path, json.dumps({"version": 1, "capabilities": ["judgments", "watches-v3"], "heartbeat": heartbeat,
                                            "dry_run": dry_run, "sources": sources}, allow_nan=False))
         if not dry_run:
             atomic_write(self.seen_path, json.dumps(self.seen))

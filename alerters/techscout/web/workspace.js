@@ -16,9 +16,9 @@
     catch(_){notice('Could not load watch settings or alert activity. Retrying shortly.');}
   }
   async function save(settings){
-    if(!data || saving)return false;saving=true;sequence++;el('notification-mode').disabled=true;
+    if(!data || saving)return false;saving=true;sequence++;el('notification-mode').disabled=true;el('include-target-notices').disabled=true;
     try{
-      settings={...settings,version:2,watches:settings.watches.map(({reuse,...watch})=>watch)};
+      settings={...settings,version:3,include_target_notices:settings.include_target_notices===true,watches:settings.watches.map(({reuse,...watch})=>watch)};
       const response=await fetch('/api/watches',{method:'POST',headers:{'Content-Type':'application/json','X-TechScout-Token':document.querySelector('meta[name="techscout-token"]').content},body:JSON.stringify({revision:data.revision,settings})});
       const result=await response.json();if(!response.ok)throw Error(result.error || 'Could not save watches');
       data={...data,...result,error:null};notice('Watch settings saved. The monitor applies them on its next job.');return true;
@@ -42,10 +42,13 @@
     openWatch({id:crypto.randomUUID().replaceAll('-',''),name:product ? (product.product_name || product.title).slice(0,80) : `${categoryNames[context.category]} ${Object.values(p.filters).filter(Boolean).join(' ')}`.slice(0,80),enabled:true,category:product ? 'monitor' : context.category,filters:product ? {} : Object.fromEntries(Object.entries(p.filters).filter(([,v])=>v)),source:product ? product.source : p.source,budget:p.budget,product_id:product?.id || ''});
   }
   function renderWatches(){
-    el('notification-mode').disabled=!data?.supported || saving;
+    el('notification-mode').disabled=!data?.supported || saving;el('include-target-notices').disabled=!data?.supported || saving;
+    if(!saving)el('include-target-notices').checked=data?.settings.include_target_notices===true;
     if(!data){el('watch-status').textContent='Loading monitor settings…';return;}
     el('notification-mode').value=data.settings.mode;
-    el('watch-status').textContent=data.error || (!data.supported ? 'Install the monitor integration to enable watch controls.' : data.settings.mode==='all' ? 'Exceptional parts and monitor deals, plus configured price-target notices, can alert without a saved watch. Choose Only enabled watches to narrow those alerts.' : data.settings.mode==='paused' ? 'Deal notifications are paused. Collection continues.' : 'Only enabled watches can pass qualifying exceptional deals and configured price-target notices to notifications. No enabled watches means no deal notifications.');
+    const targets=data.settings.include_target_notices===true;
+    el('watch-status').textContent=data.error || (!data.supported ? 'Install the monitor integration to enable watch controls.' : data.settings.mode==='all' ? `Verified standout parts and monitor deals can alert without a saved watch. Price-target notices are ${targets ? 'included' : 'off'}.` : data.settings.mode==='paused' ? 'Deal notifications are paused. Collection continues.' : `Only enabled watches can send verified standout deals${targets ? ' and verified price-target notices' : ''}. No enabled watches means no deal notifications.`);
+
     el('watch-list').innerHTML=data.settings.watches.length ? data.settings.watches.map(w=>`<article class="watch-card"><h2>${esc(w.name)}</h2><p>${esc(description(w))}</p><span class="badge">${w.enabled ? 'Enabled' : 'Paused'}</span><div class="card-actions"><button data-edit-watch="${w.id}">Edit</button><button data-toggle-watch="${w.id}">${w.enabled ? 'Pause' : 'Enable'}</button><button data-browse-watch="${w.id}">Browse matches</button><button data-delete-watch="${w.id}">Remove</button></div></article>`).join('') : '<p class="empty">No saved watches yet. In Deals, choose Watch this search or Watch product on a card.</p>';
   }
   function renderAlerts(){
@@ -72,6 +75,7 @@
   el('watch-cancel').addEventListener('click',()=>el('watch-dialog').close());
   el('watch-form').addEventListener('submit',async event=>{event.preventDefault();if(!draft || !el('watch-form').reportValidity())return;draft.name=el('watch-name').value.trim();draft.budget=el('watch-budget').value==='' ? null : el('watch-budget').valueAsNumber;draft.enabled=el('watch-enabled').checked;if(!draft.product_id){draft.filters={};for(const field of el('watch-criteria').querySelectorAll('select')){const key=field.dataset.watchField;if(['category','source'].includes(key))draft[key]=field.value;else if(field.value)draft.filters[key]=field.value;}}const settings=structuredClone(data.settings);const index=settings.watches.findIndex(w=>w.id===draft.id);if(index<0)settings.watches.push(draft);else settings.watches[index]=draft;if(await save(settings)){el('watch-dialog').close();show('watching');}});
   el('notification-mode').addEventListener('change',()=>save({...data.settings,mode:el('notification-mode').value}));
+  el('include-target-notices').addEventListener('change',()=>save({...data.settings,include_target_notices:el('include-target-notices').checked}));
   el('alert-filter').addEventListener('change',renderAlerts);
   document.querySelector('main').addEventListener('click',async event=>{
     const product=event.target.closest('[data-watch-product]');if(product){newWatch(context.rows.find(r=>r.id===product.dataset.watchProduct));return;}

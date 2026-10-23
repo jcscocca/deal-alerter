@@ -44,12 +44,13 @@ def at_run_time(row):
     return replace(row, extra={**row.extra, "shopping":shopping})
 
 
-def execute(tmp_path, rows):
+def execute(tmp_path, rows, *, include_target_notices=False):
     plugin = PartsHardwarePlugin(ROOT / "config/hardware.toml", tmp_path, now=NOW)
     plugin.sources = (SimpleNamespace(name="fixture", fetch=lambda: FetchResult(rows)),)
     sent = []
     result = run(plugin, AlertState(plugin.state_dir / "alerts.json", plugin.normalise_key),
-                 replace(plugin.options, quiet_when_empty=True, preview=tmp_path / "preview.html"),
+                 replace(plugin.options, quiet_when_empty=True, preview=tmp_path / "preview.html",
+                         notify_filter=lambda item: plugin.notification_allowed(item, include_target_notices=include_target_notices)),
                  (Channel("fixture", "push", sent.append),), now=NOW)
     assert not result.problems
     return sent, result, plugin
@@ -105,6 +106,7 @@ def test_detail_identity_purchase_stock_and_trust_vetoes_still_prevent_native_al
 
 def test_one_shared_stock_budget_and_duplicate_identity_are_preserved(monkeypatch):
     monkeypatch.setattr("alerters.hardware.native.sources.ebay.MAX_STOCK_CHECKS", 1)
+    monkeypatch.setattr("alerters.hardware.native.sources.ebay._stock_rotation_slot", lambda:0)
     feed = source()
     try:
         first = feed._search_active("RTX 3090")[0]
@@ -175,14 +177,14 @@ def test_memory_notice_requires_fresh_matching_exact_item_stock(tmp_path, age):
     feed.memory_limits = {"ddr5_udimm_96_kit":1109.99}
     try:
         row = at_run_time(feed.fetch()[0])
-        assert execute(tmp_path / "fresh", [row])[0]
+        assert execute(tmp_path / "fresh", [row], include_target_notices=True)[0]
         shopping = dict(row.extra["shopping"])
         if age is None:
             shopping.pop("availability_checked_at")
         else:
             shopping["availability_checked_at"] = (NOW-timedelta(seconds=age)).isoformat()
-        assert not execute(tmp_path / "old", [replace(row, extra={**row.extra, "shopping":shopping})])[0]
+        assert not execute(tmp_path / "old", [replace(row, extra={**row.extra, "shopping":shopping})], include_target_notices=True)[0]
         shopping = {**row.extra["shopping"], "verified_price_watch":"ddr5_udimm_64"}
-        assert not execute(tmp_path / "identity", [replace(row, extra={**row.extra, "shopping":shopping})])[0]
+        assert not execute(tmp_path / "identity", [replace(row, extra={**row.extra, "shopping":shopping})], include_target_notices=True)[0]
     finally:
         feed.session.close()

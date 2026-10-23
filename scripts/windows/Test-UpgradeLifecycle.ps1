@@ -92,6 +92,8 @@ try {
         Remove-Item -LiteralPath $resolvedTestRoot -Recurse -Force
     }
 }
+& (Join-Path $PSScriptRoot 'Test-TechScoutLifecycle.ps1') -PythonExe $PythonExe
+if ($LASTEXITCODE -ne 0) { throw 'TechScout lifecycle regression failed.' }
 # Negative probe cases deliberately leave a nonzero native exit status. GitHub's
 # PowerShell wrapper otherwise propagates it after this successful test script.
 exit 0

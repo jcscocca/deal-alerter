@@ -4,6 +4,7 @@ from __future__ import annotations
 import hmac
 import json
 import math
+import os
 import secrets
 import socket
 import threading
@@ -23,6 +24,7 @@ from .facets import attributes
 from .integration import Workspace
 from .scope import allowed_title, in_scope, categories as product_categories
 from .facets import product_type
+from .version import app_version
 
 FRESH_SECONDS = 15 * 60
 ASSETS = Path(__file__).with_name("web")
@@ -223,6 +225,8 @@ class Dashboard:
         self.deal_feeds = deal_feeds
         self.workspace = Workspace(monitor_runtime)
         self.token = secrets.token_urlsafe(32)
+        self.version = app_version()
+        self.instance_id = secrets.token_hex(16)
         self.lock = threading.Lock()
         self.running = None
         self.last_start = None
@@ -325,7 +329,9 @@ def create_server(dashboard: Dashboard, port=8768):
                 with dashboard.lock:
                     return self.send(200, dashboard.workspace.state())
             if parsed.path == "/health":
-                return self.send(200, {"service": "TechScout", "status": "ok"})
+                return self.send(200, {"service": "TechScout", "status": "ok", "version": dashboard.version,
+                                       "instance_id": dashboard.instance_id, "pid": os.getpid(),
+                                       "watch_schema_version": 3})
             assets = {"/": ("index.html", "text/html; charset=utf-8"),
                       "/browsing.js": ("browsing.js", "text/javascript; charset=utf-8"),
                       "/workspace.js": ("workspace.js", "text/javascript; charset=utf-8"),

@@ -15,12 +15,17 @@ FACETS = {"kind", "gpu", "ram", "cpu", "storage", "condition", "memory_layout"}
 
 
 def defaults():
-    return {"version": 2, "mode": "all", "watches": []}
+    return {"version": 3, "mode": "all", "include_target_notices": False, "watches": []}
 
 
 def validate(data):
-    if not isinstance(data, dict) or set(data) != {"version", "mode", "watches"} or data["version"] not in (1, 2) or data["mode"] not in ("all", "watches", "paused"):
+    if not isinstance(data, dict) or type(data.get("version")) is not int or data["version"] not in (1, 2, 3):
         raise ValueError("Invalid watch settings")
+    fields = {"version", "mode", "watches"} | ({"include_target_notices"} if data["version"] == 3 else set())
+    if set(data) != fields or data["mode"] not in ("all", "watches", "paused"):
+        raise ValueError("Invalid watch settings")
+    if data["version"] == 3 and type(data["include_target_notices"]) is not bool:
+        raise ValueError("Target notices must be explicitly enabled or disabled")
     if not isinstance(data["watches"], list) or len(data["watches"]) > 40:
         raise ValueError("At most 40 watches are supported")
     legacy = data["version"] == 1
@@ -56,7 +61,7 @@ def validate(data):
         if retired:
             current.update(category="parts", enabled=False)
         migrated.append(current)
-    return {**data, "version": 2, "watches": migrated}
+    return {"version": 3, "mode": data["mode"], "include_target_notices": data.get("include_target_notices", False), "watches": migrated}
 
 
 def read_controls(path):
@@ -67,7 +72,7 @@ def read_controls(path):
             raise ValueError()
         return validate(json.loads(path.read_text(encoding="utf-8-sig"))), None
     except (OSError, ValueError, TypeError, KeyError):
-        return {"version": 2, "mode": "paused", "watches": []}, "Watch settings could not be read; notifications are paused until repaired."
+        return {"version": 3, "mode": "paused", "include_target_notices": False, "watches": []}, "Watch settings could not be read; notifications are paused until repaired."
 
 
 def product_identity(item):
@@ -100,6 +105,11 @@ def matches(watch, item, plugin):
 
 
 def delivery_filter(data, plugin):
-    if data["mode"] == "all":
-        return None
-    return lambda item: data["mode"] == "watches" and any(matches(w, item, plugin) for w in data["watches"])
+    def allowed(item):
+        if data["mode"] == "paused":
+            return False
+        policy = getattr(plugin, "notification_allowed", None)
+        if policy and not policy(item, include_target_notices=data.get("include_target_notices", False)):
+            return False
+        return data["mode"] == "all" or any(matches(w, item, plugin) for w in data["watches"])
+    return allowed

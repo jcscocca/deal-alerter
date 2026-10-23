@@ -30,13 +30,22 @@ def listing(title="NVIDIA RTX 3090 24GB graphics card", price=850, **changes):
                            price=price, condition_hint="new"), **changes)
 
 
-def execute(tmp_path, rows):
+
+def verified_listing(title="NVIDIA RTX 3090 24GB graphics card", price=850, *, key="rtx_3090", **changes):
+    return listing(title, price, source="ebay", url="https://www.ebay.com/itm/123456789012",
+                   extra={"seller": "EstablishedStore", "shopping": {
+                       "available": True, "stock": "in_stock", "item_price": price, "shipping": 0,
+                       "availability_checked_at": NOW.isoformat(), "verified_price_watch": key}}, **changes)
+
+
+def execute(tmp_path, rows, *, include_target_notices=False, channel_kind="push"):
     plugin = PartsHardwarePlugin(ROOT / "config/hardware.toml", tmp_path, now=NOW)
     plugin.sources = (SimpleNamespace(name="fixture", fetch=lambda: FetchResult(rows)),)
     sent = []
     result = run(plugin, AlertState(plugin.state_dir / "alerts.json", plugin.normalise_key),
-                 replace(plugin.options, quiet_when_empty=True, preview=tmp_path / "preview.html"),
-                 (Channel("fixture", "push", sent.append),), now=NOW)
+                 replace(plugin.options, quiet_when_empty=True, preview=tmp_path / "preview.html",
+                         notify_filter=lambda item: plugin.notification_allowed(item, include_target_notices=include_target_notices)),
+                 (Channel("fixture", channel_kind, sent.append),), now=NOW)
     assert not result.problems
     return sent, result
 
@@ -54,7 +63,7 @@ def test_whole_pc_is_never_judged_alerted_or_logged_regardless_of_ram(tmp_path, 
 
 
 def test_standalone_bargain_can_alert_below_owned_gpu_capacity(tmp_path):
-    sent, result = execute(tmp_path, [listing()])
+    sent, result = execute(tmp_path, [verified_listing()])
     assert len(sent) == 1
     item = result.assessments[0]
     assert item.detail.vram_before == 32 and 0 < item.detail.vram_after < 24
@@ -69,14 +78,14 @@ def test_removing_upgrade_veto_does_not_remove_price_or_seller_vetoes(tmp_path, 
     assert not sent
 
 
-@pytest.mark.parametrize("title,price,badge", [
-    ("NVIDIA GeForce RTX 5080 graphics card", 1400, "CARD PRICE WATCH"),
-    ("Corsair DDR5 UDIMM 96GB (2x48GB) Desktop Memory", 1109.99, "DESKTOP RAM PRICE WATCH"),
-    ('Alienware AW2725QF 27" 4K 180Hz IPS DisplayPort', 299.99, "4K MONITOR PRICE WATCH")])
-def test_product_notices_need_no_desktop_ram_profile(tmp_path, monkeypatch, title, price, badge):
+@pytest.mark.parametrize("title,price,key,badge", [
+    ("NVIDIA GeForce RTX 5080 graphics card", 1400, "rtx_5080", "CARD PRICE WATCH"),
+    ("Corsair DDR5 UDIMM 96GB (2x48GB) Desktop Memory", 1109.99, "ddr5_udimm_96_kit", "DESKTOP RAM PRICE WATCH"),
+    ('Alienware AW2725QF 27" 4K 180Hz IPS DisplayPort', 299.99, "AW2725QF", "4K MONITOR PRICE WATCH")])
+def test_product_notices_need_no_desktop_ram_profile(tmp_path, monkeypatch, title, price, key, badge):
     monkeypatch.setattr(DesktopProfile, "__init__", lambda *_: pytest.fail("Retired RAM profile was loaded"))
-    row = listing(title, price, extra={"shopping":{"available":True}})
-    sent, result = execute(tmp_path, [row])
+    row = verified_listing(title, price, key=key)
+    sent, result = execute(tmp_path, [row], include_target_notices=True)
     assert len(sent) == 1 and badge in sent[0].buys[0].badge
     assert not any("reuse" in text.lower() for text in sent[0].buys[0].facts)
     assert len(result.assessments) == 1
@@ -115,7 +124,7 @@ url = "https://www.ibuypower.com/gaming-pcs/prebuilt-gaming-pcs"
     exported = mon.shopping.batches[key]["rows"]
     assert [row["title"] for row in exported] == [peripheral.title]
     mon.write_health()
-    assert "watches-v2" in json.loads(mon.shopping.path.read_text())["capabilities"]
+    assert json.loads(mon.shopping.path.read_text())["capabilities"] == ["judgments", "watches-v3"]
     assert not list((tmp_path / "state").rglob("prebuilt-*"))
 
 
@@ -140,3 +149,67 @@ def test_manual_complete_pc_is_rejected_before_writing_and_mac_source_is_retired
         assert not plugin.manual_path.exists()
     finally:
         plugin.close()
+
+
+@pytest.mark.parametrize("opt_in", [False, True])
+def test_community_bargain_keeps_assessment_but_never_notifies(tmp_path, opt_in):
+    sent, result = execute(tmp_path, [listing()], include_target_notices=opt_in)
+    assert not sent
+    assert len(result.assessments) == 1 and result.assessments[0].verdict.name == "EXCEPTIONAL"
+
+
+def test_inherited_card_target_requires_explicit_opt_in(tmp_path):
+    row = verified_listing("NVIDIA GeForce RTX 5080 graphics card", 1400, key="rtx_5080")
+    sent, result = execute(tmp_path, [row])
+    assert result.assessments[0].target_override and not sent
+    sent, _ = execute(tmp_path / "opt-in", [row], include_target_notices=True)
+    assert len(sent) == 1
+
+
+def test_exact_model_monitor_discount_is_standout_without_target_opt_in(tmp_path):
+    sent, result = execute(tmp_path, [verified_listing('Alienware AW2725QF 27" 4K 180Hz IPS DisplayPort',
+                                                    299.99, key="AW2725QF")])
+    assert len(sent) == 1 and result.assessments[0].verdict.name == "STRONG"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("shipping", None), ("shipping", -1), ("item_price", 849),
+    ("available", False), ("stock", "unknown"), ("verified_price_watch", "rtx_5090"),
+    ("availability_checked_at", "2020-01-01T00:00:00+00:00"),
+])
+def test_incomplete_exact_offer_cannot_notify_even_with_targets_enabled(tmp_path, field, value):
+    row = verified_listing()
+    row.extra["shopping"][field] = value
+    sent, _ = execute(tmp_path, [row], include_target_notices=True)
+    assert not sent
+
+
+def test_missing_seller_cannot_notify(tmp_path):
+    row = verified_listing()
+    row.extra.pop("seller")
+    sent, _ = execute(tmp_path, [row], include_target_notices=True)
+    assert not sent
+
+
+
+def test_email_digest_contains_only_verified_standout_deals(tmp_path):
+    rows = [verified_listing(), listing(price=1400, listing_id="community-pass")]
+    sent, result = execute(tmp_path, rows, channel_kind="email")
+    assert len(result.assessments) == 2
+    assert len(sent) == 1 and len(sent[0].buys) == 1 and not sent[0].others
+    assert sent[0].buys[0].url == rows[0].url
+
+
+
+def test_live_cli_clock_accepts_stock_verified_after_plugin_construction(tmp_path):
+    plugin = PartsHardwarePlugin(ROOT / "config/hardware.toml", tmp_path)
+    def fetch():
+        row = verified_listing()
+        row.extra["shopping"]["availability_checked_at"] = datetime.now(timezone.utc).isoformat()
+        return FetchResult([row])
+    plugin.sources = (SimpleNamespace(name="fixture", fetch=fetch),)
+    sent = []
+    result = run(plugin, AlertState(plugin.state_dir / "alerts.json", plugin.normalise_key),
+                 replace(plugin.options, quiet_when_empty=True, preview=tmp_path / "preview.html"),
+                 (Channel("fixture", "push", sent.append),))
+    assert not result.problems and len(sent) == 1
