@@ -197,13 +197,9 @@ def test_separate_price_gap_promotion_never_relabels_over_ceiling_price(plugin):
     assert "Within the watch range" not in " ".join(card.facts)
 
 
-def test_out_of_stock_email_and_dashboard_remain_saved_price_evidence(plugin):
+def test_archived_prebuilt_email_is_safe_but_dashboard_excludes_it(plugin):
     offer = pc(4829.99, stock="out_of_stock", sku="GML70943")
     item = judge_offer(plugin, offer)
-    row = public_row({"type": "offer", "offer": asdict(offer)}, "newegg", NOW.isoformat(),
-                     NOW.timestamp()+120, [], NOW.timestamp(), plugin.desktop_profile)
-    assert not row["available"] and row["stock"] == "out_of_stock"
-    assert not current(row, NOW.timestamp())
+    assert public_row({"type": "offer", "offer": asdict(offer)}, "newegg", NOW.isoformat(),
+                      NOW.timestamp()+120, [], NOW.timestamp()) is None
     assert "OUT OF STOCK" in plugin.card(item).badge and not item.alertable
-    assert peer_view(row, {"issues": [], "core": {"gpu": "5080", "cpu": "test", "ram_gb": 64,
-                     "ram_type": "DDR5", "ssd_gb": 4000, "condition": "new"}}, [], NOW.timestamp())["label"] == "Peer rating needs a current offer"

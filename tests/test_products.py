@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 from alerters.hardware.native.catalog import BY_KEY, Kind, in_class
-from alerters.hardware.native.config import Config, _query_for, load_watchlist
+from alerters.hardware.native.config import Config, Hunt, _query_for, load_watchlist
 from alerters.hardware.native.match import match
 from alerters.techscout.facets import attributes
 from dealcore.run import run
@@ -36,8 +36,9 @@ LAPTOP = ('ASUS Zenbook Duo Laptop (2026), Dual 14" OLED 3K 144Hz Touch Display,
 
 
 def judged(tmp_path: Path, listings: list[Listing]):
-    """One dry run over the shipped config: (core assessment, native detail) pairs."""
+    """Keep archived product-price rules covered without an active laptop watch."""
     hardware = plugin(tmp_path)
+    hardware.watched[ZENBOOK.key] = Hunt("Archived product fixture", (ZENBOOK,), target=2500.0)
     hardware.sources = (StubSource(listings),)
     state = AlertState(hardware.state_dir / "alerts.json", hardware.normalise_key)
     options = replace(hardware.options, dry_run=True, preview=tmp_path / "report-hardware.html")
@@ -209,16 +210,14 @@ class TestJudgment:
 
 
 class TestWatchlist:
-    def test_the_shipped_watchlist_hunts_the_zenbook_at_its_target(self) -> None:
-        hunts = {hunt.name: hunt for hunt in load_watchlist(WATCHLIST)}
-        hunt = hunts["Zenbook Duo 2026 (X9 388H)"]
-        assert hunt.parts == (ZENBOOK,) and hunt.target == 2500.0
+    def test_the_shipped_watchlist_retires_the_zenbook_purchase(self) -> None:
+        assert all(ZENBOOK not in hunt.parts for hunt in load_watchlist(WATCHLIST))
 
     def test_its_search_names_the_cpu(self) -> None:
         # "Zenbook Duo" alone would return two years of older models.
         assert _query_for(ZENBOOK) == "Zenbook Duo 388H"
         cfg = Config.load(CONFIG, WATCHLIST)
-        assert "Zenbook Duo 388H" in cfg.search_queries
+        assert "Zenbook Duo 388H" not in cfg.search_queries
 
     def test_no_hunt_is_silently_dropped_by_the_query_cap(self) -> None:
         # search_queries keeps the first 24, so a hunt added past the cap is

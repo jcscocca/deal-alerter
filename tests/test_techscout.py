@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from alerters.techscout import __main__ as cli
-from alerters.techscout.research import research
+from alerters.techscout.research import PRESETS, cpu_model, research
 from alerters.techscout.walmart import Credentials, WalmartClient, WalmartError, response_items, validate_zip
 
 
@@ -46,9 +46,9 @@ class Session:
 
 
 def product(item_id="123", **changes):
-    return {"itemId": item_id, "name": "Gaming PC RTX 5080 Ryzen 7 9800X3D 32GB DDR5 1TB SSD",
+    return {"itemId": item_id, "name": "MSI GeForce RTX 5080 16GB GDDR7 graphics card",
             "stock": "Available", "availableOnline": True, "salePrice": 2000,
-            "sellerInfo": "Walmart.com", "conditionName": "New", "modelNumber": "PC-1", **changes}
+            "sellerInfo": "Walmart.com", "conditionName": "New", "modelNumber": "GPU-1", **changes}
 
 
 def test_signature_and_sanitized_audit(credentials):
@@ -147,23 +147,30 @@ class FakeClient:
 
 
 def run(rows, **kwargs):
-    return research(FakeClient(rows), queries=["desktop"], seeds=[], **kwargs)
+    return research(FakeClient(rows), queries=["computer parts"], seeds=[], **kwargs)
 
 
-def test_desktop_default_starts_with_owned_ram_plan():
-    client = FakeClient([product()])
+def test_parts_default_has_bounded_queries_and_no_saved_desktop_or_ram_plan(monkeypatch):
+    from alerters.hardware.desktop_profile import DesktopProfile
+    def forbidden(*args, **kwargs):
+        pytest.fail("Parts research must not assess a completed desktop's RAM")
+    monkeypatch.setattr(DesktopProfile, "assess_memory", forbidden)
+    client = FakeClient([product(), product("124", name="Corsair Vengeance 64GB DDR5 memory kit")])
     result = research(client)
     searches = [arg for op, arg in client.calls if op == "search"]
-    assert searches == ["RTX 5080 gaming desktop", "RTX 5090 gaming desktop", "CMH64GX5M2B6000C40W"]
-    assert len(result.products) == 1  # same item across all searches
-    fit = result.products[0].memory_fit
-    assert fit["potential_gb"] == 96 and fit["status"] == "NEEDS SPECS"
+    assert searches == list(PRESETS["parts"])
+    assert set(PRESETS) == {"parts", "monitors", "memory", "supplies"}
+    assert all(1 <= len(queries) <= 4 for queries in PRESETS.values())
+    assert [arg for op, arg in client.calls if op == "lookup"] == [["123", "124"]]
+    assert len(result.products) == 2  # repeated discovery is deduplicated
+    assert all(p.memory_fit is None for p in result.products)
+    assert "RAM kit" not in result.html()
     assert result.products[0].shipping is None
 
 
 def test_search_price_never_used_when_localized_lookup_missing():
     client = FakeClient([], discovery=[product(salePrice=1)])
-    result = research(client, queries=["desktop"], seeds=[])
+    result = research(client, queries=["graphics card"], seeds=[])
     assert not result.products
     assert any("not substituted" in p for p in result.problems)
 
@@ -172,7 +179,7 @@ def test_search_is_discovery_then_zip_localized_lookup(credentials):
     session = Session([Response({"items": [product(salePrice=1)], "totalResults": 999}),
                        Response({"items": [product(salePrice=2000)]})])
     client = WalmartClient(credentials, "94105", session=session)
-    result = research(client, queries=["desktop"], seeds=[])
+    result = research(client, queries=["graphics card"], seeds=[])
     assert result.products[0].price == 2000
     assert "zipCode" not in session.calls[0][1]["params"]
     assert session.calls[1][1]["params"]["zipCode"] == "94105"
@@ -181,62 +188,36 @@ def test_search_is_discovery_then_zip_localized_lookup(credentials):
 
 def test_batch_limit_and_dedup():
     client = FakeClient([product(str(i + 1)) for i in range(25)])
-    result = research(client, queries=["desktop", "other desktop"], seeds=[], limit=25)
+    result = research(client, queries=["graphics card", "other parts"], seeds=[], limit=25)
     assert len(result.products) == 25
     assert [len(arg) for op, arg in client.calls if op == "lookup"] == [20, 5]
 
 
-def test_owned_memory_and_unmatched_results():
-    result = run([product(), product("124", name="Corsair CMH64GX5M2B6000C40W memory kit"),
-                  product("125", name="RTX 5080 laptop 32GB RAM"), product("126", name="RTX 5090 GPU 32GB GDDR7")])
-    assert len(result.products) == 2 and result.excluded == 2
-    assert any("Owned-kit reference" in w for p in result.products for w in p.warnings)
+@pytest.mark.parametrize("category", PRESETS)
+def test_complete_computers_excluded_even_from_custom_searches_and_explicit_ids(category):
+    rows = [product("1", name="Gaming PC RTX 5080 Ryzen 7 9800X3D 32GB DDR5 1TB SSD"),
+            product("2", name="RTX 5080 laptop 32GB RAM"),
+            product("3", name="Apple iPad Air 256GB tablet"),
+            product("4", name="Apple Mac mini M4 desktop computer"),
+            product("5", name="MSI GeForce RTX 5090 32GB GDDR7 graphics card"),
+            product("6", name="Samsung 32-inch 4K 144Hz gaming monitor"),
+            product("7", name="Corsair Vengeance 64GB DDR5 desktop memory kit"),
+            product("8", name="AMD Ryzen 9 9950X3D")]
+    result = research(FakeClient(rows), category=category, queries=["desktop laptop tablet"], seeds=["1", "2", "3"])
+    assert {p.item_id for p in result.products} == {"5", "6", "7", "8"}
+    assert result.excluded == 4
+    assert all(p.memory_fit is None for p in result.products)
 
 
-def test_ram_reuse_requires_published_layout():
-    row = product(attributes={"ramMemory": "32GB DDR5 (2 x 16GB)", "memorySlots": "4",
-                              "maximumMemorySupported": "128GB"})
-    fit = run([row]).products[0].memory_fit
-    assert fit["status"] == "POSSIBLE REUSE" and "unverified" in fit["summary"]
-    outside = run([product(name="Gaming PC RTX 5080 128GB DDR5 1TB SSD")]).products[0]
-    assert outside.memory_fit["eligible"] is False
-    assert outside.comparison_key is None
-
-
-def test_vram_is_not_system_ram():
-    row = product(name="Gaming PC RTX 5090 32GB GDDR7 9800X3D 2TB SSD")
-    fit = run([row]).products[0].memory_fit
-    assert fit["installed_gb"] is None and fit["potential_gb"] is None
-
-
-def test_unknown_memory_generation_not_averaged_with_ddr5():
-    result = run([product("1"), product("2", name="Gaming PC RTX 5080 9800X3D 32GB RAM 1TB SSD")])
-    assert result.averages() == []
-
-
-def test_cpu_plus_suffix_keeps_different_models_out_of_same_average():
-    result = run([product("1", name="Gaming PC RTX 5080 Core Ultra 5 250KF Plus 32GB DDR5 1TB SSD"),
-                  product("2", name="Gaming PC RTX 5080 Core Ultra 5 250KF 32GB DDR5 1TB SSD")])
-    assert result.products[0].comparison_key[2] == "ULTRA 5 250KF PLUS"
-    assert result.averages() == []
-
-
-def test_conflicting_ram_attributes_require_review():
-    fit = run([product(attributes={"ramMemory": "32GB DDR5", "ramMemorySize": "64GB"})]).products[0].memory_fit
-    assert fit["status"] == "NEEDS SPECS" and fit["installed_gb"] is None
+def test_cpu_plus_suffix_retains_exact_model_helper():
+    assert cpu_model("Intel Core Ultra 5 250KF Plus processor") == "ULTRA 5 250KF PLUS"
+    assert cpu_model("Intel Core Ultra 5 250KF processor") == "ULTRA 5 250KF"
 
 
 def test_generic_model_family_variants_not_averaged():
-    result = run([product("1", name="Tablet", modelNumber="TAB", attributes={"storage": "128GB"}),
-                  product("2", name="Tablet", modelNumber="TAB", attributes={"storage": "256GB"})], category="tablets")
+    result = run([product("1", name="Samsung 990 Pro NVMe SSD", modelNumber="SSD", attributes={"storage": "1TB"}),
+                  product("2", name="Samsung 990 Pro NVMe SSD", modelNumber="SSD", attributes={"storage": "2TB"})])
     assert result.averages() == []
-
-
-def test_tablet_default_variant_mismatch_is_flagged():
-    result = research(FakeClient([product("1", name="iPad Air 128GB", modelNumber="TAB")]),
-                      category="tablets", queries=["iPad Air 256GB"], seeds=[])
-    assert result.products[0].comparison_key is None
-    assert any("differs" in warning for warning in result.products[0].warnings)
 
 
 def test_malformed_credential_metadata_is_sanitized(tmp_path):
@@ -267,12 +248,12 @@ def test_averages_are_comparable_current_offers_only():
                   product("4", salePrice=10, stock="Not available"),
                   product("5", salePrice=500, conditionName="Refurbished"),
                   product("6", salePrice=100, sellerInfo=None),
-                  product("7", name="Gaming PC RTX 5090 9800X3D 32GB DDR5 1TB SSD"),
-                  product("8", name="Gaming PC RTX 5080 9800X3D 64GB DDR5 1TB SSD"),
-                  product("9", name="Gaming PC RTX 5080 9800X3D 32GB DDR5 2TB SSD")])
+                  product("7", name="MSI GeForce RTX 5090 32GB GDDR7 graphics card"),
+                  product("8", name="Choose your RTX 5080 graphics card configuration")])
     stats = result.averages()
     assert len(stats) == 1 and stats[0]["count"] == 2 and stats[0]["mean_item_price"] == 2200
     assert stats[0]["item_ids"] == ["1", "2"]
+    assert "not a historical discount or deal verdict" in result.html()
 
 
 def test_marketplace_alternative_is_not_selected_offer():
@@ -280,15 +261,16 @@ def test_marketplace_alternative_is_not_selected_offer():
     assert run([row]).products[0].price is None
 
 
-@pytest.mark.parametrize("category", ["tablets", "computers", "supplies", "memory"])
-def test_categories_share_cards_but_not_desktop_rules(category):
-    result = run([product("1", name="Tablet 128GB Wi-Fi", modelNumber="TAB1")], category=category)
+@pytest.mark.parametrize("category", PRESETS)
+def test_categories_share_research_cards_without_ram_completion(category):
+    result = run([product("1", name="Corsair Vengeance 32GB DDR5 desktop memory kit", modelNumber="DDR5")], category=category)
     assert result.products[0].memory_fit is None
-    assert "Tablet 128GB Wi-Fi" in result.html()
+    assert "Corsair Vengeance" in result.html()
+    assert "RAM compatibility" not in result.html()
 
 
 def test_report_escapes_api_content_and_does_not_use_api_urls():
-    result = run([product("1", name='<script>attack()</script> tablet', productUrl="file:///private")], category="tablets")
+    result = run([product("1", name='<script>attack()</script> gaming monitor', productUrl="file:///private")], category="monitors")
     html = result.html()
     assert "<script>" not in html and "&lt;script&gt;" in html
     assert "file:///" not in html and 'https://www.walmart.com/ip/1' in html
@@ -303,20 +285,24 @@ def test_invalid_plans_make_no_calls(kwargs):
     assert client.calls == []
 
 
-def test_cli_creates_local_snapshot_without_notifications(tmp_path, monkeypatch, credentials):
+def test_cli_creates_parts_snapshot_without_prebuilt_history_or_notifications(tmp_path, monkeypatch, credentials):
+    from alerters.techscout import price_history
+    def forbidden(*args, **kwargs):
+        pytest.fail("The active research CLI must not write whole-PC price history")
+    monkeypatch.setattr(price_history, "record_research", forbidden)
     settings = tmp_path / "settings.json"
     settings.write_text(json.dumps({"walmart": {"zip_code": "94105", "credential_file": "fake.json"}}))
     session = Session([Response({"items": [product(standardShipRate=0)]}), Response({"items": [product(standardShipRate=0)]})])
     monkeypatch.setattr(cli.Credentials, "load", lambda _: credentials)
     monkeypatch.setattr(cli, "WalmartClient", lambda cred, zipcode, audit: WalmartClient(cred, zipcode, audit=audit, session=session))
     output = tmp_path / "reports"
-    args = ["--settings", str(settings), "--output", str(output), "--query", "desktop", "--item-id", "123"]
+    args = ["--settings", str(settings), "--output", str(output), "--query", "graphics card", "--item-id", "123"]
     assert cli.main(args) == 0
     assert session.closed
-    assert {p.name for p in output.iterdir()} == {"latest-desktop-memory.html", "latest-desktop-memory.json", "latest-desktop-memory.requests.json", "walmart-prebuilt-observations.json"}
-    receipt = (output / "latest-desktop-memory.requests.json").read_text()
+    assert {p.name for p in output.iterdir()} == {"latest-parts.html", "latest-parts.json", "latest-parts.requests.json"}
+    receipt = (output / "latest-parts.requests.json").read_text()
     assert "WM_" not in receipt and credentials.consumer_id not in receipt
-    assert json.loads((output / "latest-desktop-memory.json").read_text())["products"][0]["price"] == 2000
+    assert json.loads((output / "latest-parts.json").read_text())["products"][0]["price"] == 2000
 
 
 def test_missing_settings_fail_without_network(tmp_path, capsys):

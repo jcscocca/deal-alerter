@@ -10,7 +10,7 @@ max_listing_age_hours = 72
 [alerts]
 # Minimum verdict that triggers the *daily email digest*. Ordered weakest to
 # strongest:  PASS | FAIR | GOOD | STRONG | EXCEPTIONAL | GRAIL
-digest_at = "STRONG"
+digest_at = "EXCEPTIONAL"
 
 # Minimum verdict that triggers an *instant push*. Keep this high -- the whole
 # point of push is that it is rare enough that you'll actually look at it.
@@ -19,11 +19,6 @@ push_at = "EXCEPTIONAL"
 # If a listing is still live and still qualifies, nudge again after this many
 # days. Stops a week-long Slickdeals post from pushing you every 15 minutes.
 remind_after_days = 7
-
-# A prebuilt priced this far under the cheapest same-condition loose card of
-# its own GPU is pushed, even though a whole machine is otherwise capped below
-# push. Bait prices (under suspicious_price_ratio of that card) never qualify.
-prebuilt_push_margin_pct = 5.0
 
 [thresholds]
 # A price at or below the Nth percentile of everything we've recorded for that

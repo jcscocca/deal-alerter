@@ -10,20 +10,16 @@ from statistics import mean
 
 from dealcore.report import render_html
 from dealcore.types import Card, Report
-from alerters.hardware.desktop_profile import DEFAULT_PROFILE, DesktopProfile
-from alerters.hardware.prebuilt import Offer, dollars, exact_desktop, gpu_model, pacific_time
+from alerters.hardware.prebuilt import dollars, pacific_time
 
 from .walmart import WalmartError, item_ids
 
 PRESETS = {
-    "desktop-memory": ("RTX 5080 gaming desktop", "RTX 5090 gaming desktop"),
-    "tablets": ("Apple iPad tablet", "Samsung Galaxy Tab tablet"),
-    "computers": ("laptop computer", "desktop computer"),
-    "supplies": ("USB C docking station", "computer monitor"),
-    "memory": ("DDR5 SO-DIMM 32GB", "DDR5 SO-DIMM 48GB", "DDR5 SO-DIMM 96GB 2x48GB", "DDR5 desktop memory kit"),
+    "parts": ("AMD Ryzen processor", "Intel Core processor", "NVIDIA GeForce graphics card", "NVMe SSD"),
+    "monitors": ("4K 144Hz gaming monitor", "4K OLED gaming monitor"),
+    "memory": ("DDR5 32GB memory kit", "DDR5 64GB memory kit", "DDR5 96GB memory kit"),
+    "supplies": ("USB C docking station", "mechanical keyboard", "gaming mouse"),
 }
-# An already researched desktop remains visible even when search omits it.
-DESKTOP_SEEDS = ("20707507998",)
 
 
 def cpu_model(title: str) -> str | None:
@@ -62,7 +58,7 @@ def specs_from(row: dict) -> dict[str, str]:
             continue
         normal = re.sub(r"[^a-z0-9]", "", name.lower())
         label = aliases.get(normal, name)
-        # Keep conflicting aliases for the profile to detect, not last-write-wins.
+        # Keep conflicting aliases visible, rather than silently overwriting them.
         if label in result and result[label] != str(value):
             label = name
         result[label] = str(value)
@@ -92,14 +88,16 @@ class Product:
         return f"https://www.walmart.com/ip/{self.item_id}"
 
 
-def normalize(row: dict, queries: list[str], category: str, profile: DesktopProfile,
-              observed_at: str) -> Product | None:
+def normalize(row: dict, queries: list[str], category: str) -> Product | None:
     try:
         item_id = item_ids([row.get("itemId")])[0]
     except ValueError:
         return None
     title = text(row.get("name"))
-    if not title:
+    # Lazy import: facets uses cpu_model, so importing the scope at module load
+    # would create a cycle. Apply it to lookup titles, including explicit item IDs.
+    from .scope import allowed_title
+    if not title or not allowed_title(title):
         return None
     specs = specs_from(row)
     stock = text(row.get("stock")) or "Not published"
@@ -115,40 +113,11 @@ def normalize(row: dict, queries: list[str], category: str, profile: DesktopProf
     ambiguous = bool(re.search(r"\b(?:up to|select your|choose your|various configurations)\b", title, re.I))
     if ambiguous:
         product.warnings.append("Selected configuration is ambiguous; excluded from averages.")
-    mismatch = capacity_mismatch(category, title, queries)
-    if mismatch:
-        product.warnings.append("The selected item's capacity differs from the requested search; verify the variant. Excluded from averages.")
-
-    if category == "desktop-memory":
-        owned_model = profile.memory["owned_kit"].split()[-1]
-        if owned_model.casefold() in (title + " " + product.model).casefold():
-            product.warnings.append("Owned-kit reference only; no additional kit is included in the desktop budget.")
-        elif exact_desktop(title) and not re.search(r"\b(?:case only|case for|enclosure|waterblock)\b", title, re.I):
-            offer = Offer("walmart", item_id, title, product.url, product.seller, product.condition,
-                          specs, price, shipping, "in_stock" if available else "unknown", available, observed_at)
-            fit = profile.assess_memory(offer)
-            product.memory_fit = asdict(fit)
-            # Keep off-plan configurations visible with their rejection reason.
-            product.warnings.append(fit.summary)
-            memory_type = " ".join([title, *(specs.get(key, "") for key in
-                                           ("RAM", "Memory Type", "Memory Size", "System Memory"))])
-            if fit.eligible and fit.installed_gb in (32, 64) and re.search(r"\bDDR5\b", memory_type, re.I):
-                # Require an exact CPU and one stated SSD capacity for build cohorts.
-                cpu = cpu_model(title)
-                storage = re.findall(r"\b(\d+(?:\.\d+)?)\s*(TB|GB)\s*(?:Gen[345]\s+)?(?:NVMe\s+)?SSD\b", title, re.I)
-                if cpu and len(storage) == 1:
-                    amount, unit = storage[0]
-                    capacity = float(amount) * (1000 if unit.upper() == "TB" else 1)
-                    product.comparison_key = ("desktop", f"RTX {gpu_model(title)}", cpu,
-                                              f"{fit.installed_gb}GB DDR5 RAM", f"{capacity:g}GB SSD",
-                                              product.condition.lower())
-        else:
-            return None
     # Generic categories compare the same published model and title, not unlike devices.
-    if product.memory_fit is None and product.model:
+    if product.model:
         product.comparison_key = ("model", product.model.casefold(), " ".join(title.casefold().split()),
                                   product.condition.lower(), json_specs(specs))
-    if ambiguous or mismatch or not available or price is None or price <= 0 or product.seller == "Not published" or product.condition == "Not published":
+    if ambiguous or not available or price is None or price <= 0 or product.seller == "Not published" or product.condition == "Not published":
         product.comparison_key = None
     return product
 
@@ -186,12 +155,10 @@ class Research:
     def html(self) -> str:
         cards = []
         for product in self.products:
-            fit = product.memory_fit
-            badge = fit["status"] if fit else "PRODUCT RESEARCH"
             cards.append(Card(
                 title=product.title, url=product.url,
                 price=f"${product.price:,.2f} before tax" if product.price is not None else "Price not published",
-                badge=badge,
+                badge="PRODUCT RESEARCH",
                 headline="Available online" if product.available else "Unavailable / needs availability check",
                 reason="Current Walmart product lookup for ZIP " + self.zip_code,
                 facts=(f"Seller: {product.seller} · Condition: {product.condition}",
@@ -208,14 +175,13 @@ class Research:
             comparison = ["No comparable cohort with at least two available, identified offers. No average calculated."]
         coverage = [f"Search {row['query']!r}: {row['returned']} of {row['total'] if row['total'] is not None else 'unknown'} results inspected."
                     for row in self.coverage]
-        purpose = ("Start with factory 32GB/64GB RTX 5080/5090 desktops and assess reuse of your owned 64GB DDR5 kit. "
-                   if self.category == "desktop-memory" else "Compare the products returned by your selected shopping searches. ")
+        purpose = "Research computer parts, monitors and useful peripherals from the selected searches. "
         report = Report(
             subject="TechScout shopping research", heading="TechScout · " + self.category.replace("-", " & "),
             summary=purpose + f"{len(cards)} product cards · ZIP {self.zip_code} · checked {pacific_time(self.observed_at)}.",
             footer="Bounded current snapshot, not a market-wide average. Availability and checkout totals can change. "
-                   "Build cohorts match CPU, GPU, RAM capacity and SSD capacity; other components can differ. "
-                   "No purchase or RAM compatibility guarantee. No automated alerts or historical price tracking.",
+                   "Matching-model averages describe this sample, not a historical discount or deal verdict. "
+                   "No automated alerts or historical price tracking.",
             buys=tuple(cards), problems=tuple(self.problems + comparison + coverage +
                                             ([f"{self.excluded} unmatched or invalid products omitted."] if self.excluded else [])))
         return render_html(report).replace("<html>", '<html lang="en"><head><meta charset="utf-8">'
@@ -223,24 +189,20 @@ class Research:
                                           '<title>TechScout shopping research</title></head>')
 
 
-def research(client, category: str = "desktop-memory", *, queries=None, seeds=None,
-             limit: int = 10, profile: DesktopProfile | None = None, now=None) -> Research:
+def research(client, category: str = "parts", *, queries=None, seeds=None,
+             limit: int = 10, now=None) -> Research:
     if category not in PRESETS:
         raise ValueError("Unknown shopping category")
-    profile = profile or DesktopProfile(DEFAULT_PROFILE)
     default_queries = list(PRESETS[category])
-    if category == "desktop-memory":
-        default_queries.append(profile.memory["owned_kit"].split()[-1])
     queries = list(dict.fromkeys(default_queries if queries is None else queries))
     if not 1 <= len(queries) <= 4 or any(not isinstance(q, str) or not q.strip() or len(q) > 200 for q in queries):
         raise ValueError("Choose one to four searches of 1-200 characters")
     if not 1 <= limit <= 25:
         raise ValueError("Search limit must be between 1 and 25")
-    seeds = (DESKTOP_SEEDS if category == "desktop-memory" else ()) if seeds is None else seeds
     seeds = item_ids(seeds) if seeds else []
     observed_at = (now or datetime.now(timezone.utc)).isoformat()
     result = Research(category, client.zip_code, observed_at, queries, [], [], [])
-    found = {item_id: ["Saved desktop candidate"] for item_id in seeds}
+    found = {item_id: ["Requested item ID"] for item_id in seeds}
     for query in queries:
         try:
             rows, total = client.search(query, limit)
@@ -279,11 +241,10 @@ def research(client, category: str = "desktop-memory", *, queries=None, seeds=No
             if item_id in seen:
                 continue
             seen.add(item_id)
-            product = normalize(row, found[item_id], category, profile, observed_at)
+            product = normalize(row, found[item_id], category)
             if product:
                 result.products.append(product)
             else:
                 result.excluded += 1
-    result.products.sort(key=lambda p: (not p.available, bool(p.memory_fit and not p.memory_fit["eligible"]),
-                                        p.price is None, p.price or 0, p.item_id))
+    result.products.sort(key=lambda p: (not p.available, p.price is None, p.price or 0, p.item_id))
     return result

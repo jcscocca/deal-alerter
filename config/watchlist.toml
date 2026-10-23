@@ -8,65 +8,49 @@
 # alerters/hardware/native/catalog.py) or a `class` filter. `target` is the price
 # at or below which you always get pushed regardless of what the history says
 # -- the equivalent of config/steam-targets.json. `queries` adds searches beyond
-# the parts' own names, which is how whole PCs to part out get found at all.
+# the parts' own names. Complete-machine queries are retired.
 #
-# The completed desktop inventory now lives in desktop-inventory.toml.
-# Existing purchase watches retain their earlier targets at the user's request,
-# alongside additional 50-series cards and desktop memory price notices.
-# The GPU hunts were set for the previous Z790 desktop; the products section is
-# the exception, judged on price alone. An M5 Ultra 512GB is on order
-# (2026-09-28) and outclasses every Mac, GB10 and Strix Halo box on both
-# capacity and bandwidth, so unified-memory machines are not hunted.
+# Watches are for standalone parts and displays. Current inventory is context,
+# never an alert veto. Complete PCs and laptop purchase plans are retired.
+# Targets remain the existing explicit price notices; history/trust checks apply.
+# Unified-memory machines are not hunted.
 #
-# Targets were set 2026-09-28 just under the 5th percentile of the last 30
-# days of asks, so a push means cheaper than ~95% of what was listed. A target
-# is compared with the whole price, so a prebuilt under a card's target is a
-# machine that costs less than the card alone.
-
 # ---------------------------------------------------------------------- tier 1
-# Larger single-device capacity, retained from the previous watch strategy.
+# Standalone GPU price and capacity opportunities.
 [[hunt]]
 name = "RTX PRO 6000 Blackwell"
 parts = ["rtx_pro_6000_blackwell_maxq", "rtx_pro_6000_blackwell"]
 target = 13000.0
-queries = ["RTX PRO 6000 workstation"]
 note = "96GB single-device capacity; verify exact card fit in the completed MSI build."
 
-# Legacy pair strategy; the completed desktop already has a 32GB RTX 5090.
 [[hunt]]
-name = "RTX 3090 (pair up)"
+name = "RTX 3090 cards"
 parts = ["rtx_3090", "rtx_3090_ti"]
 target = 1250.0
-queries = ["RTX 3090 gaming PC"]
-# Pair-level capability is not evaluated by quantity_wanted.
-quantity_wanted = 2
 
 [[hunt]]
 name = "RTX 5090"
 parts = ["rtx_5090"]
 target = 5000.0
-queries = ["RTX 5090 gaming PC"]
 
 [[hunt]]
-name = "RTX 5080 cards and prebuilts"
+name = "RTX 5080 cards"
 parts = ["rtx_5080"]
 target = 1500.0
-# Provisional new-card ceiling; the desktop profile owns PC price bands.
+# Standalone new-card thresholds are in parts-watch.toml.
 
 [[hunt]]
 name = "RTX 4090"
 parts = ["rtx_4090"]
 target = 2600.0
-queries = ["RTX 4090 gaming PC"]
 
 # Added 2026-10-10 for gaming/compute price alerts, independent of the native
-# VRAM-pool upgrade score. The live desktop profile owns new-card and PC bands.
+# VRAM-pool score. parts-watch.toml owns standalone new-card price bands.
 [[hunt]]
-name = "RTX 5070 Ti cards and prebuilts"
+name = "RTX 5070 Ti cards"
 parts = ["rtx_5070_ti"]
 target = 1000.0
-queries = ["RTX 5070 Ti gaming PC"]
-note = "$900 is a standout stretch deal, not an expected holiday price."
+note = "$900 is an urgent price threshold, not an estimate of market value."
 
 # ---------------------------------------------------------------------- tier 2
 # 48GB single-slot-ish pro cards. Blower coolers, no transient power spikes.
@@ -128,14 +112,6 @@ max_dollars_per_gb = 25.0
 # Coverage is whatever the monitor already reads: eBay (the part's name is its
 # search), the Slickdeals Computers page and r/buildapcsales. Amazon and Best
 # Buy prices reach it only when someone posts them there.
-[[hunt]]
-name = "Zenbook Duo 2026 (X9 388H)"
-parts = ["zenbook_duo_2026_x9_388h"]
-# Set 2026-10-08 just above the lowest price seen, $2,487.91 at Amazon on a
-# June pre-order. List is $2,699.99.
-target = 2500.0
-note = "UX8407AA-PSXT. The 386H base model has a third of the graphics and is not hunted."
-
 # ThinkPad P16 Gen 2: user requested both spare 32GB and upgrade 48GB modules.
 # Kit limits are for the complete purchase, not per module. 2026-10-10.
 [[hunt]]
@@ -158,13 +134,9 @@ name = "ThinkPad DDR5 SO-DIMM 96GB kits (2x48GB)"
 parts = ["ddr5_sodimm_96_kit"]
 target = 600.0
 
-# Completed MSI desktop: all four 32GB slots are occupied. Two 2x48GB kits
-# could reach 192GB; 64GB modules provide another route. Compatibility of
-# separate kits and the final four-module speed still require verification.
-# Recalibrated 2026-10-14 from the selected new, orderable product quotes in
-# desktop-memory-market.toml: 96GB kit $1,479.99, single 64GB $1,249.99.
-# Limits are 25% below those asks, rounded down to cents. They are editable
-# price notices, not sold-value estimates or purchase budgets.
+# Optional standalone desktop memory notices. Compatibility is checked for the
+# actual intended machine, independently of any RAM-completion/reuse plan.
+# Existing limits retain their dated retail-quote basis in desktop-memory-market.toml.
 [[hunt]]
 name = "Desktop DDR5 UDIMM 96GB kits (2x48GB)"
 parts = ["ddr5_udimm_96_kit"]

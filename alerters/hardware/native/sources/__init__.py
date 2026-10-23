@@ -7,6 +7,7 @@ from .base import Listing, Source, SourceError
 from .ebay import EbaySource
 from .reddit import RedditSource
 from .slickdeals import SlickdealsSource
+from ..catalog import BY_KEY, Kind
 
 __all__ = [
     "AppleRefurbSource",
@@ -52,6 +53,9 @@ def build_sources(cfg) -> list[Source]:
                                if key.startswith(("ddr5_sodimm_", "ddr5_udimm_")) and hunt.target is not None},
                 card_limits={key: hunt.target for key, hunt in cfg.all_watched_parts().items()
                              if key in ("rtx_5070_ti", "rtx_5080", "rtx_5090") and hunt.target is not None},
+                gpu_limits={key: hunt.target for key, hunt in cfg.all_watched_parts().items()
+                            if hunt.target is not None and BY_KEY[key].kind in
+                            (Kind.CONSUMER_GPU, Kind.PRO_GPU, Kind.DATACENTER)},
                 display_limits={model: min(limit, hunt.target) if hunt.target is not None else limit
                                 for model, limit in DISPLAY_LIMITS.items()
                                 if (hunt := cfg.all_watched_parts().get(display_configuration(model)))},

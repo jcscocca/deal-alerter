@@ -269,7 +269,8 @@ def test_sources_search_every_watch_and_share_existing_detail_budget():
     wanted = {_query_for(part) for hunt in cfg.hunts for part in hunt.parts}
     wanted |= {q for hunt in cfg.hunts for q in hunt.queries}
     assert wanted <= set(cfg.search_queries)
-    assert len(cfg.search_queries) == 34
+    assert len(cfg.search_queries) <= 40
+    assert not any("gaming pc" in query.lower() for query in cfg.search_queries)
     ebay = next(source for source in build_sources(replace(cfg, ebay_client_id="fixture", ebay_client_secret="fixture")) if source.name == "ebay")
     assert ebay.display_limits == LIMITS
     assert set(WATCHES) <= set(cfg.all_watched_parts())

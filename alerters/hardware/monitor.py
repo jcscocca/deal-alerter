@@ -31,14 +31,12 @@ from dealcore.state import AlertState, atomic_write
 from dealcore.types import Card, FetchResult, Report
 from .monitor_sources import Batch, fetch_job
 from .community import SLICKDEALS_COMPUTERS, SLICKDEALS_COVERAGE
-from .prebuilt import OfferState
-from .prebuilt_plugin import MonitorHardwarePlugin, community_offer, offer_listing
-from .retailers import canonical_product
-from .retail_http import Deferred, PublicClient, public_url
+from .parts_plugin import PartsHardwarePlugin
+from .retail_http import Deferred, PublicClient
 from .shopping_export import ShoppingExport
 from .shopping_activity import judgments
 from .shopping_controls import read_controls, delivery_filter
-from .monitor_health import (HEALTH_GRACE_SECONDS, HP_PAUSED, LISTING_UNVERIFIED, incidents,
+from .monitor_health import (HEALTH_GRACE_SECONDS, incidents,
                              eligible_incidents, problem_key as health_problem_key, migrate_key)
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -101,16 +99,9 @@ class Monitor:
         if not 1 <= self.cfg["workers"] <= 12 or not 1 <= self.cfg["max_products_per_retailer"] <= 100:
             raise ValueError("Invalid monitor concurrency/product limit")
         self.runtime.mkdir(parents=True, exist_ok=True)
-        browser = self.config.get("hp_browser", {})
-        if not isinstance(browser.get("enabled", False), bool):
-            raise ValueError("hp_browser.enabled must be a boolean")
-        hp_reader = None
-        if browser.get("enabled", False):
-            from .hp_browser import HPBrowserReader
-            hp_reader = HPBrowserReader(browser.get("channel", "msedge"))
-        self.client = PublicClient(hp_reader=hp_reader)
+        self.client = PublicClient()
         self.jobs = {}
-        self.pending, self.cache, self.benchmarks = {}, {}, []
+        self.pending, self.cache = {}, {}
         self.started = time.time()
         self.problems = [SLICKDEALS_COVERAGE]
         self.results = []
@@ -120,25 +111,11 @@ class Monitor:
         self.last_digest = ""
         self.stopping = False
         self.delivery = channels(email=False, push=True, dry_run=dry_run)
-        for seed in self.config.get("seed", []):
-            self.add_product(seed["url"])
-        for discovery in self.config.get("discovery", []):
-            public_url(discovery["url"])
-            if discovery["kind"] == "discover-hp" and not self.client.hp_reader:
-                self.pause_hp()
-                continue
-            interval = max(21600, self.cfg["discovery_seconds"]) if discovery["kind"] == "discover-skytech" else self.cfg["discovery_seconds"]
-            if discovery["kind"] == "discover-newegg":
-                interval = max(NEWEGG_SECONDS, interval)
-            self.add_job(discovery["kind"], interval, discovery["url"])
-        for catalog in self.config.get("catalog", []):
-            if catalog.get("kind") != "ibuypower" or catalog.get("url") != "https://www.ibuypower.com/gaming-pcs/prebuilt-gaming-pcs":
-                raise ValueError("Unsupported builder catalog")
-            key = self.add_job("ibuypower", max(900, self.cfg["discovery_seconds"]), catalog["url"])
-            self.jobs[key]["limit"] = self.cfg["max_products_per_retailer"]
+        # Desktop product/discovery/catalog configuration is retired. Loading an
+        # older config must never restore complete-PC polling.
         for name in ("reddit", "slickdeals"):
             self.add_job(name, self.cfg["feed_seconds"], SLICKDEALS_COMPUTERS if name == "slickdeals" else "")
-        for name, interval in (("ebay", self.cfg["legacy_seconds"]), ("apple-refurb", 3600)):
+        for name, interval in (("ebay", self.cfg["legacy_seconds"]),):
             if name == "ebay" and not (os.environ.get("EBAY_CLIENT_ID") and os.environ.get("EBAY_CLIENT_SECRET")):
                 self.problems.append("eBay disabled: local credentials missing")
                 continue
@@ -149,8 +126,6 @@ class Monitor:
         for name, deadline in saved.get("host_backoff", {}).items():
             self.client.host(name)["blocked_until"] = deadline
         for key, old in saved["jobs"].items():
-            if key not in self.jobs and old.get("kind") in ("hp", "newegg", "cyberpowerpc", "skytech"):
-                self.add_product(old["url"])
             if key in self.jobs:
                 for field in ("created_at", "last_success", "last_fetch_success", "last_error_at",
                               "next", "failures", "error", "listing_notes"):
@@ -171,69 +146,20 @@ class Monitor:
         return key
 
     def add_product(self, url):
-        url = canonical_product(url)
-        from urllib.parse import urlsplit
-        kind = {"www.hp.com": "hp", "www.newegg.com": "newegg", "www.cyberpowerpc.com": "cyberpowerpc",
-                "skytechgaming.com": "skytech"}.get(urlsplit(url).hostname)
-        if kind is None:
-            # iBUYPOWER remains one bounded catalog job; product-page access failed.
-            return None
-        if kind == "hp" and not self.client.hp_reader:
-            self.pause_hp()
-            return None
-        if kind == "hp" and self.client.hp_reader:
-            from .hp_browser import hp_page_url
-            try:
-                hp_page_url(url)
-            except ValueError:
-                message = "HP browser: custom/configuration-selector URLs remain unverified"
-                if message not in self.problems:
-                    self.problems.append(message)
-                return None
-        key = job_id(kind, url)
-        count = sum(j["kind"] == kind for j in self.jobs.values())
-        if key not in self.jobs and count >= self.cfg["max_products_per_retailer"]:
-            message = f"{kind}: discovery cap reached; expand reviewed product limit for full coverage"
-            if message not in self.problems:
-                self.problems.append(message)
-            return None
-        interval = max(300, self.cfg["retailer_seconds"]) if kind == "hp" and self.client.hp_reader else self.cfg["retailer_seconds"]
-        if kind in ("cyberpowerpc", "skytech"):
-            interval = max(600, interval)
-        if kind == "newegg":
-            interval = max(NEWEGG_SECONDS, interval)
-        return self.add_job(kind, interval, url)
-
-    def pause_hp(self):
-        if HP_PAUSED not in self.problems:
-            self.problems.append(HP_PAUSED)
+        """Retired complete-PC discovery hook; saved/community URLs stay inert."""
+        return None
 
     def process(self, key: str, batch: Batch):
         now = datetime.now(timezone.utc)
-        listings = []
-        for listing in batch.listings:
-            offer = community_offer(listing) if listing.source.startswith(("reddit", "slickdeals")) else None
-            if offer:
-                listings.append(offer_listing(offer))
-                try:
-                    self.add_product(offer.url)
-                except ValueError:
-                    pass
-            else:
-                listings.append(listing)
-        listings.extend(offer_listing(offer) for offer in batch.offers)
-        for url in batch.discovered:
-            self.add_product(url)
-        plugin = MonitorHardwarePlugin(ROOT / "config/hardware.toml", self.state_root, daily=False, now=now)
+        plugin = PartsHardwarePlugin(ROOT / "config/hardware.toml", self.state_root, daily=False, now=now)
+        # Retired retailer offers and discovered PCs cannot enter shopping exports,
+        # history, schedules or notification receipts. The component matcher also
+        # rejects complete machines in broad community/legacy feeds.
+        from alerters.techscout.scope import allowed_title
+        listings = [listing for listing in batch.listings
+                    if not listing.extra.get("prebuilt_offer") and allowed_title(listing.title)]
+        batch = Batch(listings=listings, notes=list(batch.notes))
         plugin.sources = (type("FetchedBatch", (), {"name": key, "fetch": lambda _: FetchResult(listings)})(),)
-        # Fresh comparable loose-GPU evidence survives separate retailer/feed jobs,
-        # but expires after 20 minutes. It is never used as PC price history.
-        benchmark = [item for stamp, item in self.benchmarks if time.time() - stamp <= 1200]
-        original_promote = plugin.promote
-        def promote(items):
-            selected = {item.key for item in items}
-            return [item for item in original_promote(items + [b for b in benchmark if b.key not in selected]) if item.key in selected]
-        plugin.promote = promote
         state = AlertState(plugin.state_dir / "alerts.json", plugin.normalise_key)
         preview = self.runtime / "previews" / f"{key}.html"
         controls, control_error = read_controls(self.controls_path)
@@ -252,24 +178,8 @@ class Monitor:
                     self.shopping.record_activity(decisions)
                 except (OSError, ValueError, TypeError):
                     LOG.warning("Shopping activity could not be exported")
-        for item in result.assessments:
-            if item.loggable and not item.detail.is_system and not item.detail.is_bundle:
-                self.benchmarks = [(stamp, old) for stamp, old in self.benchmarks if old.key != item.key and time.time() - stamp <= 1200]
-                self.benchmarks.append((time.time(), item))
         self.cache[key] = (time.time(), listings)
-        # Successful exact retailer verification resolves any earlier community
-        # start recheck without modifying the original announcement's receipt.
-        for offer in batch.offers:
-            if offer.confirmed and offer.sale_status(now) == "live":
-                for row in plugin.offers.rows.values():
-                    if row["offer"].get("announcement") and row["offer"].get("url") == offer.url:
-                        row["confirmed_offer_key"] = offer.key
-                if not self.dry_run:
-                    plugin.offers.save()
         notes = list(batch.notes)
-        for offer in batch.offers:
-            if not offer.confirmed or offer.total(now) is None:
-                notes.append(LISTING_UNVERIFIED)
         self.jobs[key]["listing_notes"] = list(dict.fromkeys(notes))
         self.results.append({"job": key, "offers": len(batch.offers), "listings": len(listings),
                              "assessed": len(result.assessments), "notes": notes + result.problems})
@@ -280,24 +190,8 @@ class Monitor:
         # original confirmation/stock fields still prevent inventory/deal alerts.
 
     def recheck_starts(self):
-        store = OfferState(self.state_root / "hardware/US")
-        for identity, offer in store.due_announcements(datetime.now(timezone.utc)):
-            try:
-                key = self.add_product(offer.url)
-            except ValueError:
-                # Unknown retailer: recheck community feed, never claim confirmation.
-                for job in self.jobs.values():
-                    if job["kind"] in ("reddit", "slickdeals"):
-                        job["next"] = min(job["next"], time.time())
-                key = None
-            if key:
-                job = self.jobs[key]
-                # Respect source failure backoff and published host Retry-After.
-                if not job["failures"]:
-                    job["next"] = min(job["next"], time.time())
-            store.rows[identity]["start_rechecked"] = datetime.now(timezone.utc).isoformat()
-        if not self.dry_run:
-            store.save()
+        # Historical PC announcements remain archival; they never create jobs.
+        return None
 
     def digest(self, now: datetime):
         hour, minute = map(int, self.cfg["digest_utc"].split(":"))
@@ -316,7 +210,7 @@ class Monitor:
         rows = [row for stamp, entries in self.cache.values() if time.time() - stamp < 1200 for row in entries]
         if not rows:
             return
-        plugin = MonitorHardwarePlugin(ROOT / "config/hardware.toml", self.state_root, daily=True, now=now)
+        plugin = PartsHardwarePlugin(ROOT / "config/hardware.toml", self.state_root, daily=True, now=now)
         plugin.sources = (type("Cached", (), {"name": "digest-cache", "fetch": lambda _: FetchResult(rows)})(),)
         state = AlertState(plugin.state_dir / "alerts.json", plugin.normalise_key)
         controls, control_error = read_controls(self.controls_path)

@@ -8,29 +8,37 @@ import re
 
 from alerters.techscout.facets import attributes
 
-CATEGORIES = {"monitor", "amazon", "desktop-memory", "computers", "tablets", "memory", "supplies"}
+CATEGORIES = {"monitor", "amazon", "parts", "monitors", "memory", "supplies"}
+LEGACY_CATEGORIES = CATEGORIES | {"desktop-memory", "computers", "tablets"}
+RETIRED_KINDS = {"Desktops", "Laptops", "Tablets"}
 FACETS = {"kind", "gpu", "ram", "cpu", "storage", "condition", "memory_layout"}
 
 
 def defaults():
-    return {"version": 1, "mode": "all", "watches": []}
+    return {"version": 2, "mode": "all", "watches": []}
 
 
 def validate(data):
-    if not isinstance(data, dict) or set(data) != {"version", "mode", "watches"} or data["version"] != 1 or data["mode"] not in ("all", "watches", "paused"):
+    if not isinstance(data, dict) or set(data) != {"version", "mode", "watches"} or data["version"] not in (1, 2) or data["mode"] not in ("all", "watches", "paused"):
         raise ValueError("Invalid watch settings")
     if not isinstance(data["watches"], list) or len(data["watches"]) > 40:
         raise ValueError("At most 40 watches are supported")
+    legacy = data["version"] == 1
     ids = set()
+    migrated = []
     for watch in data["watches"]:
-        if not isinstance(watch, dict) or set(watch) != {"id", "name", "enabled", "category", "filters", "source", "budget", "reuse", "product_id"}:
+        fields = {"id", "name", "enabled", "category", "filters", "source", "budget", "product_id"}
+        if legacy:
+            fields.add("reuse")
+        if not isinstance(watch, dict) or set(watch) != fields:
             raise ValueError("Invalid watch fields")
         if not isinstance(watch["id"], str) or not re.fullmatch(r"[a-f0-9]{16,32}", watch["id"]) or watch["id"] in ids:
             raise ValueError("Invalid watch ID")
         ids.add(watch["id"])
         if not isinstance(watch["name"], str) or not 1 <= len(watch["name"].strip()) <= 80 or any(ord(c) < 32 for c in watch["name"]):
             raise ValueError("Watch name must have 1–80 characters")
-        if type(watch["enabled"]) is not bool or type(watch["reuse"]) is not bool or watch["category"] not in CATEGORIES:
+        if (type(watch["enabled"]) is not bool or legacy and type(watch["reuse"]) is not bool
+                or watch["category"] not in (LEGACY_CATEGORIES if legacy else CATEGORIES)):
             raise ValueError("Invalid watch preference")
         if not isinstance(watch["filters"], dict) or set(watch["filters"]) - FACETS or any(not isinstance(v, str) or not 1 <= len(v) <= 100 for v in watch["filters"].values()):
             raise ValueError("Invalid watch filters")
@@ -41,7 +49,14 @@ def validate(data):
             raise ValueError("Invalid maximum price")
         if not isinstance(watch["product_id"], str) or watch["product_id"] and not re.fullmatch(r"(?:\d{1,20}|[a-z-]+:[a-f0-9]{24})", watch["product_id"]):
             raise ValueError("Invalid product")
-    return data
+        current = {key: value for key, value in watch.items() if key != "reuse"}
+        # Old PC goals must not silently turn into broad component purchases.
+        retired = (watch["category"] in {"desktop-memory", "computers", "tablets"}
+                   or watch["filters"].get("kind") in RETIRED_KINDS)
+        if retired:
+            current.update(category="parts", enabled=False)
+        migrated.append(current)
+    return {**data, "version": 2, "watches": migrated}
 
 
 def read_controls(path):
@@ -52,7 +67,7 @@ def read_controls(path):
             raise ValueError()
         return validate(json.loads(path.read_text(encoding="utf-8-sig"))), None
     except (OSError, ValueError, TypeError, KeyError):
-        return {"version": 1, "mode": "paused", "watches": []}, "Watch settings could not be read; notifications are paused until repaired."
+        return {"version": 2, "mode": "paused", "watches": []}, "Watch settings could not be read; notifications are paused until repaired."
 
 
 def product_identity(item):
@@ -76,14 +91,11 @@ def matches(watch, item, plugin):
         return False
     if watch["budget"] is not None and (item.price <= 0 or detail.total_price > watch["budget"]):
         return False
-    fit = getattr(plugin, "memory_fits", {}).get(item.key)
-    facets = attributes({"title": detail.title, "condition": detail.condition,
-                         "ram": getattr(fit, "installed_gb", None)})
+    facets = attributes({"title": detail.title, "condition": detail.condition})
+    if detail.is_system or facets["kind"] in RETIRED_KINDS:
+        return False
     if any(facets[key] != value for key, value in watch["filters"].items()):
         return False
-    if watch["reuse"] and facets["kind"] == "Desktops":
-        if not fit or not fit.eligible:
-            return False
     return True
 
 

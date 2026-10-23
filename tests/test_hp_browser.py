@@ -107,7 +107,7 @@ def test_windowless_monitor_uses_pipe_capable_worker(monkeypatch):
     assert worker_python() == str(path.with_name("python.exe"))
 
 
-def test_monitor_opt_in_is_explicit_preserves_backoff_and_bounds_cadence(tmp_path, monkeypatch):
+def test_retired_browser_opt_in_cannot_restart_desktop_polling(tmp_path, monkeypatch):
     from alerters.hardware.monitor import Monitor
     monkeypatch.setattr("alerters.hardware.monitor.channels", lambda **_: ())
     root = Path(__file__).resolve().parents[1]
@@ -119,13 +119,13 @@ def test_monitor_opt_in_is_explicit_preserves_backoff_and_bounds_cadence(tmp_pat
     assert default.client.hp_reader is None
     default.client.host("www.hp.com")["blocked_until"] = 9999999999
     default.write_health()
-    config.write_text(original.replace("enabled = false", "enabled = true"))
+    config.write_text(original + '\n[hp_browser]\nenabled = true\nchannel = "msedge"\n')
     enabled = Monitor(config, tmp_path / "state", runtime, dry_run=False)
-    assert enabled.client.hp_reader.channel == "msedge"
+    assert enabled.client.hp_reader is None
     assert enabled.client.host("www.hp.com")["blocked_until"] == 9999999999
-    assert all(job["interval"] >= 300 for job in enabled.jobs.values() if job["kind"] == "hp")
+    assert not any(job["kind"] in ("hp", "discover-hp") for job in enabled.jobs.values())
     assert enabled.add_product("https://www.hp.com/us-en/shop/custom/omen-example") is None
-    assert any("custom/configuration" in problem for problem in enabled.problems)
+    assert not any("HP" in problem for problem in enabled.problems)
 
 
 def transport(monkeypatch, *, policy="User-agent: *\nAllow: /", reader=None):

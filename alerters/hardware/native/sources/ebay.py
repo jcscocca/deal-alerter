@@ -152,6 +152,7 @@ class EbaySource:
         price_floors: dict[str, float] | None = None,
         memory_limits: dict[str, float] | None = None,
         card_limits: dict[str, float] | None = None,
+        gpu_limits: dict[str, float] | None = None,
         display_limits: dict[str, float] | None = None,
     ) -> None:
         self.name = "ebay"
@@ -163,6 +164,9 @@ class EbaySource:
         self.price_floors = price_floors or {}
         self.memory_limits = memory_limits or {}
         self.card_limits = card_limits or {}
+        # Native GPU hunts retain their own condition-aware price judgments;
+        # these ceilings only bound exact-item availability requests.
+        self.gpu_limits = gpu_limits or {}
         self.display_limits = display_limits or {}
         self.client_id = client_id
         self.client_secret = client_secret
@@ -229,7 +233,7 @@ class EbaySource:
         return self._verify_memory_stock(listings)
 
     def _verify_memory_stock(self, listings: list[Listing]) -> list[Listing]:
-        """Verify explicit memory/card/display watches against exact-item evidence.
+        """Verify watched parts/displays against exact-item evidence.
 
         Bound extra requests to affordable watched modules, with one lookup per
         item per fetch. Neither errors nor the request limit imply availability.
@@ -246,14 +250,14 @@ class EbaySource:
                 from ...displays import specifications
                 if (display := specifications(title)) and display.model in self.display_limits:
                     return display.model
-            if not self.card_limits:
+            if not (self.card_limits or self.gpu_limits):
                 return None
             from ..match import match
             # Match the advertised title just as HardwarePlugin.prepare does.
             # Bodies may veto absence, but instructions/accessories included
             # with a real card must not be interpreted as the sale's title.
             result = match(title, body=body)
-            if (not result.junk and result.part and result.part.key in self.card_limits
+            if (not result.junk and result.part and result.part.key in (self.card_limits | self.gpu_limits)
                     and result.quantity == 1 and not result.is_system and not result.is_bundle):
                 return result.part.key
             return None
@@ -266,7 +270,7 @@ class EbaySource:
             shopping = {**listing.extra.get("shopping", {}), "available": None,
                         "stock": "unknown", "availability_note": "Item stock has not been verified"}
             listing = replace(listing, extra={**listing.extra, "shopping": shopping})
-            limit = self.memory_limits.get(key, self.card_limits.get(key, self.display_limits.get(key)))
+            limit = self.memory_limits.get(key, self.card_limits.get(key, self.gpu_limits.get(key, self.display_limits.get(key))))
             if (limit is None or listing.price is None or not 0 < listing.price <= limit
                     or listing.multi_variant or listing.seller_risk != "low"
                     or listing.condition_hint not in ("new", "open_box", "used", "refurbished")):

@@ -62,24 +62,42 @@ def storage(title):
 
 
 def product_type(title):
+    from .scope import subject_title
+    title = subject_title(title)
     if standalone_memory(title) or sodimm_configuration(title):
         return "Memory"
-    if display_specifications(title):
+    if re.search(r"\bmonitor\s+(?:arm|stand|mount|power\s+(?:supply|adapter))\b", title, re.I):
+        return "Accessories"
+    if (display_specifications(title)
+            or re.search(r"\b\d{2}(?:\.\d)?[- ]?(?:inch|in)\b.*\bmonitor\b", title, re.I)
+            and not re.search(r"\b(?:dock|docking|dual\s+monitor|monitor\s+(?:arm|stand|mount))\b", title, re.I)):
         return "Monitors"
+    # Form-factor words describe individual products too. They must not turn
+    # desktop memory, a desktop CPU or a laptop dock into a complete computer.
     for label, pattern in (
-        ("Accessories", r"\b(?:backpack|sleeve|case for|cover for|bag|insect bite|screen protector)\b|\b(?:iPad|tablet|laptop)\s+(?:case|cover|stand)\b"),
+        ("Memory", r"\b(?:desktop|laptop|PC)\s+(?:RAM|memory)\b|\b(?:SO[- ]?DIMM|UDIMM)\b"),
+        ("Graphics cards", r"\bdesktop\s+(?:(?:graphics|video)\s+card|GPU)\b"),
+        ("Components", r"\bdesktop\s+(?:CPU|processor|power supply|PSU|cooler)\b|\b(?:PC|ATX|ITX|micro[- ]?ATX)\s+case\b"),
+        ("Storage", r"\b(?:desktop|laptop|PC)\s+(?:NVMe\s+)?SSD\b"),
+        ("Monitors", r"\bdesktop\s+monitor\b"),
+    ):
+        if re.search(pattern, title, re.I):
+            return label
+    for label, pattern in (
+        ("Accessories", r"\b(?:backpack|sleeve|case for|cover for|bag|insect bite|screen protector)\b|\b(?:iPad|tablet|laptop|MacBook|Galaxy Tab(?:\s+(?!(?:with|includes?|including)\b)\w+){0,3})\s+(?:keyboard\s+cover|case|cover|stand)\b"),
         ("Docks & hubs", r"\b(?:dock|docking|hub|KVM)\b"),
         ("Tablets", r"\b(?:iPad|tablet|Galaxy Tab)\b"),
         ("Laptops", r"\b(?:laptop|notebook|MacBook)\b"),
         ("Desktops", r"\b(?:desktop|gaming (?:PC|computer)|mini PC|Mac mini|Mac Studio|Mac Pro|workstation PC|AI workstation)\b"),
         ("Monitors", r"\b(?:monitor|UltraWide|display)\b"),
-        ("Storage", r"\b(?:SSD|hard drive|flash drive|microSD|NAS)\b"),
+        ("Storage", r"\b(?:SSD|NVMe|hard drive|flash drive|microSD|SD card|NAS)\b"),
+        ("Components", r"\b(?:motherboard|PSU|power supply|CPU|processor|cooler|Ryzen|Threadripper|PC case|computer case)\b|\b(?:Intel\s+)?Core\s+(?:i[3579]|Ultra)\b"),
         ("Graphics cards", r"\b(?:GDDR\d|GPU|graphics card|GeForce|Radeon|RTX|GTX)\b"),
-        ("Components", r"\b(?:motherboard|PSU|power supply|CPU|processor|cooler)\b"),
         ("Memory", r"\b(?:DDR[345]|DIMM|memory kit|RAM)\b"),
-        ("Keyboards & mice", r"\b(?:keyboard|mouse|trackpad)\b"),
-        ("Audio", r"\b(?:headphone|headphones|earbuds|speaker|headset|microphone)\b"),
-        ("Networking", r"\b(?:router|modem|mesh|network switch)\b"),
+        ("Keyboards & mice", r"\b(?:keyboard|mouse|mice|trackpad)\b"),
+        ("Audio", r"\b(?:headphone|headphones|earbuds|AirPods|speaker|headset|microphone)\b"),
+        ("Networking", r"\b(?:router|modem|mesh|network switch|Wi[- ]?Fi|Ethernet)\b"),
+        ("Accessories", r"\b(?:USB|Thunderbolt|charger|charging|power bank|power strip|webcam)\b"),
     ):
         if re.search(pattern, title, re.I):
             return label
@@ -98,6 +116,8 @@ def attributes(row):
     if condition in ("", "Not published", "Unknown", "Not established"):
         condition = UNKNOWN
     kind = product_type(row.get("product_name") or row["title"])
+    if kind == "Other tech":
+        kind = product_type(row["title"])
     if row.get("is_system") is True and kind not in ("Laptops", "Tablets"):
         kind = "Desktops"
     return {

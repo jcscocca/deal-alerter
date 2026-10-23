@@ -26,30 +26,30 @@ nav { display:flex;flex-wrap:wrap;gap:7px;margin-bottom:22px; }
 nav button { font-size:13px; }
 .compact-category { display:none; }
 .heading-row { display:flex;align-items:center;justify-content:space-between;gap:18px; }
-.heading-row>button { flex-shrink:0; }
+.heading-actions { display:flex;gap:8px;flex-shrink:0; }
+.heading-actions button { font-size:13px; }
 .status { margin:14px 0;display:flex;flex-wrap:wrap;gap:9px;align-items:center;font-size:12px;color:var(--muted); }
 .status a { padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:var(--paper);text-decoration:none; }
 #notice { padding:12px;border-radius:8px;background:var(--warn-bg);color:var(--warn);margin:12px 0; }
 #filters { padding:13px 16px;border:1px solid var(--line);border-radius:12px;background:var(--paper);scroll-margin-top:80px; }
 #filters>summary { font-size:14px; }
+#filter-current-summary {font-weight:400;margin-left:10px;}
 .filter-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px; }
 .filter-grid label { display:grid;gap:3px;min-width:0;font-size:12px;color:var(--muted); }
 .filter-grid select,.filter-grid input { width:100%;min-width:0;font-size:13px; }
 .filter-footer { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;font-size:13px; }
 .filter-footer button { font-size:12px; }
-#reuse-option { display:flex;align-items:center;gap:8px; }
 input[type=checkbox] { accent-color:var(--accent);width:17px;height:17px;flex-shrink:0; }
 #filter-summary { margin:9px 0 0; }
-.active-bar { position:sticky;top:0;z-index:2;background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line); }
+.active-bar {display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
 #filter-chips { display:flex;gap:6px;flex-wrap:wrap; }
 .chip { font-size:12px;padding:5px 9px;background:var(--soft);border-color:var(--line);color:var(--accent); }
-#edit-filters { font-size:12px;white-space:nowrap; }
 .toolbar { display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:15px; }
 .view-switch { display:flex;gap:6px; }
 .view-switch button,.sort-label { font-size:13px; }
 .sort-label { display:flex;align-items:center;gap:8px;color:var(--muted); }
 .sort-label select { max-width:250px; }
-#ranking-note { margin:10px 0 18px; }
+#ranking-note { margin:10px 0; }
 .result-section { scroll-margin-top:95px;margin:20px 0 28px; }
 .section-heading { display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:12px; }
 .eyebrow { display:block;font-size:10px;letter-spacing:.12em;font-weight:700;color:var(--accent);margin-bottom:4px; }
@@ -62,7 +62,7 @@ input[type=checkbox] { accent-color:var(--accent);width:17px;height:17px;flex-sh
 .deal-main { min-width:0; }
 .card-meta { display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--muted);margin-bottom:8px; }
 .badge { border:1px solid var(--line);border-radius:5px;display:inline-block;padding:3px 7px;font-size:11px; }
-.badge.current,.badge.preference { background:var(--soft);color:var(--accent); }
+.badge.current { background:var(--soft);color:var(--accent); }
 .badge.review,.badge.warning { background:var(--warn-bg);color:var(--warn);border-color:transparent; }
 .badge.unavailable { background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn);font-weight:650; }
 .verdict-deal { --verdict-text:light-dark(#166534,#86efac);--verdict-bg:light-dark(#dcfce7,#173524); }
@@ -81,7 +81,7 @@ input[type=checkbox] { accent-color:var(--accent);width:17px;height:17px;flex-sh
 .spec-strip { display:flex;flex-wrap:wrap;gap:8px 16px;margin:10px 0;font-size:13px;font-weight:600; }
 .spec-strip small { display:block;font-size:10px;font-weight:400;color:var(--muted); }
 .concern { color:var(--warn);font-size:12px; }
-.preference .concern,.differences { color:var(--accent); }
+.differences { color:var(--accent); }
 .differences { background:var(--soft);padding:7px 10px;border-radius:6px;font-size:12px;font-weight:600; }
 .price { text-align:right;font-size:21px;font-weight:650;font-variant-numeric:tabular-nums;max-width:230px; }
 .price small { display:block;font-size:11px;line-height:1.4;color:var(--muted);font-weight:400;margin-top:3px; }
@@ -111,8 +111,8 @@ footer { color:var(--muted);font-size:11px;margin-top:24px; }
   .compact-category { display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:16px; }
   .compact-category select { min-width:0;flex:1;font-size:16px; }
   h1 { font-size:22px; }
-  .heading-row { gap:12px; }
-  .heading-row>button { max-width:140px;font-size:12px; }
+  .heading-row { gap:12px;align-items:stretch;flex-direction:column; }
+  .heading-actions button { flex:1; }
   .filter-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .filter-grid input,.filter-grid select { font-size:16px; }
   .filter-footer { align-items:flex-start; }
@@ -120,7 +120,6 @@ footer { color:var(--muted);font-size:11px;margin-top:24px; }
   .toolbar { align-items:stretch; }
   .sort-label { width:100%; }
   .sort-label select { flex:1;max-width:none; }
-  .active-bar { align-items:flex-start; }
   .chip { max-width:230px;text-align:left;overflow-wrap:anywhere; }
   .deal { grid-template-columns:minmax(0,1fr);padding:14px; }
   .deal>.price { grid-row:2;text-align:left;max-width:none; }
@@ -138,10 +137,7 @@ footer { color:var(--muted);font-size:11px;margin-top:24px; }
 .watch-card h2 {font-size:18px;}
 .deal-judgment {margin:10px 0;padding-top:10px;border-top:1px solid var(--line);}
 .deal-judgment p {margin:6px 0;}
-.price-evidence {margin:10px 0;padding-top:10px;border-top:1px solid var(--line);}
-.price-evidence p {margin:6px 0;}
-.price-evidence h4 {margin:16px 0 8px;}
-.peer-offer {padding:10px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere;}
+.target-note {color:var(--warn);}
 .focused-deal {outline:3px solid var(--accent);outline-offset:3px;}
 dialog {color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:12px;width:min(480px,90vw);padding:24px;}
 dialog::backdrop {background:#10274c80;}

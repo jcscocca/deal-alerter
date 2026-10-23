@@ -5,6 +5,24 @@ from dealcore.verdict import qualifies
 from .shopping_controls import product_identity
 
 
+def standout_basis(plugin, item, eligible):
+    """Explain independent price evidence, never promote a budget by itself."""
+    if not eligible or item.detail.is_system:
+        return ""
+    if item.key in getattr(plugin, "display_watches", {}):
+        from .displays import PRICES, DISCOUNT
+        display, community = plugin.display_watches[item.key]
+        quote = PRICES.get(display.model)
+        if not community and quote and item.price <= quote["benchmark"] * (1 - float(DISCOUNT) / 100):
+            discount = (1 - item.price / quote["benchmark"]) * 100
+            return (f"{discount:.1f}% below {display.model}'s recorded retail quote of "
+                    f"${quote['benchmark']:,.2f}, checked {quote['checked_on']}. "
+                    "A dated exact-model quote, not a sold-market valuation.")
+    if item.verdict >= plugin.bands.EXCEPTIONAL and item.detail.reference_trusted:
+        return item.detail.reason
+    return ""
+
+
 def judgments(plugin, result, options, receipts, now):
     records = {}
     for item in result.assessments:
@@ -19,6 +37,9 @@ def judgments(plugin, result, options, receipts, now):
                              "reason": card.reason[:1200], "headline": card.headline[:500],
                              "facts": [v[:1200] for v in card.facts[:12]], "warnings": [v[:1200] for v in card.warnings[:8]],
                              "eligible": eligible, "target_hit": bool(detail.target_hit),
+                             "price_notice": (item.key in getattr(plugin, "card_price_watches", {})
+                                              or item.key in getattr(plugin, "sodimm_watches", {})),
+                             "standout_basis": standout_basis(plugin, item, eligible),
                              "target": detail.target_price, "price": detail.total_price if item.price > 0 else None,
                              "checked_at": now.isoformat(), "deliveries": deliveries,
                              "decisions": [{k: d[k] for k in ("channel", "status", "at")}

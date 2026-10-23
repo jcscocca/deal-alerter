@@ -16,20 +16,18 @@ from urllib.parse import parse_qs, urlsplit
 
 from dealcore.state import atomic_write
 from alerters.hardware.prebuilt import gpu_model
-from .research import PRESETS, capacity_mismatch, cpu_model
+from .research import PRESETS, cpu_model
 from .monitor_bridge import read_monitor, stock_state
 from .deal_overlap import combine_leads
 from .facets import attributes
 from .integration import Workspace
-from .price_history import PriceEvidence, walmart_key
-from .prebuilt_value import attach_values
-from alerters.hardware.prebuilt_specs import public_specs
+from .scope import allowed_title, in_scope, categories as product_categories
+from .facets import product_type
 
 FRESH_SECONDS = 15 * 60
 ASSETS = Path(__file__).with_name("web")
-CATEGORIES = {"desktop-memory": "Desktops & memory", "tablets": "Tablets",
-              "computers": "Computers", "supplies": "Tech supplies", "memory": "Memory",
-              "monitor": "All deals", "amazon": "Amazon deals"}
+CATEGORIES = {"parts": "Computer parts", "monitors": "Monitors", "memory": "Memory",
+              "supplies": "Peripherals", "monitor": "All deals", "amazon": "Amazon reports"}
 
 
 def amount(value):
@@ -42,6 +40,19 @@ def timestamp(value):
         return result.timestamp() if result.tzinfo is not None else None
     except (ValueError, TypeError, OverflowError):
         return None
+
+
+def deal_priority(row, now):
+    judgment = row.get("judgment") or {}
+    if (row.get("lead") or not row.get("available") or row.get("stock") != "in_stock"
+            or row.get("reasons") or not (row.get("expires_at") or 0) > now
+            or not judgment.get("eligible")):
+        return 0
+    if judgment.get("standout_basis"):
+        return 5 if judgment.get("verdict") == "GRAIL" else 4
+    if judgment.get("price_notice") or "PRICE WATCH" in judgment.get("badge", ""):
+        return 0
+    return {"GRAIL": 5, "EXCEPTIONAL": 4, "STRONG": 3, "GOOD": 2}.get(judgment.get("verdict"), 0)
 
 
 def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None) -> dict:
@@ -77,39 +88,29 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
                            "total": c.get("total") if type(c.get("total")) is int else None}
                           for c in data.get("coverage", []) if isinstance(c, dict)][:4] if isinstance(data.get("coverage"), list) else []
     groups, seen = {}, set()
-    history = PriceEvidence(directory / "walmart-prebuilt-observations.json")
     for raw in data["products"]:
         if not isinstance(raw, dict):
             continue
         item_id, title = raw.get("item_id"), raw.get("title")
-        if not isinstance(item_id, str) or not item_id.isascii() or not item_id.isdigit() or len(item_id) > 20 or item_id in seen or not isinstance(title, str) or not title:
+        if not isinstance(item_id, str) or not item_id.isascii() or not item_id.isdigit() or len(item_id) > 20 or item_id in seen or not isinstance(title, str) or not allowed_title(title) or category not in product_categories(title):
             continue
         seen.add(item_id)
         price, shipping = amount(raw.get("price")), amount(raw.get("shipping"))
         total = float(Decimal(str(price)) + Decimal(str(shipping))) if price is not None and shipping is not None else None
-        fit = raw.get("memory_fit") if isinstance(raw.get("memory_fit"), dict) else {}
         model_gpu = gpu_model(title)
-        ram = fit.get("installed_gb") if fit.get("installed_gb") in (32, 64) else None
         condition = raw.get("condition") if isinstance(raw.get("condition"), str) else "Not published"
         seller = raw.get("seller") if isinstance(raw.get("seller"), str) else "Not published"
-        layout = fit.get("status") == "POSSIBLE REUSE"
         stock = stock_state(raw.get("stock"))
         warnings = [w for w in raw.get("warnings", []) if isinstance(w, str)] if isinstance(raw.get("warnings"), list) else []
         queries = [q for q in raw.get("queries", []) if isinstance(q, str)] if isinstance(raw.get("queries"), list) else []
-        key = raw.get("comparison_key")
-        desktop_key = isinstance(key, list) and len(key) == 6 and key[0] == "desktop"
         row = {"id": item_id, "title": title, "url": f"https://www.walmart.com/ip/{item_id}",
-               "price_history": history.summary(walmart_key(raw, data.get("zip_code")), datetime.fromtimestamp(now, timezone.utc).isoformat()),
-               "build_specs": {**public_specs(raw.get("specs")), "Model": raw.get("model") if isinstance(raw.get("model"), str) else ""},
                "seller": seller, "condition": condition, "price": price, "shipping": shipping,
                "total": total, "available": raw.get("available") is True and stock not in ("out_of_stock", "preorder"),
                "stock": stock, "gpu": model_gpu,
-               "ram": ram, "potential": fit.get("potential_gb") if fit.get("potential_gb") in (96, 128) else None,
-               "fit": fit.get("status") if isinstance(fit.get("status"), str) else "Not assessed",
-               "fit_summary": fit.get("summary") if isinstance(fit.get("summary"), str) else "",
+               "ram": None, "is_system": False, "product_group": product_type(title),
                "cpu": cpu_model(title) or "Not established",
-               "storage": str(key[4]) if desktop_key else "Not established",
-               "warnings": warnings, "layout_documented": layout, "rank": None, "reasons": []}
+               "storage": "Not established",
+               "warnings": warnings, "rank": None, "reasons": []}
         if not fresh:
             row["reasons"].append("Last check failed" if failed_at is not None and checked is not None and checked <= failed_at else "Availability needs a new check")
         if not row["available"]:
@@ -120,23 +121,17 @@ def walmart_snapshot(directory: Path, category: str, *, now=None, failed_at=None
             row["reasons"].append("Shipping unknown")
         if not seller.strip() or seller == "Not published" or not condition.strip() or condition == "Not published":
             row["reasons"].append("Seller or condition unknown")
-        if capacity_mismatch(category, title, queries):
-            row["reasons"].append("Storage variant differs from the search")
         row["verification_reasons"] = list(row["reasons"])
-        row["preference_reasons"] = []
-        if category == "desktop-memory" and (not model_gpu or not fit or fit.get("eligible") is not True or ram is None):
-            row["preference_reasons"].append(row["fit_summary"] or "Desktop configuration needs verification / owned-kit reference")
-            row["reasons"] += row["preference_reasons"]
         if row["reasons"]:
             result["held"].append(row)
         else:
-            group = f"RTX {model_gpu} · {ram}GB · {condition}" if category == "desktop-memory" else f"{condition} · price order"
+            group = f"{product_type(title)} · {condition}"
             groups.setdefault(group, []).append(row)
     for name, rows in sorted(groups.items()):
-        rows.sort(key=lambda row: (not row["layout_documented"] if category == "desktop-memory" else False, row["total"], row["id"]))
+        rows.sort(key=lambda row: (row["total"], row["id"]))
         for index, row in enumerate(rows, 1):
             row["rank"] = index
-            row["why"] = ("Documented RAM layout first; " if row["layout_documented"] else "RAM layout still needs verification; ") + "ordered by total within this evidence level and GPU/RAM group." if category == "desktop-memory" else "Ordered by known total. Different models are not equivalent in performance or value."
+            row["why"] = "Ordered by known total. Different models are not equivalent in performance or value."
         result["groups"].append({"name": name, "rows": rows})
     result["count"] = len(seen)
     return result
@@ -189,7 +184,7 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
         rows += feeds["rows"]
         result["sources"] += feeds["sources"]
     result["problems"] += monitor["problems"]
-    attach_values(rows, now)
+    rows = [row for row in rows if in_scope(row)]
     result["monitor_connected"] = bool(monitor["sources"])
     result["groups"], result["held"], result["leads"] = [], [], []
     groups = {}
@@ -199,17 +194,13 @@ def snapshot(directory: Path, category: str, *, now=None, failed_at=None, monito
         elif row["reasons"]:
             result["held"].append(row)
         else:
-            name = (f"RTX {row['gpu']} · {row['ram']}GB · {row['condition']}" if category == "desktop-memory" else
-                    f"{row.get('product_group', 'Products')} · {row['condition']} · price order" if category == "monitor" else
-                    f"{row['condition']} · price order")
+            name = f"{row.get('product_group') or product_type(row['title'])} · {row['condition']}"
             groups.setdefault(name, []).append(row)
     for name, candidates in sorted(groups.items()):
-        candidates.sort(key=lambda row: (not row["layout_documented"] if category == "desktop-memory" else False,
-                                         row["total"], row["id"]))
+        candidates.sort(key=lambda row: (-deal_priority(row, now), row["total"], row["id"]))
         for rank, row in enumerate(candidates, 1):
             row["rank"] = rank
-            row["why"] = ("Documented RAM layout first, then known total within this GPU/RAM/condition group."
-                          if category == "desktop-memory" else "Known total within this group; unlike models are not equivalent in performance or value.")
+            row["why"] = "Current rated deal evidence first, then known total. A target price alone does not establish value."
         result["groups"].append({"name": name, "rows": candidates})
     result["report_count"] = len(result["leads"])
     result["leads"] = combine_leads(result["leads"])
@@ -326,7 +317,7 @@ def create_server(dashboard: Dashboard, port=8768):
                 return self.send(403, {"error": "Local origin required"})
             parsed = urlsplit(self.path)
             if parsed.path == "/api/state":
-                category = parse_qs(parsed.query).get("category", ["desktop-memory"])[0]
+                category = parse_qs(parsed.query).get("category", ["monitor"])[0]
                 if category not in CATEGORIES:
                     return self.send(400, {"error": "Unknown category"})
                 return self.send(200, dashboard.state(category))

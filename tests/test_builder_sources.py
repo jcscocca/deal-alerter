@@ -274,29 +274,22 @@ def test_ibuypower_conflicting_catalog_rows_are_not_silently_overwritten():
         parse_ibuypower_catalog(ibp_page(f), NOW)
 
 
-def test_new_source_jobs_preserve_config_limits_and_restart(tmp_path, monkeypatch):
+def test_builder_jobs_are_retired_and_never_restored(tmp_path, monkeypatch):
     from alerters.hardware import monitor as module
     monkeypatch.setattr(module, "channels", lambda **_: ())
     mon = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", tmp_path / "runtime", dry_run=False)
-    key = mon.add_product(CP_URL)
-    mon.jobs[key]["next"] = 9999999999
-    mon.jobs[key]["error"] = "Backoff"
-    mon.jobs[key].update(last_fetch_success=1234, last_error_at=1500, listing_notes=["Unverified shipping"])
+    assert mon.add_product(CP_URL) is None
+    assert mon.add_product("https://www.ibuypower.com/store/rdy-y50-r02") is None
     mon.client.host("www.cyberpowerpc.com")["blocked_until"] = 9999999999
     mon.write_health()
     again = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", tmp_path / "runtime", dry_run=False)
-    assert again.jobs[key]["next"] == 9999999999 and again.jobs[key]["interval"] >= 600
-    assert again.jobs[key]["last_fetch_success"] == 1234 and again.jobs[key]["last_error_at"] == 1500
-    assert again.jobs[key]["listing_notes"] == ["Unverified shipping"]
     assert again.client.host("www.cyberpowerpc.com")["blocked_until"] == 9999999999
-    assert any(j["kind"] == "ibuypower" and j["limit"] == 64 for j in again.jobs.values())
-    assert any(j["kind"] == "discover-skytech" and j["interval"] >= 21600 for j in again.jobs.values())
-    assert mon.add_product("https://www.ibuypower.com/store/rdy-y50-r02") is None
+    assert {j["kind"] for j in again.jobs.values()} <= {"reddit", "slickdeals", "legacy"}
 
 
 @pytest.mark.parametrize("fixture_name,stock", [("skytech_prebuilt.json", "unknown"),
                                                ("skytech_unpublished.json", "out_of_stock")])
-def test_unverified_offer_is_a_successful_check_without_inventory_or_deal_promotion(tmp_path, monkeypatch, fixture_name, stock):
+def test_unverified_archival_offer_cannot_enter_active_monitor(tmp_path, monkeypatch, fixture_name, stock):
     from alerters.hardware import monitor as module
     from alerters.hardware.monitor_sources import Batch
     from dealcore.notify import Channel
@@ -307,18 +300,12 @@ def test_unverified_offer_is_a_successful_check_without_inventory_or_deal_promot
     sent = []
     monkeypatch.setattr(module, "channels", lambda **_: (Channel("ntfy", "push", sent.append),))
     mon = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", tmp_path / "runtime", dry_run=False)
-    mon.jobs.clear()
-    key = mon.add_product(offer.url)
-    monkeypatch.setattr(module, "fetch_job", lambda *_: Batch(offers=[offer]))
-    assert mon.loop(once=True) == 0
-    job = mon.jobs[key]
-    assert job["last_success"] > 0 and job["last_fetch_success"] > 0
-    assert job["error"] == "" and job["failures"] == 0
-    assert job["listing_notes"] == [module.LISTING_UNVERIFIED]
-    assert not sent
-    raw = mon.shopping.batches[key]["rows"][0]
-    assert raw["offer"]["confirmed"] is False and raw["offer"]["stock"] == stock
-    assert raw["judgment"]["eligible"] is False
+    assert mon.add_product(offer.url) is None
+    key = next(k for k, job in mon.jobs.items() if job["kind"] == "slickdeals")
+    mon.process(key, Batch(offers=[offer]))
+    assert not sent and mon.results[-1]["assessed"] == 0
+    assert mon.shopping.batches[key]["rows"] == []
+    assert not list((tmp_path / "state").rglob("prebuilt-*"))
 
 
 def test_fetch_and_dashboard_include_new_sources_without_promoting_catalog_quotes(tmp_path, monkeypatch):
@@ -332,24 +319,9 @@ def test_fetch_and_dashboard_include_new_sources_without_promoting_catalog_quote
     assert len(ibp.offers) == 1 and any("cap reached" in n for n in ibp.notes)
     runtime = tmp_path / "runtime"
     mon = Monitor(ROOT / "config/monitor.toml", tmp_path / "state", runtime, dry_run=True)
-    key = mon.add_product(CP_URL)
-    mon.process(key, cp)
-    ibp_key = next(k for k,j in mon.jobs.items() if j["kind"] == "ibuypower")
-    mon.process(ibp_key, ibp)
-    for k in (key, ibp_key):
-        mon.jobs[k]["last_success"] = datetime.now(timezone.utc).timestamp()
-    mon.write_health()
-    # Dry-run exports intentionally aren't accepted as live shopping evidence.
-    from alerters.techscout.monitor_bridge import public_row
-    from alerters.hardware.desktop_profile import DesktopProfile, DEFAULT_PROFILE
-    profile = DesktopProfile(DEFAULT_PROFILE)
-    ts = datetime.now(timezone.utc).timestamp()
-    for source,k in (("cyberpowerpc",key),("ibuypower",ibp_key)):
-        raw = mon.shopping.batches[k]["rows"][0]
-        row = public_row(raw, source, raw["offer"]["observed_at"], ts+600, [], ts, profile)
-        assert row["source"] == source
-        if source == "ibuypower":
-            assert not row["available"] and row["reasons"] and row["total"] is None
-        else:
-            assert row["available"] and row["total"] == 3109
-            assert history_view(row["price_history"], row, ts)["tracked"]
+    key = next(k for k, job in mon.jobs.items() if job["kind"] == "slickdeals")
+    for archived in (cp, ibp):
+        mon.process(key, archived)
+        assert mon.shopping.batches[key]["rows"] == []
+        assert mon.results[-1]["assessed"] == 0
+    assert not list((tmp_path / "state").rglob("prebuilt-*"))

@@ -41,6 +41,8 @@ def judgment(raw):
     return {"verdict": raw["verdict"], "level": ("PASS", "FAIR", "GOOD", "STRONG", "EXCEPTIONAL", "GRAIL").index(raw["verdict"]),
             "badge": text(raw.get("badge"), 200), "reason": text(raw.get("reason")), "headline": text(raw.get("headline"), 500),
             "eligible": raw.get("eligible") is True, "target_hit": raw.get("target_hit") is True,
+            "price_notice": raw.get("price_notice") is True,
+            "standout_basis": text(raw.get("standout_basis")),
             "target": price(raw.get("target")), "checked_at": text(raw.get("checked_at"), 50),
             "facts": [text(v) for v in raw.get("facts", [])[:12] if isinstance(v, str)] if isinstance(raw.get("facts"), list) else [],
             "warnings": [text(v) for v in raw.get("warnings", [])[:8] if isinstance(v, str)] if isinstance(raw.get("warnings"), list) else [],
@@ -87,7 +89,7 @@ class Workspace:
         data = read_public(self.runtime / "shopping-sources.json") if self.runtime else {}
         settings, error = read_controls(self.path) if self.runtime else (defaults(), "Monitor is not connected")
         return {"settings": settings, "revision": revision(settings), "error": error,
-                "supported": isinstance(data.get("capabilities"), list) and "watches" in data["capabilities"], "activity": activity(self.runtime)}
+                "supported": isinstance(data.get("capabilities"), list) and "watches-v2" in data["capabilities"], "activity": activity(self.runtime)}
 
     def update(self, body):
         if not isinstance(body, dict) or set(body) != {"revision", "settings"}:

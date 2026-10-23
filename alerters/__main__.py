@@ -15,11 +15,11 @@ from dealcore.run import run
 from dealcore.state import AlertState
 from dealcore.locking import WriterLock
 from .hardware.manual import CONDITIONS as MANUAL_CONDITIONS
-from .hardware.plugin import HardwarePlugin
+from .hardware.parts_plugin import PartsHardwarePlugin
 from .steam.plugin import SteamPlugin
 
 ROOT = Path(__file__).resolve().parents[1]
-PLUGINS = {"steam": SteamPlugin, "hardware": HardwarePlugin}
+PLUGINS = {"steam": SteamPlugin, "hardware": PartsHardwarePlugin}
 
 
 def main(argv: list[str] | None = None) -> int:
