@@ -1,5 +1,15 @@
 {
   "version": 2,
-  "updated_at": "2026-11-03T23:30:11+00:00",
-  "alerts": {}
+  "updated_at": "2026-11-04T23:46:23+00:00",
+  "alerts": {
+    "steam:1904480": {
+      "deliveries": {
+        "email": {
+          "price": 14.99,
+          "verdict": 5,
+          "alerted_at": "2026-11-04T23:46:23+00:00"
+        }
+      }
+    }
+  }
 }
